@@ -37,12 +37,17 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* Top Banner Ad Placeholder */}
-      <div className="w-full bg-slate-100 border-b border-slate-200 py-3 hidden md:block">
-        <div className="max-w-[728px] h-[90px] mx-auto bg-slate-200 border border-slate-300 border-dashed rounded flex flex-col items-center justify-center text-slate-400">
-          <span className="text-xs uppercase tracking-widest font-bold mb-1">Advertisement</span>
-          <span className="text-sm">구글 애드센스 가로형 배너 영역 (728x90)</span>
-        </div>
+      {/* Top Affiliate Banner (Replaces AdSense temporarily) */}
+      <div className="w-full bg-slate-900 border-b border-slate-800 py-0 hidden md:block">
+        <a 
+          href={isLoaded ? settings.affiliateLink : '#'} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="flex items-center justify-center gap-4 text-white hover:bg-slate-800 transition-colors py-3 group"
+        >
+          <span className="bg-indigo-500 text-xs font-bold px-2 py-0.5 rounded text-white">SPONSOR</span>
+          <span className="text-sm font-medium">요즘 대세 숏폼 편집은 캡컷으로! <strong className="text-indigo-400 group-hover:text-indigo-300">CapCut Pro 워터마크 없이 무료 체험하기 &rarr;</strong></span>
+        </a>
       </div>
 
       {/* Hero Section */}

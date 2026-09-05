@@ -3,6 +3,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { convertToGif } from '@/lib/ffmpeg';
 import { Loader2, Download, RotateCcw } from 'lucide-react';
+import { useSiteSettings } from '@/lib/settings';
 
 interface VideoEditorProps {
   videoFile: File;
@@ -10,6 +11,7 @@ interface VideoEditorProps {
 }
 
 export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
+  const { settings, isLoaded } = useSiteSettings();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoUrl, setVideoUrl] = useState<string>('');
   const [duration, setDuration] = useState(0);
@@ -163,11 +165,25 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
             </button>
           </div>
 
-          {/* Square Ad Placeholder */}
-          <div className="w-full mt-6 bg-slate-50 border border-slate-200 border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-slate-400">
-            <span className="text-xs uppercase tracking-widest font-bold mb-2">Advertisement</span>
-            <span className="text-sm text-center">구글 애드센스 사각형 배너 영역 <br/>(다운로드 후 사용자 시선 집중)</span>
-          </div>
+          {/* Square Affiliate Banner (Replaces AdSense temporarily) */}
+          <a
+            href={isLoaded ? settings.affiliateLink : '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full mt-6 bg-gradient-to-br from-indigo-900 to-slate-900 rounded-xl p-8 flex flex-col items-center justify-center text-white shadow-lg hover:shadow-xl transition-all group overflow-hidden relative"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500 opacity-20 rounded-full blur-3xl transform translate-x-10 -translate-y-10 group-hover:opacity-40 transition-opacity"></div>
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-fuchsia-500 opacity-20 rounded-full blur-2xl transform -translate-x-5 translate-y-5 group-hover:opacity-40 transition-opacity"></div>
+            
+            <span className="text-[10px] uppercase tracking-widest font-black text-indigo-300 mb-3 bg-indigo-950 px-2 py-1 rounded">SPONSOR</span>
+            <h4 className="text-xl font-extrabold text-center mb-2 leading-tight">숏폼 떡상 비결? 🚀</h4>
+            <p className="text-sm text-indigo-200 text-center mb-6 leading-relaxed">
+              요즘 대세 편집 앱 <strong>CapCut Pro</strong><br/> 워터마크 없이 프로처럼 편집하세요!
+            </p>
+            <div className="bg-white text-indigo-900 font-bold px-6 py-2.5 rounded-full text-sm group-hover:bg-indigo-50 transition-colors shadow-md">
+              무료 시작하기
+            </div>
+          </a>
         </div>
       )}
     </div>
