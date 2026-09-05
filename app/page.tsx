@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Dropzone from '@/components/Dropzone';
 import VideoEditor from '@/components/VideoEditor';
+import ShareButton from '@/components/ShareButton';
 import { Sparkles, Video, Wand2, DownloadCloud, Menu, Coffee, ExternalLink } from 'lucide-react';
 import { useSiteSettings } from '@/lib/settings';
 
@@ -60,16 +61,20 @@ export default function Home() {
           <p className="text-lg text-slate-600 mb-8 max-w-md mx-auto md:mx-0 leading-relaxed">
             무거운 프로그램 설치 없이, 브라우저에서 바로 고화질 GIF를 만들어 보세요. 내 기기의 영상을 안전하고 빠르게 변환합니다.
           </p>
-          <div className="flex items-center justify-center md:justify-start gap-4">
-            <div className="flex -space-x-2">
-              <div className="w-10 h-10 rounded-full border-2 border-white shadow-sm bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">A</div>
-              <div className="w-10 h-10 rounded-full border-2 border-white shadow-sm bg-pink-100 flex items-center justify-center text-pink-600 font-bold text-sm">B</div>
-              <div className="w-10 h-10 rounded-full border-2 border-white shadow-sm bg-green-100 flex items-center justify-center text-green-600 font-bold text-sm">C</div>
-              <div className="w-10 h-10 rounded-full border-2 border-white shadow-sm bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500">
-                +2k
+          <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex -space-x-2">
+                <div className="w-10 h-10 rounded-full border-2 border-white shadow-sm bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">A</div>
+                <div className="w-10 h-10 rounded-full border-2 border-white shadow-sm bg-pink-100 flex items-center justify-center text-pink-600 font-bold text-sm">B</div>
+                <div className="w-10 h-10 rounded-full border-2 border-white shadow-sm bg-green-100 flex items-center justify-center text-green-600 font-bold text-sm">C</div>
+                <div className="w-10 h-10 rounded-full border-2 border-white shadow-sm bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500">
+                  +2k
+                </div>
               </div>
+              <p className="text-sm font-medium text-slate-500 hidden sm:block">완전 무료!</p>
             </div>
-            <p className="text-sm font-medium text-slate-500">완전 무료! 이미 많은 사용자가 함께하고 있어요.</p>
+            <div className="hidden sm:block w-px h-8 bg-slate-200"></div>
+            <ShareButton />
           </div>
         </div>
 
