@@ -138,6 +138,7 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
           <div className="bg-green-100 text-green-700 text-sm font-bold px-3 py-1 rounded-full mb-2">
             완성되었습니다!
           </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={gifUrl} alt="Converted GIF" className="max-w-full h-auto max-h-[200px] rounded-lg shadow-md border border-slate-200" />
           
           <div className="flex flex-col sm:flex-row gap-3 w-full mt-4">

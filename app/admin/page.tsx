@@ -88,7 +88,7 @@ export default function AdminDashboard() {
                   onChange={(e) => setFormData({...formData, heroTagline: e.target.value})}
                   className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
-                <p className="text-xs text-slate-400 mt-1">예: "오늘 단 하루! 서버비 무료 이벤트", "100% 무료 GIF 메이커"</p>
+                <p className="text-xs text-slate-400 mt-1">예: &quot;오늘 단 하루! 서버비 무료 이벤트&quot;, &quot;100% 무료 GIF 메이커&quot;</p>
               </div>
             </div>
           </section>

@@ -55,7 +55,8 @@ export const convertToGif = async (
   ]);
 
   const data = await ffmpegInstance.readFile(outputName);
-  const gifBlob = new Blob([data as Uint8Array], { type: 'image/gif' });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const gifBlob = new Blob([data as any], { type: 'image/gif' });
   const gifUrl = URL.createObjectURL(gifBlob);
 
   return gifUrl;
