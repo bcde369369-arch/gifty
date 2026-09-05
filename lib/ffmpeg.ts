@@ -27,9 +27,17 @@ export const convertToGif = async (
 ): Promise<string> => {
   const ffmpegInstance = await getFFmpeg();
   
-  ffmpegInstance.on('progress', ({ progress }) => {
-    if (onProgress) onProgress(progress);
-  });
+  const progressHandler = ({ time }: { time: number }) => {
+    if (onProgress && duration > 0) {
+      let calculatedProgress = time / (duration * 1000000);
+      if (calculatedProgress < 0) calculatedProgress = 0;
+      if (calculatedProgress > 1) calculatedProgress = 1;
+      
+      onProgress(calculatedProgress);
+    }
+  };
+
+  ffmpegInstance.on('progress', progressHandler);
 
   const inputName = 'input.mp4';
   const outputName = 'output.gif';
@@ -37,9 +45,6 @@ export const convertToGif = async (
   await ffmpegInstance.writeFile(inputName, await fetchFile(videoFile));
 
   // Convert video to GIF using FFmpeg
-  // -ss: start time
-  // -t: duration
-  // -vf: scale to width 480 (keep aspect ratio), fps 10, split to create palette (better colors)
   await ffmpegInstance.exec([
     '-ss',
     startTime.toString(),
@@ -58,6 +63,9 @@ export const convertToGif = async (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const gifBlob = new Blob([data as any], { type: 'image/gif' });
   const gifUrl = URL.createObjectURL(gifBlob);
+
+  // Cleanup listener
+  ffmpegInstance.off('progress', progressHandler);
 
   return gifUrl;
 };
