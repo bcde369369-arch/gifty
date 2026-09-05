@@ -52,9 +52,10 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
         setProgress(Math.round(ratio * 100));
       });
       setGifUrl(url);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Conversion failed', error);
-      alert(`변환 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}\n(브라우저가 지원하지 않거나 파일이 너무 클 수 있습니다)`);
+      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+      alert(`변환 중 오류가 발생했습니다: ${errorMessage}\n(브라우저가 지원하지 않거나 파일이 너무 클 수 있습니다)`);
     } finally {
       setIsConverting(false);
     }

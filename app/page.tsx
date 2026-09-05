@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Dropzone from '@/components/Dropzone';
 import VideoEditor from '@/components/VideoEditor';
 import ShareButton from '@/components/ShareButton';
-import { Sparkles, Video, Wand2, DownloadCloud, Menu, Coffee, ExternalLink } from 'lucide-react';
+import { Sparkles, Video, Wand2, DownloadCloud, Menu, ExternalLink } from 'lucide-react';
 import { useSiteSettings } from '@/lib/settings';
 
 export default function Home() {
