@@ -55,7 +55,7 @@ export const convertToGif = async (
   ]);
 
   const data = await ffmpegInstance.readFile(outputName);
-  const gifBlob = new Blob([(data as Uint8Array).buffer], { type: 'image/gif' });
+  const gifBlob = new Blob([data as Uint8Array], { type: 'image/gif' });
   const gifUrl = URL.createObjectURL(gifBlob);
 
   return gifUrl;
