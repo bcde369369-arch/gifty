@@ -119,19 +119,31 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
             <p className="text-xs text-center text-slate-400 mt-1">* 15초 이상은 선택되지 않습니다.</p>
           </div>
 
-          <button
-            onClick={handleConvert}
-            disabled={isConverting}
-            className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-bold text-white bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:shadow-none"
-          >
-            {isConverting ? (
-              <>
-                <Loader2 className="animate-spin" /> 변환 중... {progress}%
-              </>
-            ) : (
-              '마법처럼 움짤 만들기 🪄'
-            )}
-          </button>
+          {isConverting ? (
+            <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-5 flex flex-col gap-3 shadow-sm animate-in fade-in duration-300">
+              <div className="flex justify-between items-center text-sm font-bold text-indigo-700">
+                <span className="flex items-center gap-2">
+                  <Loader2 className="animate-spin" size={18} /> 마법 부리는 중... (조금만 기다려주세요)
+                </span>
+                <span>{progress}%</span>
+              </div>
+              <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden shadow-inner">
+                <div 
+                  className="bg-gradient-to-r from-indigo-500 to-fuchsia-500 h-3 rounded-full transition-all duration-300 ease-out relative" 
+                  style={{ width: `${progress}%` }}
+                >
+                  <div className="absolute top-0 left-0 bottom-0 right-0 bg-white/20 animate-pulse"></div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={handleConvert}
+              className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-bold text-white bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 transition-all shadow-lg shadow-indigo-200 active:scale-95"
+            >
+              마법처럼 움짤 만들기 🪄
+            </button>
+          )}
         </div>
       )}
 
