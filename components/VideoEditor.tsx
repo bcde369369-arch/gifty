@@ -157,12 +157,6 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
             >
               <Download size={18} /> 다운로드
             </a>
-            <button
-              onClick={() => alert('후원 계좌(토스): 123-4567-8901 \n\n소중한 후원 감사합니다! 커피 맛있게 먹고 더 좋은 사이트로 업데이트 할게요💖')}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 shadow-sm transition-all"
-            >
-              ☕ 칭찬하기
-            </button>
           </div>
 
           {/* Square Affiliate Banner (Replaces AdSense temporarily) */}

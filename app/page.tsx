@@ -27,9 +27,6 @@ export default function Home() {
           <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
             <a href="#" className="hover:text-indigo-600 transition-colors">홈</a>
             <a href="#features" className="hover:text-indigo-600 transition-colors">기능</a>
-            <button className="flex items-center gap-2 px-4 py-2 bg-amber-100 text-amber-700 hover:bg-amber-200 rounded-full transition-colors font-bold">
-              <Coffee size={16} /> 커피 후원하기
-            </button>
           </div>
           <button className="md:hidden text-slate-500 hover:text-slate-800">
             <Menu size={24} />
