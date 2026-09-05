@@ -73,6 +73,24 @@ export default function AdminDashboard() {
         </div>
 
         <div className="space-y-8">
+          {/* Visitor Stats Section */}
+          <section className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-indigo-700 font-bold text-lg mb-2">
+                <LayoutDashboard size={20} /> 실시간 방문자 통계
+              </div>
+              <p className="text-sm text-slate-500">오늘 방문한 사람 / 지금까지 총 방문한 사람 숫자를 보여줍니다.</p>
+            </div>
+            <div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
+                src="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgifty.run&count_bg=%234F46E5&title_bg=%231E293B&icon=&icon_color=%23E7E7E7&title=Visitors&edge_flat=true" 
+                alt="Visitor Count" 
+                className="h-8 shadow-sm rounded"
+              />
+            </div>
+          </section>
+
           {/* Main Hero Section Settings */}
           <section className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
             <div className="flex items-center gap-2 text-indigo-700 font-bold text-lg mb-6 pb-4 border-b border-slate-100">

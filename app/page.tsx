@@ -151,21 +151,11 @@ export default function Home() {
           <div className="flex justify-center items-center gap-2 mb-6 opacity-50">
             <Sparkles size={16} /> <span className="font-bold tracking-widest text-slate-200">GIFTY</span>
           </div>
-          <div className="flex justify-center gap-6 mb-8 text-sm font-medium">
+          <div className="flex justify-center gap-6 mb-6 text-sm font-medium">
             <a href="/legal" className="hover:text-white transition-colors">이용약관 및 개인정보처리방침</a>
             <a href="mailto:contact@gifty.run" className="hover:text-white transition-colors">문의하기</a>
             <a href="/admin" className="text-slate-700 hover:text-white transition-colors">관리자</a>
           </div>
-          
-          <div className="flex justify-center mb-6">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img 
-              src="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgifty.run&count_bg=%234F46E5&title_bg=%231E293B&icon=&icon_color=%23E7E7E7&title=Visitors&edge_flat=true" 
-              alt="Visitor Count" 
-              className="h-5"
-            />
-          </div>
-
           <p className="text-sm mb-4">© 2026 Gifty. All rights reserved. Build your awesome meme.</p>
           <p className="text-xs text-slate-500 max-w-md mx-auto">이 서비스는 영상 처리를 위해 오픈소스 엔진인 FFmpeg(ffmpeg.org) 기술을 활용하여 제작되었습니다.</p>
         </div>
