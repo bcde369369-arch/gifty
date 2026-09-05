@@ -1,0 +1,62 @@
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { fetchFile, toBlobURL } from '@ffmpeg/util';
+
+let ffmpeg: FFmpeg | null = null;
+
+export const getFFmpeg = async (): Promise<FFmpeg> => {
+  if (ffmpeg) {
+    return ffmpeg;
+  }
+  
+  ffmpeg = new FFmpeg();
+  
+  const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
+  await ffmpeg.load({
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+  });
+
+  return ffmpeg;
+};
+
+export const convertToGif = async (
+  videoFile: File,
+  startTime: number,
+  duration: number,
+  onProgress?: (ratio: number) => void
+): Promise<string> => {
+  const ffmpegInstance = await getFFmpeg();
+  
+  ffmpegInstance.on('progress', ({ progress }) => {
+    if (onProgress) onProgress(progress);
+  });
+
+  const inputName = 'input.mp4';
+  const outputName = 'output.gif';
+
+  await ffmpegInstance.writeFile(inputName, await fetchFile(videoFile));
+
+  // Convert video to GIF using FFmpeg
+  // -ss: start time
+  // -t: duration
+  // -vf: scale to width 480 (keep aspect ratio), fps 10, split to create palette (better colors)
+  await ffmpegInstance.exec([
+    '-ss',
+    startTime.toString(),
+    '-t',
+    duration.toString(),
+    '-i',
+    inputName,
+    '-vf',
+    'fps=10,scale=480:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse',
+    '-loop',
+    '0',
+    outputName,
+  ]);
+
+  const data = await ffmpegInstance.readFile(outputName);
+  const gifBlob = new Blob([(data as Uint8Array).buffer], { type: 'image/gif' });
+  const gifUrl = URL.createObjectURL(gifBlob);
+
+  return gifUrl;
+};
