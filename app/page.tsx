@@ -34,7 +34,7 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* Top Affiliate Banner (Replaces AdSense temporarily) */}
+      {/* Top Affiliate Banner */}
       <div className="w-full bg-slate-900 border-b border-slate-800 py-0 hidden md:block">
         <a 
           href={isLoaded ? settings.affiliateLink : '#'} 
@@ -43,7 +43,7 @@ export default function Home() {
           className="flex items-center justify-center gap-4 text-white hover:bg-slate-800 transition-colors py-3 group"
         >
           <span className="bg-indigo-500 text-xs font-bold px-2 py-0.5 rounded text-white">SPONSOR</span>
-          <span className="text-sm font-medium">요즘 대세 숏폼 편집은 캡컷으로! <strong className="text-indigo-400 group-hover:text-indigo-300">CapCut Pro 워터마크 없이 무료 체험하기 &rarr;</strong></span>
+          <span className="text-sm font-medium">{isLoaded ? settings.affiliateTitle : '스폰서 배너 불러오는 중...'} <strong className="text-indigo-400 group-hover:text-indigo-300">&rarr;</strong></span>
         </a>
       </div>
 

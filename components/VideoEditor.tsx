@@ -172,7 +172,7 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
             </a>
           </div>
 
-          {/* Square Affiliate Banner (Replaces AdSense temporarily) */}
+          {/* Square Affiliate Banner */}
           <a
             href={isLoaded ? settings.affiliateLink : '#'}
             target="_blank"
@@ -183,12 +183,12 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
             <div className="absolute bottom-0 left-0 w-24 h-24 bg-fuchsia-500 opacity-20 rounded-full blur-2xl transform -translate-x-5 translate-y-5 group-hover:opacity-40 transition-opacity"></div>
             
             <span className="text-[10px] uppercase tracking-widest font-black text-indigo-300 mb-3 bg-indigo-950 px-2 py-1 rounded">SPONSOR</span>
-            <h4 className="text-xl font-extrabold text-center mb-2 leading-tight">숏폼 떡상 비결? 🚀</h4>
+            <h4 className="text-xl font-extrabold text-center mb-2 leading-tight">{isLoaded ? settings.affiliateTitle : '스폰서 배너'}</h4>
             <p className="text-sm text-indigo-200 text-center mb-6 leading-relaxed">
-              요즘 대세 편집 앱 <strong>CapCut Pro</strong><br/> 워터마크 없이 프로처럼 편집하세요!
+              {isLoaded ? settings.affiliateSubtitle : '불러오는 중...'}
             </p>
             <div className="bg-white text-indigo-900 font-bold px-6 py-2.5 rounded-full text-sm group-hover:bg-indigo-50 transition-colors shadow-md">
-              무료 시작하기
+              자세히 보기
             </div>
           </a>
         </div>

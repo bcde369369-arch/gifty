@@ -9,9 +9,9 @@ export interface SiteSettings {
 
 const defaultSettings: SiteSettings = {
   heroTagline: '100% 무료 GIF 메이커',
-  affiliateTitle: '더 화려한 영상 편집이 필요하신가요?',
-  affiliateSubtitle: 'Canva Pro로 워터마크 없이 수만 개의 템플릿과 텍스트 효과를 활용해 보세요.',
-  affiliateLink: 'https://www.canva.com',
+  affiliateTitle: '요즘 대세 필수 AI 앱, 에이닷 🚀',
+  affiliateSubtitle: '통화 녹음부터 일정 관리까지! 나만의 똑똑한 AI 비서 A. 무료로 시작하기',
+  affiliateLink: 'http://searchcategory.co.kr/ad/cpc_open.php?app=205&custom=16&domain=adot.ai&type=1&aid=8291&browser=chrome&guid=202311057VpLO8',
 };
 
 export function useSiteSettings() {
