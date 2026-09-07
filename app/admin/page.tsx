@@ -84,7 +84,7 @@ export default function AdminDashboard() {
             <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
-                src="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgifty.run&count_bg=%234F46E5&title_bg=%231E293B&icon=&icon_color=%23E7E7E7&title=Visitors&edge_flat=true" 
+                src="https://komarev.com/ghpvc/?username=gifty-run-admin&label=VISITORS&color=4F46E5&style=flat-square" 
                 alt="Visitor Count Badge" 
                 className="h-8 shadow-sm rounded"
               />
