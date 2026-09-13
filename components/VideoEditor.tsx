@@ -22,6 +22,7 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
 
   const [isConverting, setIsConverting] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState<string>('마법 부리는 중... (조금만 기다려주세요)');
   const [gifUrl, setGifUrl] = useState<string | null>(null);
   const [gifSize, setGifSize] = useState<number>(0);
 
@@ -41,13 +42,15 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
   const handleConvert = async () => {
     setIsConverting(true);
     setProgress(0);
+    setStatusMessage('마법 부리는 중... (조금만 기다려주세요)');
     
     // Ensure duration is maximum 15 seconds
     const resultDuration = Math.min(endTime - startTime, 15);
 
     try {
-      const result = await convertToGif(videoFile, startTime, resultDuration, quality, (ratio) => {
+      const result = await convertToGif(videoFile, startTime, resultDuration, quality, (ratio, status) => {
         setProgress(Math.round(ratio * 100));
+        if (status) setStatusMessage(status);
       });
       setGifUrl(result.url);
       setGifSize(result.size);
@@ -153,7 +156,7 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
             <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-5 flex flex-col gap-3 shadow-sm animate-in fade-in duration-300">
               <div className="flex justify-between items-center text-sm font-bold text-indigo-700">
                 <span className="flex items-center gap-2">
-                  <Loader2 className="animate-spin" size={18} /> 마법 부리는 중... (조금만 기다려주세요)
+                  <Loader2 className="animate-spin" size={18} /> {statusMessage}
                 </span>
                 <span>{progress}%</span>
               </div>
