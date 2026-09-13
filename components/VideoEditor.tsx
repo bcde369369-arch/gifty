@@ -2,7 +2,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { convertToGif } from '@/lib/ffmpeg';
-import { Loader2, Download, RotateCcw } from 'lucide-react';
+import { Loader2, Download, RotateCcw, Sparkles } from 'lucide-react';
 import { useSiteSettings } from '@/lib/settings';
 
 interface VideoEditorProps {
