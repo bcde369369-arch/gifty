@@ -23,6 +23,7 @@ export const convertToGif = async (
   videoFile: File,
   startTime: number,
   duration: number,
+  quality: 'high' | 'normal' | 'low',
   onProgress?: (ratio: number) => void
 ): Promise<string> => {
   const ffmpegInstance = await getFFmpeg();
@@ -44,6 +45,19 @@ export const convertToGif = async (
 
   await ffmpegInstance.writeFile(inputName, await fetchFile(videoFile));
 
+  // Set FPS and scale based on quality
+  let fps = 10;
+  let scale = 480;
+  if (quality === 'high') {
+    fps = 15;
+    scale = 640;
+  } else if (quality === 'low') {
+    fps = 8;
+    scale = 320;
+  }
+  
+  const vfCommand = `fps=${fps},scale=${scale}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
+
   // Convert video to GIF using FFmpeg
   await ffmpegInstance.exec([
     '-ss',
@@ -53,7 +67,7 @@ export const convertToGif = async (
     '-i',
     inputName,
     '-vf',
-    'fps=10,scale=480:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse',
+    vfCommand,
     '-loop',
     '0',
     outputName,

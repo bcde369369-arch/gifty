@@ -18,6 +18,8 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
   const [startTime, setStartTime] = useState(0);
   const [endTime, setEndTime] = useState(15);
   
+  const [quality, setQuality] = useState<'high' | 'normal' | 'low'>('normal');
+
   const [isConverting, setIsConverting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [gifUrl, setGifUrl] = useState<string | null>(null);
@@ -48,7 +50,7 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
         return;
       }
 
-      const url = await convertToGif(videoFile, startTime, resultDuration, (ratio) => {
+      const url = await convertToGif(videoFile, startTime, resultDuration, quality, (ratio) => {
         setProgress(Math.round(ratio * 100));
       });
       setGifUrl(url);
@@ -118,6 +120,36 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
               />
             </div>
             <p className="text-xs text-center text-slate-400 mt-1">* 15초 이상은 선택되지 않습니다.</p>
+          </div>
+
+          {/* Quality Selection */}
+          <div className="mb-6 animate-in fade-in slide-in-from-bottom-2">
+            <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+              <Sparkles size={16} className="text-indigo-500" /> 화질 및 용량 선택
+            </h4>
+            <div className="grid grid-cols-3 gap-2">
+              <button 
+                onClick={() => setQuality('low')}
+                disabled={isConverting}
+                className={`py-2 px-1 rounded-xl border text-sm font-medium transition-all ${quality === 'low' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}
+              >
+                저용량<br/><span className="text-xs font-normal opacity-70 leading-tight block mt-0.5">작고 가벼움</span>
+              </button>
+              <button 
+                onClick={() => setQuality('normal')}
+                disabled={isConverting}
+                className={`py-2 px-1 rounded-xl border text-sm font-medium transition-all ${quality === 'normal' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}
+              >
+                블로그용<br/><span className="text-xs font-normal opacity-70 leading-tight block mt-0.5">네이버 최적화</span>
+              </button>
+              <button 
+                onClick={() => setQuality('high')}
+                disabled={isConverting}
+                className={`py-2 px-1 rounded-xl border text-sm font-medium transition-all ${quality === 'high' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}
+              >
+                고화질<br/><span className="text-xs font-normal opacity-70 leading-tight block mt-0.5">크고 선명함</span>
+              </button>
+            </div>
           </div>
 
           {isConverting ? (
