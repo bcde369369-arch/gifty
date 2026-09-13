@@ -23,6 +23,7 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
   const [isConverting, setIsConverting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [gifUrl, setGifUrl] = useState<string | null>(null);
+  const [gifSize, setGifSize] = useState<number>(0);
 
   useEffect(() => {
     const url = URL.createObjectURL(videoFile);
@@ -32,28 +33,24 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
 
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
-      const vidDuration = videoRef.current.duration;
-      setDuration(vidDuration);
-      setEndTime(Math.min(15, vidDuration));
+      setDuration(videoRef.current.duration);
+      setEndTime(Math.min(videoRef.current.duration, 15));
     }
   };
 
   const handleConvert = async () => {
     setIsConverting(true);
     setProgress(0);
-    setGifUrl(null);
-    try {
-      const resultDuration = endTime - startTime;
-      if (resultDuration > 15) {
-        alert('최대 15초까지만 변환 가능합니다.');
-        setIsConverting(false);
-        return;
-      }
+    
+    // Ensure duration is maximum 15 seconds
+    const resultDuration = Math.min(endTime - startTime, 15);
 
-      const url = await convertToGif(videoFile, startTime, resultDuration, quality, (ratio) => {
+    try {
+      const result = await convertToGif(videoFile, startTime, resultDuration, quality, (ratio) => {
         setProgress(Math.round(ratio * 100));
       });
-      setGifUrl(url);
+      setGifUrl(result.url);
+      setGifSize(result.size);
     } catch (error: unknown) {
       console.error('Conversion failed', error);
       const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
@@ -188,7 +185,24 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={gifUrl} alt="Converted GIF" className="max-w-full h-auto max-h-[200px] rounded-lg shadow-md border border-slate-200" />
           
-          <div className="flex flex-col sm:flex-row gap-3 w-full mt-4">
+          <div className="w-full bg-indigo-50 border border-indigo-100 rounded-xl p-5 shadow-sm animate-in fade-in duration-300">
+            <div className="flex flex-col gap-3">
+              <div className="flex justify-between items-center mb-1">
+                <h4 className="text-sm font-bold text-indigo-900">✨ 변환 완료!</h4>
+                <span className={`text-xs font-bold px-2 py-1 rounded-full ${gifSize > 20 * 1024 * 1024 ? 'bg-red-100 text-red-600' : 'bg-indigo-100 text-indigo-700'}`}>
+                  용량: {(gifSize / (1024 * 1024)).toFixed(2)} MB
+                </span>
+              </div>
+              
+              {gifSize > 20 * 1024 * 1024 && (
+                <p className="text-xs text-red-600 bg-red-50 p-2 rounded-lg border border-red-100 font-medium">
+                  ⚠️ 20MB를 초과하여 네이버 블로그에 업로드할 수 없습니다. 화질 옵션을 낮춰서 다시 변환해 주세요!
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 w-full mt-2">
             <button
               onClick={onReset}
               className="flex-1 px-4 py-3 rounded-xl font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
@@ -197,10 +211,11 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
             </button>
             <a
               href={gifUrl}
-              download="gifty.gif"
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all"
+              download="gifty-magic.gif"
+              className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-md hover:bg-indigo-700 hover:shadow-lg transition-all"
             >
-              <Download size={18} /> 다운로드
+              <Download size={18} />
+              다운로드
             </a>
           </div>
 

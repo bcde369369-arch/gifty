@@ -25,7 +25,7 @@ export const convertToGif = async (
   duration: number,
   quality: 'high' | 'normal' | 'low',
   onProgress?: (ratio: number) => void
-): Promise<string> => {
+): Promise<{ url: string; size: number }> => {
   const ffmpegInstance = await getFFmpeg();
   
   const progressHandler = ({ time }: { time: number }) => {
@@ -81,5 +81,5 @@ export const convertToGif = async (
   // Cleanup listener
   ffmpegInstance.off('progress', progressHandler);
 
-  return gifUrl;
+  return { url: gifUrl, size: gifBlob.size };
 };
