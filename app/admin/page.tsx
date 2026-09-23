@@ -84,7 +84,7 @@ export default function AdminDashboard() {
             <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
-                src="https://komarev.com/ghpvc/?username=gifty-run-admin&label=VISITORS&color=4F46E5&style=flat-square" 
+                src="https://komarev.com/ghpvc/?username=gifty-run-main-site&label=MAIN+SITE+VISITORS&color=4F46E5&style=flat-square" 
                 alt="Visitor Count Badge" 
                 className="h-8 shadow-sm rounded"
               />
