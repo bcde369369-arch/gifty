@@ -81,13 +81,16 @@ export default function AdminDashboard() {
               </div>
               <p className="text-sm text-slate-500">오늘 방문한 사람 / 지금까지 총 방문한 사람 숫자입니다.</p>
             </div>
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img 
-                src="https://komarev.com/ghpvc/?username=gifty-run-main-site&label=MAIN+SITE+VISITORS&color=4F46E5&style=flat-square" 
-                alt="Visitor Count Badge" 
-                className="h-8 shadow-sm rounded"
-              />
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col items-end gap-2">
+              <span className="text-xs text-slate-500">더 정확하고 상세한 통계는 구글에서 확인하세요!</span>
+              <a 
+                href="https://analytics.google.com/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm transition-colors text-sm flex items-center gap-2"
+              >
+                구글 애널리틱스 바로가기 &rarr;
+              </a>
             </div>
           </section>
 

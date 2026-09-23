@@ -13,10 +13,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-indigo-200">
-      {/* Hidden Visitor Tracking Pixel for Admin Dashboard */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="https://komarev.com/ghpvc/?username=gifty-run-main-site" alt="" style={{ display: 'none' }} aria-hidden="true" />
-      
       {/* Navigation */}
       <nav className="w-full bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
