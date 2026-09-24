@@ -4,15 +4,33 @@ import React, { useState } from 'react';
 import Dropzone from '@/components/Dropzone';
 import VideoEditor from '@/components/VideoEditor';
 import ShareButton from '@/components/ShareButton';
-import { Sparkles, Video, Wand2, DownloadCloud, Menu, ExternalLink } from 'lucide-react';
+import UpdateModal from '@/components/UpdateModal';
+import { Sparkles, Video, Wand2, DownloadCloud, Menu, ExternalLink, X } from 'lucide-react';
 import { useSiteSettings } from '@/lib/settings';
 
 export default function Home() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [showBanner, setShowBanner] = useState(true);
   const { settings, isLoaded } = useSiteSettings();
 
   return (
     <main className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-indigo-200">
+      <UpdateModal />
+      
+      {/* Top Announcement Banner */}
+      {showBanner && (
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 text-sm font-semibold flex items-center justify-center gap-2 relative">
+          <span className="animate-pulse">✨</span>
+          <span>[대규모 업데이트] 이제 움짤에 <strong>자막</strong>을 넣고, 내 <strong>블로그 로고</strong>도 박을 수 있어요!</span>
+          <button 
+            onClick={() => setShowBanner(false)}
+            className="absolute right-4 p-1 hover:bg-white/20 rounded-full transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Navigation */}
       <nav className="w-full bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">

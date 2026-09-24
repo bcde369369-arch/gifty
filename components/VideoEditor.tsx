@@ -127,7 +127,10 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
 
           {/* New Feature: Speed Control */}
           <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 mb-2">
-            <h4 className="text-sm font-bold text-slate-700">재생 속도 조절</h4>
+            <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+              재생 속도 조절 
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-red-500 text-white animate-pulse shadow-sm shadow-red-200">NEW ✨</span>
+            </h4>
             <div className="grid grid-cols-4 gap-2">
               <button onClick={() => setPlaybackSpeed('0.5')} disabled={isConverting} className={`py-2 px-1 rounded-xl border text-xs font-bold transition-all ${playbackSpeed === '0.5' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}>0.5x<br/><span className="font-normal opacity-70">느리게</span></button>
               <button onClick={() => setPlaybackSpeed('1.0')} disabled={isConverting} className={`py-2 px-1 rounded-xl border text-xs font-bold transition-all ${playbackSpeed === '1.0' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}>1.0x<br/><span className="font-normal opacity-70">기본</span></button>
@@ -138,7 +141,10 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
 
           {/* New Feature: Text Overlay */}
           <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 mb-2">
-            <h4 className="text-sm font-bold text-slate-700">움짤 자막 달기 (선택)</h4>
+            <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+              움짤 자막 달기 (선택)
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-red-500 text-white animate-pulse shadow-sm shadow-red-200">NEW ✨</span>
+            </h4>
             <input 
               type="text" 
               value={textOverlay}
@@ -153,7 +159,10 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
           {/* New Feature: Logo Upload */}
           <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 mb-2">
             <h4 className="text-sm font-bold text-slate-700 flex justify-between items-center">
-              <span>내 블로그 로고 넣기 (선택)</span>
+              <span className="flex items-center gap-2">
+                내 블로그 로고 넣기 (선택)
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-red-500 text-white animate-pulse shadow-sm shadow-red-200">NEW ✨</span>
+              </span>
               {logoFile && (
                 <button 
                   onClick={() => setLogoFile(null)}
