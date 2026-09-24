@@ -21,6 +21,7 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
   const [quality, setQuality] = useState<'high' | 'normal' | 'low'>('normal');
   const [textOverlay, setTextOverlay] = useState<string>('');
   const [playbackSpeed, setPlaybackSpeed] = useState<string>('1.0');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
 
   const [isConverting, setIsConverting] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -50,7 +51,7 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
     const resultDuration = Math.min(endTime - startTime, 15);
 
     try {
-      const result = await convertToGif(videoFile, startTime, resultDuration, quality, textOverlay, parseFloat(playbackSpeed), (ratio, status) => {
+      const result = await convertToGif(videoFile, startTime, resultDuration, quality, textOverlay, parseFloat(playbackSpeed), logoFile, (ratio, status) => {
         setProgress(Math.round(ratio * 100));
         if (status) setStatusMessage(status);
       });
@@ -148,6 +149,39 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-slate-400 disabled:opacity-50"
             />
           </div>
+
+          {/* New Feature: Logo Upload */}
+          <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 mb-2">
+            <h4 className="text-sm font-bold text-slate-700 flex justify-between items-center">
+              <span>내 블로그 로고 넣기 (선택)</span>
+              {logoFile && (
+                <button 
+                  onClick={() => setLogoFile(null)}
+                  className="text-xs text-red-500 hover:text-red-700 font-medium"
+                >
+                  지우기 ✕
+                </button>
+              )}
+            </h4>
+            <label className={`w-full border-2 border-dashed rounded-xl p-3 flex items-center justify-center gap-2 cursor-pointer transition-colors ${logoFile ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'} ${isConverting ? 'opacity-50 pointer-events-none' : ''}`}>
+              <input 
+                type="file" 
+                accept="image/png, image/jpeg" 
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    setLogoFile(e.target.files[0]);
+                  }
+                }}
+                className="hidden"
+                disabled={isConverting}
+              />
+              <span className="text-sm font-medium text-slate-600">
+                {logoFile ? `✅ ${logoFile.name} (선택됨)` : '📷 로고 이미지 선택 (.png, .jpg)'}
+              </span>
+            </label>
+            <p className="text-xs text-slate-400 pl-1">완성된 움짤 우측 하단에 자동으로 도장이 찍힙니다.</p>
+          </div>
+
 
           {/* Quality Selection */}
           <div className="mb-6 animate-in fade-in slide-in-from-bottom-2">

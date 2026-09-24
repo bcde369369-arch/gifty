@@ -26,14 +26,20 @@ export const convertToGif = async (
   quality: 'high' | 'normal' | 'low',
   textOverlay: string,
   speed: number,
+  logoFile: File | null,
   onProgress?: (ratio: number, status?: string) => void
 ): Promise<{ url: string; size: number }> => {
   const ffmpegInstance = await getFFmpeg();
   
   const inputName = 'input.mp4';
   const outputName = 'output.gif';
+  const logoName = 'logo.png';
   
   await ffmpegInstance.writeFile(inputName, await fetchFile(videoFile));
+
+  if (logoFile) {
+    await ffmpegInstance.writeFile(logoName, await fetchFile(logoFile));
+  }
 
   // If text overlay is provided, we need to load the font
   let fontFilter = '';
@@ -92,17 +98,33 @@ export const convertToGif = async (
 
     ffmpegInstance.on('progress', progressHandler);
 
-    // Apply speed, text, and scaling filters before splitting to create the palette
-    const vfCommand = `${speedFilter}fps=${profile.fps},scale=${profile.scale}:-1:flags=lanczos${fontFilter},split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
+    // Build the filtergraph
+    let filterGraph = `[0:v]${speedFilter}fps=${profile.fps},scale=${profile.scale}:-1:flags=lanczos${fontFilter}[v_base];`;
+    
+    if (logoFile) {
+      // Scale logo to a maximum of 25% of the video width
+      const logoScaleWidth = Math.round(profile.scale * 0.25);
+      filterGraph += `[1:v]scale=${logoScaleWidth}:-1[logo_scaled];`;
+      // Overlay logo at the bottom right with 15px padding
+      filterGraph += `[v_base][logo_scaled]overlay=W-w-15:H-h-15[v_overlay];`;
+    }
 
-    await ffmpegInstance.exec([
+    const lastNode = logoFile ? '[v_overlay]' : '[v_base]';
+    filterGraph += `${lastNode}split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
+
+    const args = [
       '-ss', startTime.toString(),
       '-t', duration.toString(),
       '-i', inputName,
-      '-vf', vfCommand,
-      '-loop', '0',
-      outputName,
-    ]);
+    ];
+
+    if (logoFile) {
+      args.push('-i', logoName);
+    }
+
+    args.push('-filter_complex', filterGraph, '-loop', '0', outputName);
+
+    await ffmpegInstance.exec(args);
 
     ffmpegInstance.off('progress', progressHandler);
     
