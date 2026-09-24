@@ -57,7 +57,7 @@ export default function UpdateModal() {
             </div>
             <div>
               <h3 className="font-bold text-slate-800 text-base">자막 (텍스트) 넣기</h3>
-              <p className="text-sm text-slate-600 mt-1">"가즈아아!" 같은 재미있는 자막을 움짤에 바로 새겨 넣을 수 있어요.</p>
+              <p className="text-sm text-slate-600 mt-1">&quot;가즈아아!&quot; 같은 재미있는 자막을 움짤에 바로 새겨 넣을 수 있어요.</p>
             </div>
           </div>
 
