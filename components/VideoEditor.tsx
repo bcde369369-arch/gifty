@@ -19,6 +19,8 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
   const [endTime, setEndTime] = useState(15);
   
   const [quality, setQuality] = useState<'high' | 'normal' | 'low'>('normal');
+  const [textOverlay, setTextOverlay] = useState<string>('');
+  const [playbackSpeed, setPlaybackSpeed] = useState<string>('1.0');
 
   const [isConverting, setIsConverting] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -48,7 +50,7 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
     const resultDuration = Math.min(endTime - startTime, 15);
 
     try {
-      const result = await convertToGif(videoFile, startTime, resultDuration, quality, (ratio, status) => {
+      const result = await convertToGif(videoFile, startTime, resultDuration, quality, textOverlay, parseFloat(playbackSpeed), (ratio, status) => {
         setProgress(Math.round(ratio * 100));
         if (status) setStatusMessage(status);
       });
@@ -120,6 +122,31 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
               />
             </div>
             <p className="text-xs text-center text-slate-400 mt-1">* 15초 이상은 선택되지 않습니다.</p>
+          </div>
+
+          {/* New Feature: Speed Control */}
+          <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 mb-2">
+            <h4 className="text-sm font-bold text-slate-700">재생 속도 조절</h4>
+            <div className="grid grid-cols-4 gap-2">
+              <button onClick={() => setPlaybackSpeed('0.5')} disabled={isConverting} className={`py-2 px-1 rounded-xl border text-xs font-bold transition-all ${playbackSpeed === '0.5' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}>0.5x<br/><span className="font-normal opacity-70">느리게</span></button>
+              <button onClick={() => setPlaybackSpeed('1.0')} disabled={isConverting} className={`py-2 px-1 rounded-xl border text-xs font-bold transition-all ${playbackSpeed === '1.0' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}>1.0x<br/><span className="font-normal opacity-70">기본</span></button>
+              <button onClick={() => setPlaybackSpeed('1.5')} disabled={isConverting} className={`py-2 px-1 rounded-xl border text-xs font-bold transition-all ${playbackSpeed === '1.5' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}>1.5x<br/><span className="font-normal opacity-70">빠르게</span></button>
+              <button onClick={() => setPlaybackSpeed('2.0')} disabled={isConverting} className={`py-2 px-1 rounded-xl border text-xs font-bold transition-all ${playbackSpeed === '2.0' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}>2.0x<br/><span className="font-normal opacity-70">아주빠름</span></button>
+            </div>
+          </div>
+
+          {/* New Feature: Text Overlay */}
+          <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 mb-2">
+            <h4 className="text-sm font-bold text-slate-700">움짤 자막 달기 (선택)</h4>
+            <input 
+              type="text" 
+              value={textOverlay}
+              onChange={(e) => setTextOverlay(e.target.value)}
+              placeholder="예: 가즈아아아!! ㅋㅋ"
+              maxLength={20}
+              disabled={isConverting}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-slate-400 disabled:opacity-50"
+            />
           </div>
 
           {/* Quality Selection */}

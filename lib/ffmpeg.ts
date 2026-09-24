@@ -24,6 +24,8 @@ export const convertToGif = async (
   startTime: number,
   duration: number,
   quality: 'high' | 'normal' | 'low',
+  textOverlay: string,
+  speed: number,
   onProgress?: (ratio: number, status?: string) => void
 ): Promise<{ url: string; size: number }> => {
   const ffmpegInstance = await getFFmpeg();
@@ -32,6 +34,28 @@ export const convertToGif = async (
   const outputName = 'output.gif';
   
   await ffmpegInstance.writeFile(inputName, await fetchFile(videoFile));
+
+  // If text overlay is provided, we need to load the font
+  let fontFilter = '';
+  if (textOverlay.trim()) {
+    try {
+      const fontUrl = '/fonts/NanumGothic.ttf';
+      await ffmpegInstance.writeFile('font.ttf', await fetchFile(fontUrl));
+      // Escape text properly for ffmpeg drawtext filter
+      const safeText = textOverlay.replace(/'/g, "\\'").replace(/:/g, "\\:");
+      fontFilter = `,drawtext=fontfile=font.ttf:text='${safeText}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h-(text_h*1.5):borderw=3:bordercolor=black`;
+    } catch (e) {
+      console.warn("Failed to load font for text overlay", e);
+    }
+  }
+
+  // Playback speed filter (setpts = 1/speed * PTS)
+  // When speed is 2.0 (fast), setpts=0.5*PTS.
+  const ptsFactor = 1.0 / speed;
+  const speedFilter = speed !== 1.0 ? `setpts=${ptsFactor}*PTS,` : '';
+
+  // Actual expected output duration (for progress calculation)
+  const expectedOutputDuration = duration / speed;
 
   const TARGET_SIZE_MB = 19.5; // Aim slightly below 20MB
   const MAX_BYTES = TARGET_SIZE_MB * 1024 * 1024;
@@ -58,8 +82,8 @@ export const convertToGif = async (
     }
 
     const progressHandler = ({ time }: { time: number }) => {
-      if (onProgress && duration > 0) {
-        let calculatedProgress = time / (duration * 1000000);
+      if (onProgress && expectedOutputDuration > 0) {
+        let calculatedProgress = time / (expectedOutputDuration * 1000000);
         if (calculatedProgress < 0) calculatedProgress = 0;
         if (calculatedProgress > 1) calculatedProgress = 1;
         onProgress(calculatedProgress, i > 0 ? `재압축 중... (${Math.round(calculatedProgress * 100)}%)` : undefined);
@@ -68,7 +92,8 @@ export const convertToGif = async (
 
     ffmpegInstance.on('progress', progressHandler);
 
-    const vfCommand = `fps=${profile.fps},scale=${profile.scale}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
+    // Apply speed, text, and scaling filters before splitting to create the palette
+    const vfCommand = `${speedFilter}fps=${profile.fps},scale=${profile.scale}:-1:flags=lanczos${fontFilter},split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
 
     await ffmpegInstance.exec([
       '-ss', startTime.toString(),
