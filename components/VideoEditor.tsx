@@ -84,8 +84,9 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
       navigator.clipboard.write([clipboardItem]).then(() => {
         alert('블로그용 출처 문구가 복사되었습니다!\n네이버 블로그 에디터에 붙여넣기(Ctrl+V) 해보세요.');
       });
-    } catch (err) {
+    } catch (err: unknown) {
       // Fallback for older browsers
+      console.warn("Clipboard API HTML copy failed, falling back to text", err);
       navigator.clipboard.writeText('이 움짤은 Gifty(https://gifty.run)에서 1초만에 만들어졌습니다!').then(() => {
         alert('블로그용 출처 문구가 텍스트로 복사되었습니다!');
       });
