@@ -27,6 +27,7 @@ export const convertToGif = async (
   textOverlay: string,
   speed: number,
   logoFile: File | null,
+  videoFilter: 'none' | 'grayscale' | 'sepia' | 'bright',
   onProgress?: (ratio: number, status?: string) => void
 ): Promise<{ url: string; size: number }> => {
   const ffmpegInstance = await getFFmpeg();
@@ -98,8 +99,18 @@ export const convertToGif = async (
 
     ffmpegInstance.on('progress', progressHandler);
 
+    // Build color filter string
+    let colorFilterStr = '';
+    if (videoFilter === 'grayscale') {
+      colorFilterStr = ',hue=s=0';
+    } else if (videoFilter === 'sepia') {
+      colorFilterStr = ',colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131';
+    } else if (videoFilter === 'bright') {
+      colorFilterStr = ',eq=brightness=0.05:contrast=1.1:saturation=1.2';
+    }
+
     // Build the filtergraph
-    let filterGraph = `[0:v]${speedFilter}fps=${profile.fps},scale=${profile.scale}:-1:flags=lanczos${fontFilter}[v_base];`;
+    let filterGraph = `[0:v]${speedFilter}fps=${profile.fps},scale=${profile.scale}:-1:flags=lanczos${colorFilterStr}${fontFilter}[v_base];`;
     
     if (logoFile) {
       // Scale logo to a maximum of 25% of the video width

@@ -2,7 +2,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { convertToGif } from '@/lib/ffmpeg';
-import { Loader2, Download, RotateCcw, Sparkles } from 'lucide-react';
+import { Loader2, Download, RotateCcw, Sparkles, Copy } from 'lucide-react';
 import { useSiteSettings } from '@/lib/settings';
 
 interface VideoEditorProps {
@@ -21,6 +21,7 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
   const [quality, setQuality] = useState<'high' | 'normal' | 'low'>('normal');
   const [textOverlay, setTextOverlay] = useState<string>('');
   const [playbackSpeed, setPlaybackSpeed] = useState<string>('1.0');
+  const [videoFilter, setVideoFilter] = useState<'none' | 'grayscale' | 'sepia' | 'bright'>('none');
   const [logoFile, setLogoFile] = useState<File | null>(null);
 
   const [isConverting, setIsConverting] = useState(false);
@@ -51,7 +52,7 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
     const resultDuration = Math.min(endTime - startTime, 15);
 
     try {
-      const result = await convertToGif(videoFile, startTime, resultDuration, quality, textOverlay, parseFloat(playbackSpeed), logoFile, (ratio, status) => {
+      const result = await convertToGif(videoFile, startTime, resultDuration, quality, textOverlay, parseFloat(playbackSpeed), logoFile, videoFilter, (ratio, status) => {
         setProgress(Math.round(ratio * 100));
         if (status) setStatusMessage(status);
       });
@@ -63,6 +64,31 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
       alert(`변환 중 오류가 발생했습니다: ${errorMessage}\n(브라우저가 지원하지 않거나 파일이 너무 클 수 있습니다)`);
     } finally {
       setIsConverting(false);
+    }
+  };
+
+  const handleCopyHtml = () => {
+    const htmlString = `
+<p><br/></p>
+<p style="text-align: center;">
+  <span style="font-size: 13px; color: #888888;">
+    이 움짤은 <a href="https://gifty.run" target="_blank" style="color: #4f46e5; text-decoration: underline;">Gifty</a>에서 1초만에 만들어졌습니다!
+  </span>
+</p>
+<p><br/></p>
+    `;
+    
+    try {
+      const blob = new Blob([htmlString], { type: 'text/html' });
+      const clipboardItem = new ClipboardItem({ 'text/html': blob });
+      navigator.clipboard.write([clipboardItem]).then(() => {
+        alert('블로그용 출처 문구가 복사되었습니다!\n네이버 블로그 에디터에 붙여넣기(Ctrl+V) 해보세요.');
+      });
+    } catch (err) {
+      // Fallback for older browsers
+      navigator.clipboard.writeText('이 움짤은 Gifty(https://gifty.run)에서 1초만에 만들어졌습니다!').then(() => {
+        alert('블로그용 출처 문구가 텍스트로 복사되었습니다!');
+      });
     }
   };
 
@@ -136,6 +162,20 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
               <button onClick={() => setPlaybackSpeed('1.0')} disabled={isConverting} className={`py-2 px-1 rounded-xl border text-xs font-bold transition-all ${playbackSpeed === '1.0' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}>1.0x<br/><span className="font-normal opacity-70">기본</span></button>
               <button onClick={() => setPlaybackSpeed('1.5')} disabled={isConverting} className={`py-2 px-1 rounded-xl border text-xs font-bold transition-all ${playbackSpeed === '1.5' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}>1.5x<br/><span className="font-normal opacity-70">빠르게</span></button>
               <button onClick={() => setPlaybackSpeed('2.0')} disabled={isConverting} className={`py-2 px-1 rounded-xl border text-xs font-bold transition-all ${playbackSpeed === '2.0' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}>2.0x<br/><span className="font-normal opacity-70">아주빠름</span></button>
+            </div>
+          </div>
+
+          {/* New Feature: Video Filter */}
+          <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 mb-2">
+            <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+              감성 화면 필터 
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-red-500 text-white animate-pulse shadow-sm shadow-red-200">NEW ✨</span>
+            </h4>
+            <div className="grid grid-cols-4 gap-2">
+              <button onClick={() => setVideoFilter('none')} disabled={isConverting} className={`py-2 px-1 rounded-xl border text-xs font-bold transition-all ${videoFilter === 'none' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}>없음<br/><span className="font-normal opacity-70">원본</span></button>
+              <button onClick={() => setVideoFilter('grayscale')} disabled={isConverting} className={`py-2 px-1 rounded-xl border text-xs font-bold transition-all ${videoFilter === 'grayscale' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}>흑백<br/><span className="font-normal opacity-70">클래식</span></button>
+              <button onClick={() => setVideoFilter('sepia')} disabled={isConverting} className={`py-2 px-1 rounded-xl border text-xs font-bold transition-all ${videoFilter === 'sepia' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}>세피아<br/><span className="font-normal opacity-70">빈티지</span></button>
+              <button onClick={() => setVideoFilter('bright')} disabled={isConverting} className={`py-2 px-1 rounded-xl border text-xs font-bold transition-all ${videoFilter === 'bright' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}>뽀샤시<br/><span className="font-normal opacity-70">화사하게</span></button>
             </div>
           </div>
 
@@ -291,6 +331,14 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
               다운로드
             </a>
           </div>
+          
+          <button
+            onClick={handleCopyHtml}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition-colors mt-2"
+          >
+            <Copy size={18} />
+            네이버 블로그용 출처 문구 복사 (추천✨)
+          </button>
 
           {/* Square Affiliate Banner */}
           <a
