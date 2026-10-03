@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSiteSettings } from '@/lib/settings';
-import { Save, LogOut, LayoutDashboard, Link as LinkIcon, Type } from 'lucide-react';
+import { Save, LogOut, LayoutDashboard, Link as LinkIcon, Type, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminDashboard() {
