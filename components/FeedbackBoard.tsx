@@ -8,6 +8,26 @@ export default function FeedbackBoard() {
 
   useEffect(() => {
     setIsMounted(true);
+    
+    // Only load Disqus once
+    if ((window as any).DISQUS) return;
+
+    // Set configuration
+    (window as any).disqus_config = function () {
+      this.page.url = "https://gifty.run";
+      this.page.identifier = "gifty-main-board";
+    };
+
+    // Inject the Disqus script
+    const script = document.createElement('script');
+    script.src = 'https://https-gifty-run.disqus.com/embed.js';
+    script.setAttribute('data-timestamp', new Date().getTime().toString());
+    script.async = true;
+    document.body.appendChild(script);
+
+    return () => {
+      // Cleanup is usually not necessary for Disqus unless unmounting completely
+    };
   }, []);
 
   return (
@@ -23,27 +43,7 @@ export default function FeedbackBoard() {
           </div>
         </div>
         <div className="p-6 md:p-8 min-h-[300px]">
-          {isMounted && (
-            <div id="disqus_thread"></div>
-          )}
-          {isMounted && (
-            <script
-              dangerouslySetInnerHTML={{
-                __html: `
-                  var disqus_config = function () {
-                    this.page.url = "https://gifty.run"; 
-                    this.page.identifier = "gifty-main-board"; 
-                  };
-                  (function() {
-                    var d = document, s = d.createElement('script');
-                    s.src = 'https://https-gifty-run.disqus.com/embed.js';
-                    s.setAttribute('data-timestamp', +new Date());
-                    (d.head || d.body).appendChild(s);
-                  })();
-                `
-              }}
-            />
-          )}
+          <div id="disqus_thread"></div>
           <noscript>게시판을 보려면 자바스크립트를 활성화해 주세요.</noscript>
         </div>
       </div>
