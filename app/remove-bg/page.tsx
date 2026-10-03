@@ -1,9 +1,9 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Sparkles, ArrowLeft, Upload, Download, Loader2, Image as ImageIcon } from 'lucide-react';
-import Footer from '@/components/Footer';
+
 
 export default function RemoveBg() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -33,7 +33,7 @@ export default function RemoveBg() {
     
     // Only accept images
     if (!file.type.startsWith('image/')) {
-      alert('이미지 파일만 업로드 가능합니다. (JPG, PNG 등)');
+      alert('?대?吏 ?뚯씪留??낅줈??媛?ν빀?덈떎. (JPG, PNG ??');
       return;
     }
     
@@ -47,7 +47,7 @@ export default function RemoveBg() {
     if (!selectedFile) return;
     
     setIsProcessing(true);
-    setProgressText('AI 모델을 불러오고 있습니다... (최초 1회는 10초 정도 소요됩니다)');
+    setProgressText('AI 紐⑤뜽??遺덈윭?ㅺ퀬 ?덉뒿?덈떎... (理쒖큹 1?뚮뒗 10珥??뺣룄 ?뚯슂?⑸땲??');
     
     try {
       // Configuration for model loading progress
@@ -55,9 +55,9 @@ export default function RemoveBg() {
         progress: (key: string, current: number, total: number) => {
           const percent = Math.round((current / total) * 100);
           if (key.includes('fetch')) {
-            setProgressText(`AI 모델 다운로드 중... ${percent}%`);
+            setProgressText(`AI 紐⑤뜽 ?ㅼ슫濡쒕뱶 以?.. ${percent}%`);
           } else {
-            setProgressText('이미지 배경을 분석하고 지우는 중...');
+            setProgressText('?대?吏 諛곌꼍??遺꾩꽍?섍퀬 吏?곕뒗 以?..');
           }
         }
       };
@@ -65,10 +65,10 @@ export default function RemoveBg() {
       const resultBlob = await (window as any).imglyRemoveBackground(selectedFile, config);
       const url = URL.createObjectURL(resultBlob);
       setResultUrl(url);
-      setProgressText('완료!');
+      setProgressText('?꾨즺!');
     } catch (error) {
       console.error(error);
-      alert('배경 제거 중 오류가 발생했습니다. 브라우저를 최신 버전으로 업데이트 해보세요.');
+      alert('諛곌꼍 ?쒓굅 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎. 釉뚮씪?곗?瑜?理쒖떊 踰꾩쟾?쇰줈 ?낅뜲?댄듃 ?대낫?몄슂.');
       setProgressText('');
     } finally {
       setIsProcessing(false);
@@ -100,7 +100,7 @@ export default function RemoveBg() {
           </Link>
           <div className="flex items-center gap-4 text-sm font-semibold">
             <Link href="/" className="flex items-center gap-1 text-slate-500 hover:text-indigo-600 transition-colors">
-              <ArrowLeft size={16} /> 움짤 메인으로
+              <ArrowLeft size={16} /> ?吏?硫붿씤?쇰줈
             </Link>
           </div>
         </div>
@@ -110,13 +110,13 @@ export default function RemoveBg() {
       <main className="flex-grow max-w-4xl mx-auto px-6 py-12 w-full flex flex-col items-center">
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-bold mb-4">
-            <ImageIcon size={16} /> 100% 무료 사진 누끼따기
+            <ImageIcon size={16} /> 100% 臾대즺 ?ъ쭊 ?꾨겮?곌린
           </div>
           <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight mb-3">
-            AI 배경 제거 (누끼따기)
+            AI 諛곌꼍 ?쒓굅 (?꾨겮?곌린)
           </h1>
           <p className="text-slate-500 max-w-lg mx-auto">
-            클릭 한 번으로 사진의 배경을 깔끔하게 지워보세요! 서버에 사진이 저장되지 않아 개인정보가 100% 보호됩니다.
+            ?대┃ ??踰덉쑝濡??ъ쭊??諛곌꼍??源붾걫?섍쾶 吏?뚮낫?몄슂! ?쒕쾭???ъ쭊????λ릺吏 ?딆븘 媛쒖씤?뺣낫媛 100% 蹂댄샇?⑸땲??
           </p>
         </div>
 
@@ -127,35 +127,35 @@ export default function RemoveBg() {
               className="w-full h-80 border-4 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors"
             >
               <Upload className="text-indigo-500 mb-4" size={48} />
-              <p className="text-lg font-bold text-slate-700">여기를 클릭하여 사진을 업로드하세요</p>
-              <p className="text-sm text-slate-400 mt-2">JPG, PNG 파일 지원</p>
+              <p className="text-lg font-bold text-slate-700">?ш린瑜??대┃?섏뿬 ?ъ쭊???낅줈?쒗븯?몄슂</p>
+              <p className="text-sm text-slate-400 mt-2">JPG, PNG ?뚯씪 吏??/p>
             </div>
           ) : (
             <div className="flex flex-col items-center">
               <div className="flex flex-col md:flex-row w-full gap-8 justify-center items-center mb-8">
                 {/* Original */}
                 <div className="flex flex-col items-center w-full md:w-1/2">
-                  <span className="text-sm font-bold text-slate-500 mb-2">원본 사진</span>
+                  <span className="text-sm font-bold text-slate-500 mb-2">?먮낯 ?ъ쭊</span>
                   <div className="w-full aspect-square bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 relative flex items-center justify-center">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={originalUrl} alt="원본" className="max-w-full max-h-full object-contain" />
+                    <img src={originalUrl} alt="?먮낯" className="max-w-full max-h-full object-contain" />
                   </div>
                 </div>
 
                 {/* Result */}
                 <div className="flex flex-col items-center w-full md:w-1/2">
-                  <span className="text-sm font-bold text-slate-500 mb-2">누끼따기 결과</span>
+                  <span className="text-sm font-bold text-slate-500 mb-2">?꾨겮?곌린 寃곌낵</span>
                   <div 
                     className="w-full aspect-square bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 relative flex items-center justify-center"
                     style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '16px 16px', backgroundColor: '#f8fafc' }}
                   >
                     {resultUrl ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={resultUrl} alt="결과" className="max-w-full max-h-full object-contain" />
+                      <img src={resultUrl} alt="寃곌낵" className="max-w-full max-h-full object-contain" />
                     ) : (
                       <div className="text-slate-400 flex flex-col items-center">
                         <ImageIcon size={32} className="mb-2 opacity-50" />
-                        <span>결과물이 여기에 표시됩니다</span>
+                        <span>寃곌낵臾쇱씠 ?ш린???쒖떆?⑸땲??/span>
                       </div>
                     )}
                   </div>
@@ -178,7 +178,7 @@ export default function RemoveBg() {
                       disabled={!imglyLoaded}
                       className={`font-bold py-3 px-8 rounded-xl shadow-md transition-transform flex items-center gap-2 ${imglyLoaded ? 'bg-purple-600 hover:bg-purple-700 text-white active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
                     >
-                      <Sparkles size={18} /> {imglyLoaded ? '배경 지우기 시작!' : 'AI 엔진 로딩 중...'}
+                      <Sparkles size={18} /> {imglyLoaded ? '諛곌꼍 吏?곌린 ?쒖옉!' : 'AI ?붿쭊 濡쒕뵫 以?..'}
                     </button>
                   )}
                   
@@ -187,8 +187,7 @@ export default function RemoveBg() {
                       onClick={handleDownload}
                       className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-xl shadow-md transition-transform active:scale-95 flex items-center gap-2"
                     >
-                      <Download size={18} /> 투명 PNG로 저장하기
-                    </button>
+                      <Download size={18} /> ?щ챸 PNG濡???ν븯湲?                    </button>
                   )}
                   
                   <button 
@@ -200,8 +199,7 @@ export default function RemoveBg() {
                     }}
                     className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-3 px-6 rounded-xl transition-colors"
                   >
-                    다른 사진 고르기
-                  </button>
+                    ?ㅻⅨ ?ъ쭊 怨좊Ⅴ湲?                  </button>
                 </div>
               </div>
             </div>
