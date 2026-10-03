@@ -87,7 +87,7 @@ export default function RemoveBg() {
       if (!segmenterRef.current) {
         setProgressText('AI 모델 다운로드 중... (최초 1회 약 150MB)');
         const pipeline = (window as any).TransformersPipeline;
-        segmenterRef.current = await pipeline('image-segmentation', 'briaai/RMBG-1.4', {
+        segmenterRef.current = await pipeline('image-segmentation', 'Xenova/modnet', {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           progress_callback: (info: any) => {
             if (info.status === 'progress') {
