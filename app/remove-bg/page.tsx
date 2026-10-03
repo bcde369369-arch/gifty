@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Sparkles, ArrowLeft, Upload, Download, Loader2, Image as ImageIcon } from 'lucide-react';
+import { pipeline, env, RawImage } from '@huggingface/transformers';
 
 export default function RemoveBg() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -10,21 +11,35 @@ export default function RemoveBg() {
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progressText, setProgressText] = useState('');
-  const [imglyLoaded, setImglyLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Store the segmenter pipeline instance
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const segmenterRef = useRef<any>(null);
 
   useEffect(() => {
-    // Load imgly script from CDN
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((window as any).imglyRemoveBackground) {
-      setImglyLoaded(true);
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/imglyRemoveBackground.umd.js';
-    script.async = true;
-    script.onload = () => setImglyLoaded(true);
-    document.body.appendChild(script);
+    // Configure transformers.js for client-side usage
+    env.allowLocalModels = false;
+    env.useBrowserCache = true;
+    
+    // Pre-load the model in the background
+    const loadModel = async () => {
+      try {
+        if (!segmenterRef.current) {
+          segmenterRef.current = await pipeline('image-segmentation', 'briaai/RMBG-1.4', {
+            progress_callback: (info: any) => {
+              if (info.status === 'progress') {
+                setProgressText(`AI 모델 다운로드 중... ${Math.round(info.progress)}%`);
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.error("Failed to preload model:", err);
+      }
+    };
+    
+    loadModel();
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -44,29 +59,97 @@ export default function RemoveBg() {
   };
 
   const handleRemoveBackground = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || !originalUrl) return;
     
     setIsProcessing(true);
-    setProgressText('AI 모델을 불러오고 있습니다... (최초 1회는 10초 정도 소요됩니다)');
+    setProgressText('AI 엔진 준비 중...');
     
     try {
-      // Configuration for model loading progress
-      const config = {
-        progress: (key: string, current: number, total: number) => {
-          const percent = Math.round((current / total) * 100);
-          if (key.includes('fetch')) {
-            setProgressText(`AI 모델 다운로드 중... ${percent}%`);
-          } else {
-            setProgressText('이미지 배경을 분석하고 지우는 중...');
+      if (!segmenterRef.current) {
+        setProgressText('AI 모델 다운로드 중... (최초 1회 약 150MB)');
+        segmenterRef.current = await pipeline('image-segmentation', 'briaai/RMBG-1.4', {
+          progress_callback: (info: any) => {
+            if (info.status === 'progress') {
+              setProgressText(`AI 모델 다운로드 중... ${Math.round(info.progress)}%`);
+            }
           }
-        }
-      };
+        });
+      }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const resultBlob = await (window as any).imglyRemoveBackground(selectedFile, config);
-      const url = URL.createObjectURL(resultBlob);
+      setProgressText('배경 지우는 중... (약 2~5초 소요)');
+      
+      // Load the image for transformers.js
+      const img = await RawImage.fromURL(originalUrl);
+      
+      // Run the segmentation pipeline
+      const result = await segmenterRef.current(img);
+      
+      // result is typically an array of segmentation results, but RMBG returns single foreground mask or multiple
+      // We'll extract the mask and apply it to the original image via canvas
+      
+      let maskImage: RawImage;
+      if (Array.isArray(result) && result.length > 0) {
+        maskImage = result[0].mask;
+      } else if (result.mask) {
+        maskImage = result.mask;
+      } else {
+        throw new Error("No mask found");
+      }
+
+      // Convert the mask to an offscreen canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error("Canvas 2D context not supported");
+
+      // Draw original image
+      const origHtmlImg = new Image();
+      origHtmlImg.src = originalUrl;
+      await new Promise(resolve => { origHtmlImg.onload = resolve; });
+      ctx.drawImage(origHtmlImg, 0, 0);
+
+      // Draw mask with composite operation
+      ctx.globalCompositeOperation = 'destination-in';
+      
+      // The maskImage is a RawImage. Convert to ImageData.
+      const maskCanvas = document.createElement('canvas');
+      maskCanvas.width = maskImage.width;
+      maskCanvas.height = maskImage.height;
+      const maskCtx = maskCanvas.getContext('2d');
+      if (!maskCtx) throw new Error("Mask canvas context not supported");
+      
+      // The mask image might be L or RGB. Let's create ImageData safely
+      const maskData = new ImageData(maskCanvas.width, maskCanvas.height);
+      const pixelCount = maskCanvas.width * maskCanvas.height;
+      
+      if (maskImage.channels === 1) {
+        for (let i = 0; i < pixelCount; i++) {
+          maskData.data[i * 4] = maskImage.data[i];
+          maskData.data[i * 4 + 1] = maskImage.data[i];
+          maskData.data[i * 4 + 2] = maskImage.data[i];
+          maskData.data[i * 4 + 3] = maskImage.data[i]; // Use as alpha
+        }
+      } else {
+        // Just use it as RGBA directly if it has 4 channels, or RGB if 3
+        const hasAlpha = maskImage.channels === 4;
+        for (let i = 0; i < pixelCount; i++) {
+          maskData.data[i * 4] = maskImage.data[i * maskImage.channels];
+          maskData.data[i * 4 + 1] = maskImage.data[i * maskImage.channels + 1];
+          maskData.data[i * 4 + 2] = maskImage.data[i * maskImage.channels + 2];
+          maskData.data[i * 4 + 3] = hasAlpha ? maskImage.data[i * maskImage.channels + 3] : maskImage.data[i * maskImage.channels];
+        }
+      }
+      
+      maskCtx.putImageData(maskData, 0, 0);
+      
+      // Scale mask to fit original if sizes differ
+      ctx.drawImage(maskCanvas, 0, 0, canvas.width, canvas.height);
+
+      const url = canvas.toDataURL('image/png');
       setResultUrl(url);
       setProgressText('완료!');
+      
     } catch (error) {
       console.error(error);
       alert('배경 제거 중 오류가 발생했습니다. 브라우저를 최신 버전으로 업데이트 해보세요.');
@@ -176,10 +259,9 @@ export default function RemoveBg() {
                   {!resultUrl && !isProcessing && (
                     <button 
                       onClick={handleRemoveBackground}
-                      disabled={!imglyLoaded}
-                      className={`font-bold py-3 px-8 rounded-xl shadow-md transition-transform flex items-center gap-2 ${imglyLoaded ? 'bg-purple-600 hover:bg-purple-700 text-white active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                      className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-xl shadow-md transition-transform active:scale-95 flex items-center gap-2"
                     >
-                      <Sparkles size={18} /> {imglyLoaded ? '배경 지우기 시작!' : 'AI 엔진 로딩 중...'}
+                      <Sparkles size={18} /> 배경 지우기 시작!
                     </button>
                   )}
                   
