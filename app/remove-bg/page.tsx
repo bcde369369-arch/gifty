@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Sparkles, ArrowLeft, Upload, Download, Loader2, Image as ImageIcon } from 'lucide-react';
-import { removeBackground } from '@imgly/background-removal';
 import Footer from '@/components/Footer';
 
 export default function RemoveBg() {
@@ -12,7 +11,21 @@ export default function RemoveBg() {
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progressText, setProgressText] = useState('');
+  const [imglyLoaded, setImglyLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Load imgly script from CDN
+    if ((window as any).imglyRemoveBackground) {
+      setImglyLoaded(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/imglyRemoveBackground.umd.js';
+    script.async = true;
+    script.onload = () => setImglyLoaded(true);
+    document.body.appendChild(script);
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -49,7 +62,7 @@ export default function RemoveBg() {
         }
       };
 
-      const resultBlob = await removeBackground(selectedFile, config);
+      const resultBlob = await (window as any).imglyRemoveBackground(selectedFile, config);
       const url = URL.createObjectURL(resultBlob);
       setResultUrl(url);
       setProgressText('완료!');
@@ -162,9 +175,10 @@ export default function RemoveBg() {
                   {!resultUrl && !isProcessing && (
                     <button 
                       onClick={handleRemoveBackground}
-                      className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-xl shadow-md transition-transform active:scale-95 flex items-center gap-2"
+                      disabled={!imglyLoaded}
+                      className={`font-bold py-3 px-8 rounded-xl shadow-md transition-transform flex items-center gap-2 ${imglyLoaded ? 'bg-purple-600 hover:bg-purple-700 text-white active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
                     >
-                      <Sparkles size={18} /> 배경 지우기 시작!
+                      <Sparkles size={18} /> {imglyLoaded ? '배경 지우기 시작!' : 'AI 엔진 로딩 중...'}
                     </button>
                   )}
                   
