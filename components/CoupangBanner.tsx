@@ -7,11 +7,9 @@ interface CoupangBannerProps {
 }
 
 export default function CoupangBanner({ htmlCode }: CoupangBannerProps) {
-  // If no code, return null
-  if (!htmlCode || !htmlCode.trim()) return null;
-
   // Try to parse the script format: new PartnersCoupang.G({...})
   const parsed = useMemo(() => {
+    if (!htmlCode || !htmlCode.trim()) return null;
     try {
       // Look for the JSON object passed to PartnersCoupang.G
       const match = htmlCode.match(/new\s+PartnersCoupang\.G\(([\s\S]*?)\);?/);
@@ -24,6 +22,9 @@ export default function CoupangBanner({ htmlCode }: CoupangBannerProps) {
     }
     return null;
   }, [htmlCode]);
+
+  // If no code, return null
+  if (!htmlCode || !htmlCode.trim()) return null;
 
   // If it successfully parsed the script tag, render as an iframe
   if (parsed && parsed.id && parsed.trackingCode) {
