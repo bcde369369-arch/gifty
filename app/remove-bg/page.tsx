@@ -34,7 +34,7 @@ export default function RemoveBg() {
       script.id = 'tf-script';
       script.type = 'module';
       script.textContent = `
-        import { pipeline, env, RawImage } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0/dist/transformers.min.js';
+        import { pipeline, env, RawImage } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.min.js';
         window.TransformersPipeline = pipeline;
         window.TransformersEnv = env;
         window.TransformersRawImage = RawImage;
