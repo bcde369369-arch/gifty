@@ -8,6 +8,7 @@ import UpdateModal from '@/components/UpdateModal';
 import CoupangBanner from '@/components/CoupangBanner';
 import { Sparkles, Video, Wand2, DownloadCloud, Menu, ExternalLink, X } from 'lucide-react';
 import { useSiteSettings } from '@/lib/settings';
+import FeedbackBoard from '@/components/FeedbackBoard';
 
 export default function Home() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -189,6 +190,9 @@ export default function Home() {
           </div>
         </a>
       </section>
+
+      {/* Feedback Board */}
+      <FeedbackBoard />
 
       {/* Footer */}
       <footer className="bg-slate-900 text-slate-400 py-12 mt-12">
