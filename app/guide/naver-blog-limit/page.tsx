@@ -1,11 +1,11 @@
 import React from 'react';
 import Link from 'next/link';
 import { Sparkles, ArrowLeft } from 'lucide-react';
-import Footer from '@/components/Footer';
+
 
 export const metadata = {
-  title: '네이버 블로그 움짤(GIF) 용량 20MB 제한, 화질 깨짐 없이 올리는 완벽 가이드',
-  description: '블로그에 20MB가 넘는 움짤을 올리려다 실패하신 적 있나요? 프레임과 사이즈를 조절해 화질 손실 없이 용량만 쏙 줄이는 비밀을 공개합니다.',
+  title: '?�이�?블로�??��?GIF) ?�량 20MB ?�한, ?�질 깨짐 ?�이 ?�리???�벽 가?�드',
+  description: '블로그에 20MB가 ?�는 ?�짤을 ?�리?�다 ?�패?�신 ???�나?? ?�레?�과 ?�이즈�? 조절???�질 ?�실 ?�이 ?�량�???줄이??비�???공개?�니??',
 };
 
 export default function Post() {
@@ -23,7 +23,7 @@ export default function Post() {
           </Link>
           <div className="flex items-center gap-4 text-sm font-semibold">
             <Link href="/guide" className="flex items-center gap-1 text-slate-500 hover:text-indigo-600 transition-colors">
-              <ArrowLeft size={16} /> 목록으로
+              <ArrowLeft size={16} /> 목록?�로
             </Link>
           </div>
         </div>
@@ -34,39 +34,39 @@ export default function Post() {
           <h1 className="text-3xl md:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight mb-8">
             {metadata.title}
           </h1>
-          <p className="text-slate-500 mb-12">작성일: 2026-10-03 | 작성자: Gifty 에디터</p>
+          <p className="text-slate-500 mb-12">?�성?? 2026-10-03 | ?�성?? Gifty ?�디??/p>
           
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 text-slate-700 leading-loose space-y-6">
-            <p>네이버 블로그를 운영하다 보면 가장 짜증 나는 순간이 언제일까요? 바로 정성껏 만든 움짤(GIF)을 올리려는데 <strong>"20MB를 초과하여 업로드할 수 없습니다."</strong>라는 팝업이 뜰 때입니다. </p>
+            <p>?�이�?블로그�? ?�영?�다 보면 가??짜증 ?�는 ?�간???�제?�까?? 바로 ?�성�?만든 ?��?GIF)???�리?�는??<strong>"20MB�?초과?�여 ?�로?�할 ???�습?�다."</strong>?�는 ?�업?????�입?�다. </p>
             
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">왜 네이버 블로그는 20MB로 제한할까요?</h2>
-            <p>네이버 블로그뿐만 아니라 대부분의 커뮤니티(디시인사이드, 에펨코리아, 루리웹 등)는 서버 트래픽 비용을 절감하기 위해 GIF 파일 용량을 엄격하게 제한합니다. GIF 형식 자체가 1987년에 만들어진 아주 오래된 기술이기 때문에, 영상을 압축하는 효율이 최신 MP4 영상보다 현저히 떨어집니다. 즉, 똑같은 5초짜리 영상이라도 MP4는 1MB면 충분한데, GIF로 만들면 20MB를 훌쩍 넘어버리는 것이죠.</p>
+            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">???�이�?블로그는 20MB�??�한?�까??</h2>
+            <p>?�이�?블로그뿐�??�니???�부분의 커�??�티(?�시?�사?�드, ?�펨코리?? 루리???????�버 ?�래??비용???�감?�기 ?�해 GIF ?�일 ?�량???�격?�게 ?�한?�니?? GIF ?�식 ?�체가 1987?�에 만들?�진 ?�주 ?�래??기술?�기 ?�문?? ?�상???�축?�는 ?�율??최신 MP4 ?�상보다 ?��????�어집니?? �? ?�같?� 5초짜�??�상?�라??MP4??1MB�?충분?�데, GIF�?만들�?20MB�??�쩍 ?�어버리??것이�?</p>
 
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">화질을 유지하면서 용량을 줄이는 3가지 마법</h2>
+            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">?�질???��??�면???�량??줄이??3가지 마법</h2>
             
-            <h3 className="text-xl font-bold text-indigo-600 mt-6 mb-3">1. 프레임 레이트(FPS) 최적화</h3>
-            <p>일반적인 동영상은 1초에 30장 혹은 60장의 사진(프레임)이 지나갑니다. 하지만 블로그에 올리는 움짤은 1초에 10~15장(10fps~15fps)만 지나가도 시각적으로 충분히 부드럽게 보입니다. 프레임을 절반으로 줄이면 용량도 정확히 절반으로 줄어듭니다!</p>
+            <h3 className="text-xl font-bold text-indigo-600 mt-6 mb-3">1. ?�레???�이??FPS) 최적??/h3>
+            <p>?�반?�인 ?�영?��? 1초에 30???��? 60?�의 ?�진(?�레????지?�갑?�다. ?��?�?블로그에 ?�리???�짤�? 1초에 10~15??10fps~15fps)�?지?��????�각?�으�?충분??부?�럽�?보입?�다. ?�레?�을 ?�반?�로 줄이�??�량???�확???�반?�로 줄어??��??</p>
 
-            <h3 className="text-xl font-bold text-indigo-600 mt-6 mb-3">2. 화면 크기(해상도) 리사이징</h3>
-            <p>원본 영상이 4K 혹은 1080p FHD 해상도라면, 이를 그대로 GIF로 만들 경우 용량이 수백 메가바이트에 달하게 됩니다. 모바일로 블로그를 보는 독자들을 위해 가로 픽셀을 600px ~ 800px로 줄여보세요. 화질 저하는 거의 느껴지지 않으면서 용량은 기적처럼 줄어듭니다.</p>
+            <h3 className="text-xl font-bold text-indigo-600 mt-6 mb-3">2. ?�면 ?�기(?�상?? 리사?�징</h3>
+            <p>?�본 ?�상??4K ?��? 1080p FHD ?�상?�라�? ?��? 그�?�?GIF�?만들 경우 ?�량???�백 메�?바이?�에 ?�하�??�니?? 모바?�로 블로그�? 보는 ?�자?�을 ?�해 가�??��???600px ~ 800px�?줄여보세?? ?�질 ?�?�는 거의 ?�껴지지 ?�으면서 ?�량?� 기적처럼 줄어??��??</p>
 
-            <h3 className="text-xl font-bold text-indigo-600 mt-6 mb-3">3. 색상 압축 알고리즘 사용</h3>
-            <p>가장 중요한 부분입니다. GIF는 표현할 수 있는 색상이 최대 256색으로 제한되어 있습니다. 싸구려 변환기를 사용하면 색이 얼룩덜룩해지는 '디더링(Dithering)' 현상이 발생하죠. 하지만 Gifty와 같은 고급 인코더는 '팔레트 생성 최적화' 기술을 사용하여, 영상에 쓰인 핵심 256색을 먼저 추출한 뒤 압축하므로 화질이 완벽하게 보존됩니다.</p>
+            <h3 className="text-xl font-bold text-indigo-600 mt-6 mb-3">3. ?�상 ?�축 ?�고리즘 ?�용</h3>
+            <p>가??중요??부분입?�다. GIF???�현?????�는 ?�상??최�? 256?�으�??�한?�어 ?�습?�다. ?�구??변?�기�??�용?�면 ?�이 ?�룩?�룩?��???'?�더�?Dithering)' ?�상??발생?�죠. ?��?�?Gifty?� 같�? 고급 ?�코?�는 '?�레???�성 최적?? 기술???�용?�여, ?�상???�인 ?�심 256?�을 먼�? 추출?????�축?��?�??�질???�벽?�게 보존?�니??</p>
 
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">결론: Gifty로 한 번에 해결하세요!</h2>
-            <p>이 모든 복잡한 설정을 외울 필요가 없습니다. <strong>Gifty</strong>는 블로거 여러분을 위해 자동으로 20MB가 넘지 않도록 알고리즘을 깎고 다듬어 최고의 결과물을 뽑아냅니다. 만약 변환 결과물이 20MB를 넘는다면, Gifty의 똑똑한 AI(?)가 자동으로 크기를 조금씩 줄여가며 네이버 블로그에 딱 맞는 사이즈로 재도전하여 결국 성공해 냅니다!</p>
+            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">결론: Gifty�???번에 ?�결?�세??</h2>
+            <p>??모든 복잡???�정???�울 ?�요가 ?�습?�다. <strong>Gifty</strong>??블로�??�러분을 ?�해 ?�동?�로 20MB가 ?��? ?�도�??�고리즘??깎고 ?�듬??최고??결과물을 뽑아?�니?? 만약 변??결과물이 20MB�??�는?�면, Gifty???�똑??AI(?)가 ?�동?�로 ?�기�?조금??줄여가�??�이�?블로그에 ??맞는 ?�이즈로 ?�도?�하??결국 ?�공???�니??</p>
             
-            <p className="mt-8 font-bold text-center">지금 바로 무료로 Gifty를 체험해 보세요!</p>
+            <p className="mt-8 font-bold text-center">지�?바로 무료�?Gifty�?체험??보세??</p>
             <div className="text-center mt-6">
               <Link href="/" className="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-xl transition-colors">
-                움짤 만들러 가기 &rarr;
+                ?��?만들??가�?&rarr;
               </Link>
             </div>
           </div>
         </article>
       </main>
 
-      <Footer />
+      
     </div>
   );
 }
