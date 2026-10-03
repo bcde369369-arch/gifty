@@ -1,5 +1,4 @@
 import './globals.css';
-import Script from 'next/script';
 import Analytics from '@/components/Analytics';
 
 export const metadata = {
@@ -33,12 +32,11 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <head>
-        <Script
+        <script
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7186754693915211"
           crossOrigin="anonymous"
-          strategy="afterInteractive"
-        />
+        ></script>
       </head>
       <body>
         {children}
