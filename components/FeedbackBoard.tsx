@@ -1,18 +1,16 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { MessageSquarePlus } from 'lucide-react';
 
 export default function FeedbackBoard() {
-  const [isMounted, setIsMounted] = useState(false);
-
   useEffect(() => {
-    setIsMounted(true);
-    
     // Only load Disqus once
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if ((window as any).DISQUS) return;
 
     // Set configuration
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).disqus_config = function () {
       this.page.url = "https://gifty.run";
       this.page.identifier = "gifty-main-board";
