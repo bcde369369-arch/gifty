@@ -5,6 +5,7 @@ import Dropzone from '@/components/Dropzone';
 import VideoEditor from '@/components/VideoEditor';
 import ShareButton from '@/components/ShareButton';
 import UpdateModal from '@/components/UpdateModal';
+import CoupangBanner from '@/components/CoupangBanner';
 import { Sparkles, Video, Wand2, DownloadCloud, Menu, ExternalLink, X } from 'lucide-react';
 import { useSiteSettings } from '@/lib/settings';
 
@@ -114,7 +115,7 @@ export default function Home() {
           {/* Global Coupang Partners Banner */}
           {isLoaded && settings.coupangBannerHtml && (
             <div className="max-w-4xl mx-auto mt-8 flex justify-center items-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm p-2">
-              <div dangerouslySetInnerHTML={{ __html: settings.coupangBannerHtml }} />
+              <CoupangBanner htmlCode={settings.coupangBannerHtml} />
             </div>
           )}
 

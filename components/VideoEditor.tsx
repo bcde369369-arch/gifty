@@ -4,6 +4,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { convertToGif } from '@/lib/ffmpeg';
 import { Loader2, Download, RotateCcw, Sparkles, Copy } from 'lucide-react';
 import { useSiteSettings } from '@/lib/settings';
+import CoupangBanner from '@/components/CoupangBanner';
 
 interface VideoEditorProps {
   videoFile: File;
@@ -344,7 +345,7 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
           {/* Coupang Partners Banner */}
           {isLoaded && settings.coupangBannerHtml && (
             <div className="w-full mt-6 flex justify-center items-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm p-2">
-              <div dangerouslySetInnerHTML={{ __html: settings.coupangBannerHtml }} />
+              <CoupangBanner htmlCode={settings.coupangBannerHtml} />
             </div>
           )}
 
