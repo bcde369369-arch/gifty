@@ -110,6 +110,14 @@ export default function Home() {
               <VideoEditor videoFile={videoFile} onReset={() => setVideoFile(null)} />
             )}
           </div>
+
+          {/* Global Coupang Partners Banner */}
+          {isLoaded && settings.coupangBannerHtml && (
+            <div className="max-w-4xl mx-auto mt-8 flex justify-center items-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm p-2">
+              <div dangerouslySetInnerHTML={{ __html: settings.coupangBannerHtml }} />
+            </div>
+          )}
+
         </div>
       </section>
 

@@ -341,6 +341,13 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
             네이버 블로그용 출처 문구 복사 (추천✨)
           </button>
 
+          {/* Coupang Partners Banner */}
+          {isLoaded && settings.coupangBannerHtml && (
+            <div className="w-full mt-6 flex justify-center items-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm p-2">
+              <div dangerouslySetInnerHTML={{ __html: settings.coupangBannerHtml }} />
+            </div>
+          )}
+
           {/* Square Affiliate Banner */}
           <a
             href={isLoaded ? settings.affiliateLink : '#'}

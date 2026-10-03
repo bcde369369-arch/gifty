@@ -5,6 +5,7 @@ export interface SiteSettings {
   affiliateTitle: string;
   affiliateSubtitle: string;
   affiliateLink: string;
+  coupangBannerHtml: string;
 }
 
 const defaultSettings: SiteSettings = {
@@ -12,6 +13,7 @@ const defaultSettings: SiteSettings = {
   affiliateTitle: '요즘 대세 필수 AI 앱, 에이닷 🚀',
   affiliateSubtitle: '통화 녹음부터 일정 관리까지! 나만의 똑똑한 AI 비서 A. 무료로 시작하기',
   affiliateLink: 'http://searchcategory.co.kr/ad/cpc_open.php?app=205&custom=16&domain=adot.ai&type=1&aid=8291&browser=chrome&guid=202311057VpLO8',
+  coupangBannerHtml: '', // default is empty
 };
 
 export function useSiteSettings() {

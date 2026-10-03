@@ -154,6 +154,29 @@ export default function AdminDashboard() {
               </div>
             </div>
           </section>
+
+          {/* Coupang Partners Settings */}
+          <section className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 text-fuchsia-600 font-bold text-lg mb-6 pb-4 border-b border-slate-100">
+              <Sparkles size={20} /> 쿠팡 다이내믹 배너 설정 (HTML 코드)
+            </div>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">쿠팡 파트너스 HTML/Iframe 코드</label>
+                <textarea
+                  value={formData.coupangBannerHtml || ''}
+                  onChange={(e) => setFormData({...formData, coupangBannerHtml: e.target.value})}
+                  rows={4}
+                  placeholder='<iframe src="https://ads-partners.coupang.com..." width="680" height="140" frameborder="0" scrolling="no" referrerpolicy="unsafe-url"></iframe>'
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500 font-mono text-sm"
+                />
+                <p className="text-xs text-slate-500 mt-2">
+                  쿠팡 파트너스 사이트에서 '다이내믹 배너' 또는 '검색 위젯' 코드를 복사해서 이곳에 붙여넣으세요. 코드가 입력되면 변환기 아래쪽에 쿠팡 배너가 표시됩니다.
+                </p>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </div>
