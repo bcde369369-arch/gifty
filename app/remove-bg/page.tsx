@@ -13,6 +13,7 @@ export default function RemoveBg() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progressText, setProgressText] = useState('');
   const [tfLoaded, setTfLoaded] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -54,9 +55,17 @@ export default function RemoveBg() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    
-    // Only accept images
+    if (file) processFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
+  };
+
+  const processFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
       alert('이미지 파일만 업로드 가능합니다. (JPG, PNG 등)');
       return;
@@ -207,10 +216,19 @@ export default function RemoveBg() {
           {!originalUrl ? (
             <div 
               onClick={() => fileInputRef.current?.click()}
-              className="w-full h-80 border-4 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors"
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+              className={`w-full h-80 border-4 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-colors ${
+                isDragging 
+                  ? 'border-indigo-500 bg-indigo-50' 
+                  : 'border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/50'
+              }`}
             >
-              <Upload className="text-indigo-500 mb-4" size={48} />
-              <p className="text-lg font-bold text-slate-700">여기를 클릭하여 사진을 업로드하세요</p>
+              <Upload className={`${isDragging ? 'text-indigo-600' : 'text-indigo-500'} mb-4`} size={48} />
+              <p className="text-lg font-bold text-slate-700">
+                {isDragging ? '파일을 여기에 놓아주세요' : '여기를 클릭하거나 파일을 끌어다 놓으세요'}
+              </p>
               <p className="text-sm text-slate-400 mt-2">JPG, PNG 파일 지원</p>
             </div>
           ) : (
