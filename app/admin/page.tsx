@@ -172,7 +172,7 @@ export default function AdminDashboard() {
                   className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500 font-mono text-sm"
                 />
                 <p className="text-xs text-slate-500 mt-2">
-                  쿠팡 파트너스 사이트에서 '다이내믹 배너' 또는 '검색 위젯' 코드를 복사해서 이곳에 붙여넣으세요. 코드가 입력되면 변환기 아래쪽에 쿠팡 배너가 표시됩니다.
+                  쿠팡 파트너스 사이트에서 &apos;다이내믹 배너&apos; 또는 &apos;검색 위젯&apos; 코드를 복사해서 이곳에 붙여넣으세요. 코드가 입력되면 변환기 아래쪽에 쿠팡 배너가 표시됩니다.
                 </p>
               </div>
             </div>
