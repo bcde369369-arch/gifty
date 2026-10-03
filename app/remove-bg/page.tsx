@@ -160,9 +160,9 @@ export default function RemoveBg() {
       setResultUrl(url);
       setProgressText('완료!');
       
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert('배경 제거 중 오류가 발생했습니다. 브라우저를 최신 버전으로 업데이트 해보세요.');
+      alert('오류 발생: ' + (error.message || error.toString()) + '\n\n브라우저를 업데이트하거나 다른 사진을 사용해보세요.');
       setProgressText('');
     } finally {
       setIsProcessing(false);
