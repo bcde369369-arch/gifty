@@ -21,22 +21,6 @@ export default function RemoveBg() {
     const loadTransformers = async () => {
       if ((window as any).TransformersPipeline) {
         setTfLoaded(true);
-        return;
-      }
-      
-      try {
-        const tf = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0/dist/transformers.min.js' as any);
-        (window as any).TransformersPipeline = tf.pipeline;
-        (window as any).TransformersEnv = tf.env;
-        (window as any).TransformersRawImage = tf.RawImage;
-        
-        const env = (window as any).TransformersEnv;
-        env.allowLocalModels = false;
-        env.useBrowserCache = true;
-        
-        setTfLoaded(true);
-      } catch (err) {
-        console.error("Failed to load transformers from CDN", err);
       }
     };
     
