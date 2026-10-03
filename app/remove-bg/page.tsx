@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Sparkles, ArrowLeft, Upload, Download, Loader2, Image as ImageIcon } from 'lucide-react';
-import { pipeline, env, RawImage } from '@huggingface/transformers';
 
 export default function RemoveBg() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -11,35 +10,60 @@ export default function RemoveBg() {
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progressText, setProgressText] = useState('');
+  const [tfLoaded, setTfLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Store the segmenter pipeline instance
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const segmenterRef = useRef<any>(null);
 
   useEffect(() => {
-    // Configure transformers.js for client-side usage
-    env.allowLocalModels = false;
-    env.useBrowserCache = true;
-    
-    // Pre-load the model in the background
-    const loadModel = async () => {
+    // Load transformers.js dynamically from CDN via script
+    const loadTransformers = async () => {
+      if ((window as any).TransformersPipeline) {
+        setTfLoaded(true);
+        return;
+      }
+      
       try {
-        if (!segmenterRef.current) {
-          segmenterRef.current = await pipeline('image-segmentation', 'briaai/RMBG-1.4', {
-            progress_callback: (info: any) => {
-              if (info.status === 'progress') {
-                setProgressText(`AI 모델 다운로드 중... ${Math.round(info.progress)}%`);
-              }
-            }
-          });
-        }
+        const tf = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0/dist/transformers.min.js' as any);
+        (window as any).TransformersPipeline = tf.pipeline;
+        (window as any).TransformersEnv = tf.env;
+        (window as any).TransformersRawImage = tf.RawImage;
+        
+        const env = (window as any).TransformersEnv;
+        env.allowLocalModels = false;
+        env.useBrowserCache = true;
+        
+        setTfLoaded(true);
       } catch (err) {
-        console.error("Failed to preload model:", err);
+        console.error("Failed to load transformers from CDN", err);
       }
     };
     
-    loadModel();
+    // We can't use native import() for external HTTP URLs in Next.js build easily.
+    // So we inject a module script!
+    if (!(window as any).TransformersPipeline && !document.getElementById('tf-script')) {
+      const script = document.createElement('script');
+      script.id = 'tf-script';
+      script.type = 'module';
+      script.textContent = `
+        import { pipeline, env, RawImage } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0/dist/transformers.min.js';
+        window.TransformersPipeline = pipeline;
+        window.TransformersEnv = env;
+        window.TransformersRawImage = RawImage;
+        window.dispatchEvent(new Event('transformers-loaded'));
+      `;
+      document.body.appendChild(script);
+      
+      window.addEventListener('transformers-loaded', () => {
+        const env = (window as any).TransformersEnv;
+        env.allowLocalModels = false;
+        env.useBrowserCache = true;
+        setTfLoaded(true);
+      });
+    } else if ((window as any).TransformersPipeline) {
+      setTfLoaded(true);
+    }
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -59,7 +83,7 @@ export default function RemoveBg() {
   };
 
   const handleRemoveBackground = async () => {
-    if (!selectedFile || !originalUrl) return;
+    if (!selectedFile || !originalUrl || !tfLoaded) return;
     
     setIsProcessing(true);
     setProgressText('AI 엔진 준비 중...');
@@ -67,7 +91,9 @@ export default function RemoveBg() {
     try {
       if (!segmenterRef.current) {
         setProgressText('AI 모델 다운로드 중... (최초 1회 약 150MB)');
+        const pipeline = (window as any).TransformersPipeline;
         segmenterRef.current = await pipeline('image-segmentation', 'briaai/RMBG-1.4', {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           progress_callback: (info: any) => {
             if (info.status === 'progress') {
               setProgressText(`AI 모델 다운로드 중... ${Math.round(info.progress)}%`);
@@ -78,16 +104,13 @@ export default function RemoveBg() {
 
       setProgressText('배경 지우는 중... (약 2~5초 소요)');
       
-      // Load the image for transformers.js
+      const RawImage = (window as any).TransformersRawImage;
       const img = await RawImage.fromURL(originalUrl);
       
-      // Run the segmentation pipeline
       const result = await segmenterRef.current(img);
       
-      // result is typically an array of segmentation results, but RMBG returns single foreground mask or multiple
-      // We'll extract the mask and apply it to the original image via canvas
-      
-      let maskImage: RawImage;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let maskImage: any;
       if (Array.isArray(result) && result.length > 0) {
         maskImage = result[0].mask;
       } else if (result.mask) {
@@ -96,30 +119,25 @@ export default function RemoveBg() {
         throw new Error("No mask found");
       }
 
-      // Convert the mask to an offscreen canvas
       const canvas = document.createElement('canvas');
       canvas.width = img.width;
       canvas.height = img.height;
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error("Canvas 2D context not supported");
 
-      // Draw original image
       const origHtmlImg = new Image();
       origHtmlImg.src = originalUrl;
       await new Promise(resolve => { origHtmlImg.onload = resolve; });
       ctx.drawImage(origHtmlImg, 0, 0);
 
-      // Draw mask with composite operation
       ctx.globalCompositeOperation = 'destination-in';
       
-      // The maskImage is a RawImage. Convert to ImageData.
       const maskCanvas = document.createElement('canvas');
       maskCanvas.width = maskImage.width;
       maskCanvas.height = maskImage.height;
       const maskCtx = maskCanvas.getContext('2d');
       if (!maskCtx) throw new Error("Mask canvas context not supported");
       
-      // The mask image might be L or RGB. Let's create ImageData safely
       const maskData = new ImageData(maskCanvas.width, maskCanvas.height);
       const pixelCount = maskCanvas.width * maskCanvas.height;
       
@@ -128,10 +146,9 @@ export default function RemoveBg() {
           maskData.data[i * 4] = maskImage.data[i];
           maskData.data[i * 4 + 1] = maskImage.data[i];
           maskData.data[i * 4 + 2] = maskImage.data[i];
-          maskData.data[i * 4 + 3] = maskImage.data[i]; // Use as alpha
+          maskData.data[i * 4 + 3] = maskImage.data[i]; 
         }
       } else {
-        // Just use it as RGBA directly if it has 4 channels, or RGB if 3
         const hasAlpha = maskImage.channels === 4;
         for (let i = 0; i < pixelCount; i++) {
           maskData.data[i * 4] = maskImage.data[i * maskImage.channels];
@@ -142,8 +159,6 @@ export default function RemoveBg() {
       }
       
       maskCtx.putImageData(maskData, 0, 0);
-      
-      // Scale mask to fit original if sizes differ
       ctx.drawImage(maskCanvas, 0, 0, canvas.width, canvas.height);
 
       const url = canvas.toDataURL('image/png');
@@ -171,7 +186,6 @@ export default function RemoveBg() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-indigo-200 flex flex-col">
-      {/* Navigation */}
       <nav className="w-full bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
@@ -190,7 +204,6 @@ export default function RemoveBg() {
         </div>
       </nav>
 
-      {/* Main Content */}
       <main className="flex-grow max-w-4xl mx-auto px-6 py-12 w-full flex flex-col items-center">
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-bold mb-4">
@@ -217,7 +230,6 @@ export default function RemoveBg() {
           ) : (
             <div className="flex flex-col items-center">
               <div className="flex flex-col md:flex-row w-full gap-8 justify-center items-center mb-8">
-                {/* Original */}
                 <div className="flex flex-col items-center w-full md:w-1/2">
                   <span className="text-sm font-bold text-slate-500 mb-2">원본 사진</span>
                   <div className="w-full aspect-square bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 relative flex items-center justify-center">
@@ -226,7 +238,6 @@ export default function RemoveBg() {
                   </div>
                 </div>
 
-                {/* Result */}
                 <div className="flex flex-col items-center w-full md:w-1/2">
                   <span className="text-sm font-bold text-slate-500 mb-2">누끼따기 결과</span>
                   <div 
@@ -246,7 +257,6 @@ export default function RemoveBg() {
                 </div>
               </div>
 
-              {/* Controls */}
               <div className="flex flex-col items-center w-full">
                 {isProcessing && (
                   <div className="w-full bg-indigo-50 text-indigo-700 py-3 px-4 rounded-xl flex items-center justify-center gap-3 mb-6 font-medium">
@@ -259,9 +269,10 @@ export default function RemoveBg() {
                   {!resultUrl && !isProcessing && (
                     <button 
                       onClick={handleRemoveBackground}
-                      className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-xl shadow-md transition-transform active:scale-95 flex items-center gap-2"
+                      disabled={!tfLoaded}
+                      className={`font-bold py-3 px-8 rounded-xl shadow-md transition-transform flex items-center gap-2 ${tfLoaded ? 'bg-purple-600 hover:bg-purple-700 text-white active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
                     >
-                      <Sparkles size={18} /> 배경 지우기 시작!
+                      <Sparkles size={18} /> {tfLoaded ? '배경 지우기 시작!' : 'AI 엔진 로딩 중...'}
                     </button>
                   )}
                   
