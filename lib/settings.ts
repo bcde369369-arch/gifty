@@ -6,14 +6,16 @@ export interface SiteSettings {
   affiliateSubtitle: string;
   affiliateLink: string;
   coupangBannerHtml: string;
+  coupangBannerHtmlMobile: string;
 }
 
 const defaultSettings: SiteSettings = {
   heroTagline: '100% 무료 GIF 메이커',
   affiliateTitle: '요즘 대세 필수 AI 앱, 에이닷 🚀',
-  affiliateSubtitle: '통화 녹음부터 일정 관리까지! 나만의 똑똑한 AI 비서 A. 무료로 시작하기',
+  affiliateSubtitle: '통화 무제한 녹음부터 일정 관리까지! 나만의 똑똑한 AI 비서 A. 무료로 시작하기',
   affiliateLink: 'http://searchcategory.co.kr/ad/cpc_open.php?app=205&custom=16&domain=adot.ai&type=1&aid=8291&browser=chrome&guid=202311057VpLO8',
-  coupangBannerHtml: '', // default is empty
+  coupangBannerHtml: '', 
+  coupangBannerHtmlMobile: '', 
 };
 
 export function useSiteSettings() {

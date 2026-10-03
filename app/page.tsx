@@ -113,9 +113,20 @@ export default function Home() {
           </div>
 
           {/* Global Coupang Partners Banner */}
-          {isLoaded && settings.coupangBannerHtml && (
-            <div className="max-w-4xl mx-auto mt-8 flex justify-center items-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm p-2">
-              <CoupangBanner htmlCode={settings.coupangBannerHtml} />
+          {isLoaded && (
+            <div className="mt-8 flex flex-col justify-center items-center">
+              {/* PC Banner */}
+              {settings.coupangBannerHtml && (
+                <div className="hidden md:flex max-w-4xl mx-auto overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm p-2">
+                  <CoupangBanner htmlCode={settings.coupangBannerHtml} />
+                </div>
+              )}
+              {/* Mobile Banner */}
+              {settings.coupangBannerHtmlMobile && (
+                <div className="flex md:hidden w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm p-2 justify-center">
+                  <CoupangBanner htmlCode={settings.coupangBannerHtmlMobile} />
+                </div>
+              )}
             </div>
           )}
 

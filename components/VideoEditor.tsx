@@ -343,9 +343,20 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
           </button>
 
           {/* Coupang Partners Banner */}
-          {isLoaded && settings.coupangBannerHtml && (
-            <div className="w-full mt-6 flex justify-center items-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm p-2">
-              <CoupangBanner htmlCode={settings.coupangBannerHtml} />
+          {isLoaded && (
+            <div className="w-full mt-6 flex flex-col justify-center items-center">
+              {/* PC Banner */}
+              {settings.coupangBannerHtml && (
+                <div className="hidden md:flex w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm p-2 justify-center">
+                  <CoupangBanner htmlCode={settings.coupangBannerHtml} />
+                </div>
+              )}
+              {/* Mobile Banner */}
+              {settings.coupangBannerHtmlMobile && (
+                <div className="flex md:hidden w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm p-2 justify-center">
+                  <CoupangBanner htmlCode={settings.coupangBannerHtmlMobile} />
+                </div>
+              )}
             </div>
           )}
 

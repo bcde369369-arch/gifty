@@ -163,16 +163,28 @@ export default function AdminDashboard() {
             
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">쿠팡 파트너스 HTML/Iframe 코드</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">🖥️ PC용 배너 (가로 680 이상 추천)</label>
                 <textarea
                   value={formData.coupangBannerHtml || ''}
                   onChange={(e) => setFormData({...formData, coupangBannerHtml: e.target.value})}
-                  rows={4}
-                  placeholder='<iframe src="https://ads-partners.coupang.com..." width="680" height="140" frameborder="0" scrolling="no" referrerpolicy="unsafe-url"></iframe>'
+                  rows={3}
+                  placeholder='<iframe src="..." width="680" height="140"...'
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500 font-mono text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">📱 모바일용 배너 (가로 320 이하 추천)</label>
+                <textarea
+                  value={formData.coupangBannerHtmlMobile || ''}
+                  onChange={(e) => setFormData({...formData, coupangBannerHtmlMobile: e.target.value})}
+                  rows={3}
+                  placeholder='<iframe src="..." width="320" height="100"...'
                   className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500 font-mono text-sm"
                 />
                 <p className="text-xs text-slate-500 mt-2">
-                  쿠팡 파트너스 사이트에서 &apos;다이내믹 배너&apos; 또는 &apos;검색 위젯&apos; 코드를 복사해서 이곳에 붙여넣으세요. 코드가 입력되면 변환기 아래쪽에 쿠팡 배너가 표시됩니다.
+                  PC 화면과 모바일 화면의 크기가 다르므로 각각 알맞은 크기의 배너 코드를 쿠팡 파트너스에서 생성하여 붙여넣어 주세요. 
+                  (모바일 기기에서는 모바일용 배너만 알아서 표시됩니다.)
                 </p>
               </div>
             </div>
