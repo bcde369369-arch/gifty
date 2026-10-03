@@ -177,6 +177,17 @@ export default function AdminDashboard() {
               </div>
             </div>
           </section>
+
+          {/* Bottom Save Button */}
+          <div className="flex justify-end pt-4">
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg transition-all disabled:opacity-50 text-lg"
+            >
+              <Save size={24} /> {isSaving ? '저장 중...' : '모든 변경사항 저장하기'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
