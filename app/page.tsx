@@ -45,8 +45,9 @@ export default function Home() {
             </span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
-            <a href="#" className="hover:text-indigo-600 transition-colors">홈</a>
+            <a href="/" className="hover:text-indigo-600 transition-colors">홈</a>
             <a href="#features" className="hover:text-indigo-600 transition-colors">기능</a>
+            <a href="/guide" className="hover:text-indigo-600 transition-colors text-indigo-600">움짤 꿀팁 📚</a>
           </div>
           <button className="md:hidden text-slate-500 hover:text-slate-800">
             <Menu size={24} />
