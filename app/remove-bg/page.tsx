@@ -2,9 +2,10 @@
 // @ts-nocheck
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { Sparkles, ArrowLeft, Upload, Download, Loader2, Image as ImageIcon } from 'lucide-react';
+import imglyRemoveBackground from '@imgly/background-removal';
 
 export default function RemoveBg() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -12,46 +13,8 @@ export default function RemoveBg() {
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progressText, setProgressText] = useState('');
-  const [tfLoaded, setTfLoaded] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const segmenterRef = useRef<any>(null);
-
-  useEffect(() => {
-    // Load transformers.js dynamically from CDN via script
-    const loadTransformers = async () => {
-      if ((window as any).TransformersPipeline) {
-        setTfLoaded(true);
-      }
-    };
-    
-    // We can't use native import() for external HTTP URLs in Next.js build easily.
-    // So we inject a module script!
-    if (!(window as any).TransformersPipeline && !document.getElementById('tf-script')) {
-      const script = document.createElement('script');
-      script.id = 'tf-script';
-      script.type = 'module';
-      script.textContent = `
-        import { pipeline, env, RawImage } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.min.js';
-        window.TransformersPipeline = pipeline;
-        window.TransformersEnv = env;
-        window.TransformersRawImage = RawImage;
-        window.dispatchEvent(new Event('transformers-loaded'));
-      `;
-      document.body.appendChild(script);
-      
-      window.addEventListener('transformers-loaded', () => {
-        const env = (window as any).TransformersEnv;
-        env.allowLocalModels = false;
-        env.useBrowserCache = true;
-        setTfLoaded(true);
-      });
-    } else if ((window as any).TransformersPipeline) {
-      setTfLoaded(true);
-    }
-  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -78,85 +41,26 @@ export default function RemoveBg() {
   };
 
   const handleRemoveBackground = async () => {
-    if (!selectedFile || !originalUrl || !tfLoaded) return;
+    if (!selectedFile) return;
     
     setIsProcessing(true);
     setProgressText('AI 엔진 준비 중...');
     
     try {
-      if (!segmenterRef.current) {
-        setProgressText('AI 모델 다운로드 중... (최초 1회 약 150MB)');
-        const pipeline = (window as any).TransformersPipeline;
-        segmenterRef.current = await pipeline('image-segmentation', 'Xenova/modnet', {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          progress_callback: (info: any) => {
-            if (info.status === 'progress') {
-              setProgressText(`AI 모델 다운로드 중... ${Math.round(info.progress)}%`);
-            }
+      const config = {
+        progress: (key: string, current: number, total: number) => {
+          const percent = Math.round((current / total) * 100);
+          if (key.includes('fetch')) {
+            setProgressText(`AI 모델 다운로드 중... ${percent}%`);
+          } else {
+            setProgressText('배경 지우는 중... (약 2~5초 소요)');
           }
-        });
-      }
+        },
+        publicPath: 'https://unpkg.com/@imgly/background-removal@1.4.5/dist/'
+      };
 
-      setProgressText('배경 지우는 중... (약 2~5초 소요)');
-      
-      const RawImage = (window as any).TransformersRawImage;
-      const img = await RawImage.fromURL(originalUrl);
-      
-      const result = await segmenterRef.current(img);
-      
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let maskImage: any;
-      if (Array.isArray(result) && result.length > 0) {
-        maskImage = result[0].mask;
-      } else if (result.mask) {
-        maskImage = result.mask;
-      } else {
-        throw new Error("No mask found");
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error("Canvas 2D context not supported");
-
-      const origHtmlImg = new Image();
-      origHtmlImg.src = originalUrl;
-      await new Promise(resolve => { origHtmlImg.onload = resolve; });
-      ctx.drawImage(origHtmlImg, 0, 0);
-
-      ctx.globalCompositeOperation = 'destination-in';
-      
-      const maskCanvas = document.createElement('canvas');
-      maskCanvas.width = maskImage.width;
-      maskCanvas.height = maskImage.height;
-      const maskCtx = maskCanvas.getContext('2d');
-      if (!maskCtx) throw new Error("Mask canvas context not supported");
-      
-      const maskData = new ImageData(maskCanvas.width, maskCanvas.height);
-      const pixelCount = maskCanvas.width * maskCanvas.height;
-      
-      if (maskImage.channels === 1) {
-        for (let i = 0; i < pixelCount; i++) {
-          maskData.data[i * 4] = maskImage.data[i];
-          maskData.data[i * 4 + 1] = maskImage.data[i];
-          maskData.data[i * 4 + 2] = maskImage.data[i];
-          maskData.data[i * 4 + 3] = maskImage.data[i]; 
-        }
-      } else {
-        const hasAlpha = maskImage.channels === 4;
-        for (let i = 0; i < pixelCount; i++) {
-          maskData.data[i * 4] = maskImage.data[i * maskImage.channels];
-          maskData.data[i * 4 + 1] = maskImage.data[i * maskImage.channels + 1];
-          maskData.data[i * 4 + 2] = maskImage.data[i * maskImage.channels + 2];
-          maskData.data[i * 4 + 3] = hasAlpha ? maskImage.data[i * maskImage.channels + 3] : maskImage.data[i * maskImage.channels];
-        }
-      }
-      
-      maskCtx.putImageData(maskData, 0, 0);
-      ctx.drawImage(maskCanvas, 0, 0, canvas.width, canvas.height);
-
-      const url = canvas.toDataURL('image/png');
+      const resultBlob = await imglyRemoveBackground(selectedFile, config);
+      const url = URL.createObjectURL(resultBlob);
       setResultUrl(url);
       setProgressText('완료!');
       
@@ -273,10 +177,9 @@ export default function RemoveBg() {
                   {!resultUrl && !isProcessing && (
                     <button 
                       onClick={handleRemoveBackground}
-                      disabled={!tfLoaded}
-                      className={`font-bold py-3 px-8 rounded-xl shadow-md transition-transform flex items-center gap-2 ${tfLoaded ? 'bg-purple-600 hover:bg-purple-700 text-white active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                      className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-xl shadow-md transition-transform active:scale-95 flex items-center gap-2"
                     >
-                      <Sparkles size={18} /> {tfLoaded ? '배경 지우기 시작!' : 'AI 엔진 로딩 중...'}
+                      <Sparkles size={18} /> 배경 지우기 시작!
                     </button>
                   )}
                   

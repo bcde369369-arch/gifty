@@ -8,6 +8,10 @@ const nextConfig = {
       "sharp$": false,
       "onnxruntime-node$": false,
     }
+    config.module.rules.push({
+      test: /\.node$/,
+      use: 'ignore-loader',
+    });
     return config;
   }
 };
