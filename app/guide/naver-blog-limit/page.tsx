@@ -1,11 +1,10 @@
-﻿import React from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { Sparkles, ArrowLeft } from 'lucide-react';
 
-
 export const metadata = {
-  title: '?ㅼ씠踰?釉붾줈洹??吏?GIF) ?⑸웾 20MB ?쒗븳, ?붿쭏 源⑥쭚 ?놁씠 ?щ━???꾨꼍 媛?대뱶',
-  description: '釉붾줈洹몄뿉 20MB媛 ?섎뒗 ?吏ㅼ쓣 ?щ━?ㅻ떎 ?ㅽ뙣?섏떊 ???덈굹?? ?꾨젅?꾧낵 ?ъ씠利덈? 議곗젅???붿쭏 ?먯떎 ?놁씠 ?⑸웾留???以꾩씠??鍮꾨???怨듦컻?⑸땲??',
+  title: '네이버 블로그 움짤(GIF) 용량 20MB 제한, 화질 깨짐 없이 올리는 완벽 가이드',
+  description: '블로그에 20MB가 넘는 움짤을 올리려다 실패하신 적 있나요? 프레임과 사이즈를 조절해 화질 손실 없이 용량만 쏙 줄이는 비밀을 공개합니다.',
 };
 
 export default function Post() {
@@ -23,7 +22,7 @@ export default function Post() {
           </Link>
           <div className="flex items-center gap-4 text-sm font-semibold">
             <Link href="/guide" className="flex items-center gap-1 text-slate-500 hover:text-indigo-600 transition-colors">
-              <ArrowLeft size={16} /> 紐⑸줉?쇰줈
+              <ArrowLeft size={16} /> 목록으로
             </Link>
           </div>
         </div>
@@ -34,39 +33,37 @@ export default function Post() {
           <h1 className="text-3xl md:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight mb-8">
             {metadata.title}
           </h1>
-          <p className="text-slate-500 mb-12">?묒꽦?? 2026-10-03 | ?묒꽦?? Gifty ?먮뵒??/p>
+          <p className="text-slate-500 mb-12">작성일: 2026-10-03 | 작성자: Gifty 에디터</p>
           
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 text-slate-700 leading-loose space-y-6">
-            <p>?ㅼ씠踰?釉붾줈洹몃? ?댁쁺?섎떎 蹂대㈃ 媛??吏쒖쬆 ?섎뒗 ?쒓컙???몄젣?쇨퉴?? 諛붾줈 ?뺤꽦猿?留뚮뱺 ?吏?GIF)???щ━?ㅻ뒗??<strong>"20MB瑜?珥덇낵?섏뿬 ?낅줈?쒗븷 ???놁뒿?덈떎."</strong>?쇰뒗 ?앹뾽?????뚯엯?덈떎. </p>
+            <p>네이버 블로그를 운영하다 보면 가장 짜증 나는 순간이 언제일까요? 바로 정성껏 만든 움짤(GIF)을 올리려는데 <strong>"20MB를 초과하여 업로드할 수 없습니다."</strong>라는 팝업이 뜰 때입니다. </p>
             
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">???ㅼ씠踰?釉붾줈洹몃뒗 20MB濡??쒗븳?좉퉴??</h2>
-            <p>?ㅼ씠踰?釉붾줈洹몃퓧留??꾨땲???遺遺꾩쓽 而ㅻ??덊떚(?붿떆?몄궗?대뱶, ?먰렓肄붾━?? 猷⑤━???????쒕쾭 ?몃옒??鍮꾩슜???덇컧?섍린 ?꾪빐 GIF ?뚯씪 ?⑸웾???꾧꺽?섍쾶 ?쒗븳?⑸땲?? GIF ?뺤떇 ?먯껜媛 1987?꾩뿉 留뚮뱾?댁쭊 ?꾩＜ ?ㅻ옒??湲곗닠?닿린 ?뚮Ц?? ?곸긽???뺤텞?섎뒗 ?⑥쑉??理쒖떊 MP4 ?곸긽蹂대떎 ?꾩????⑥뼱吏묐땲?? 利? ?묎컳? 5珥덉쭨由??곸긽?대씪??MP4??1MB硫?異⑸텇?쒕뜲, GIF濡?留뚮뱾硫?20MB瑜??뚯찉 ?섏뼱踰꾨━??寃껋씠二?</p>
+            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">왜 네이버 블로그는 20MB로 제한할까요?</h2>
+            <p>네이버 블로그뿐만 아니라 대부분의 커뮤니티(디시인사이드, 에펨코리아, 루리웹 등)는 서버 트래픽 비용을 절감하기 위해 GIF 파일 용량을 엄격하게 제한합니다. GIF 형식 자체가 1987년에 만들어진 아주 오래된 기술이기 때문에, 영상을 압축하는 효율이 최신 MP4 영상보다 현저히 떨어집니다. 즉, 똑같은 5초짜리 영상이라도 MP4는 1MB면 충분한데, GIF로 만들면 20MB를 훌쩍 넘어버리는 것이죠.</p>
 
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">?붿쭏???좎??섎㈃???⑸웾??以꾩씠??3媛吏 留덈쾿</h2>
+            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">화질을 유지하면서 용량을 줄이는 3가지 마법</h2>
             
-            <h3 className="text-xl font-bold text-indigo-600 mt-6 mb-3">1. ?꾨젅???덉씠??FPS) 理쒖쟻??/h3>
-            <p>?쇰컲?곸씤 ?숈쁺?곸? 1珥덉뿉 30???뱀? 60?μ쓽 ?ъ쭊(?꾨젅????吏?섍컩?덈떎. ?섏?留?釉붾줈洹몄뿉 ?щ━???吏ㅼ? 1珥덉뿉 10~15??10fps~15fps)留?吏?섍????쒓컖?곸쑝濡?異⑸텇??遺?쒕읇寃?蹂댁엯?덈떎. ?꾨젅?꾩쓣 ?덈컲?쇰줈 以꾩씠硫??⑸웾???뺥솗???덈컲?쇰줈 以꾩뼱??땲??</p>
+            <h3 className="text-xl font-bold text-indigo-600 mt-6 mb-3">1. 프레임 레이트(FPS) 최적화</h3>
+            <p>일반적인 동영상은 1초에 30장 혹은 60장의 사진(프레임)이 지나갑니다. 하지만 블로그에 올리는 움짤은 1초에 10~15장(10fps~15fps)만 지나가도 시각적으로 충분히 부드럽게 보입니다. 프레임을 절반으로 줄이면 용량도 정확히 절반으로 줄어듭니다!</p>
 
-            <h3 className="text-xl font-bold text-indigo-600 mt-6 mb-3">2. ?붾㈃ ?ш린(?댁긽?? 由ъ궗?댁쭠</h3>
-            <p>?먮낯 ?곸긽??4K ?뱀? 1080p FHD ?댁긽?꾨씪硫? ?대? 洹몃?濡?GIF濡?留뚮뱾 寃쎌슦 ?⑸웾???섎갚 硫붽?諛붿씠?몄뿉 ?ы븯寃??⑸땲?? 紐⑤컮?쇰줈 釉붾줈洹몃? 蹂대뒗 ?낆옄?ㅼ쓣 ?꾪빐 媛濡??쎌???600px ~ 800px濡?以꾩뿬蹂댁꽭?? ?붿쭏 ??섎뒗 嫄곗쓽 ?먭뺨吏吏 ?딆쑝硫댁꽌 ?⑸웾? 湲곗쟻泥섎읆 以꾩뼱??땲??</p>
+            <h3 className="text-xl font-bold text-indigo-600 mt-6 mb-3">2. 화면 크기(해상도) 리사이징</h3>
+            <p>원본 영상이 4K 혹은 1080p FHD 해상도라면, 이를 그대로 GIF로 만들 경우 용량이 수백 메가바이트에 달하게 됩니다. 모바일로 블로그를 보는 독자들을 위해 가로 픽셀을 600px ~ 800px로 줄여보세요. 화질 저하는 거의 느껴지지 않으면서 용량은 기적처럼 줄어듭니다.</p>
 
-            <h3 className="text-xl font-bold text-indigo-600 mt-6 mb-3">3. ?됱긽 ?뺤텞 ?뚭퀬由ъ쬁 ?ъ슜</h3>
-            <p>媛??以묒슂??遺遺꾩엯?덈떎. GIF???쒗쁽?????덈뒗 ?됱긽??理쒕? 256?됱쑝濡??쒗븳?섏뼱 ?덉뒿?덈떎. ?멸뎄??蹂?섍린瑜??ъ슜?섎㈃ ?됱씠 ?쇰）?쒕）?댁???'?붾뜑留?Dithering)' ?꾩긽??諛쒖깮?섏짛. ?섏?留?Gifty? 媛숈? 怨좉툒 ?몄퐫?붾뒗 '?붾젅???앹꽦 理쒖쟻?? 湲곗닠???ъ슜?섏뿬, ?곸긽???곗씤 ?듭떖 256?됱쓣 癒쇱? 異붿텧?????뺤텞?섎?濡??붿쭏???꾨꼍?섍쾶 蹂댁〈?⑸땲??</p>
+            <h3 className="text-xl font-bold text-indigo-600 mt-6 mb-3">3. 색상 압축 알고리즘 사용</h3>
+            <p>가장 중요한 부분입니다. GIF는 표현할 수 있는 색상이 최대 256색으로 제한되어 있습니다. 싸구려 변환기를 사용하면 색이 얼룩덜룩해지는 '디더링(Dithering)' 현상이 발생하죠. 하지만 Gifty와 같은 고급 인코더는 '팔레트 생성 최적화' 기술을 사용하여, 영상에 쓰인 핵심 256색을 먼저 추출한 뒤 압축하므로 화질이 완벽하게 보존됩니다.</p>
 
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">寃곕줎: Gifty濡???踰덉뿉 ?닿껐?섏꽭??</h2>
-            <p>??紐⑤뱺 蹂듭옟???ㅼ젙???몄슱 ?꾩슂媛 ?놁뒿?덈떎. <strong>Gifty</strong>??釉붾줈嫄??щ윭遺꾩쓣 ?꾪빐 ?먮룞?쇰줈 20MB媛 ?섏? ?딅룄濡??뚭퀬由ъ쬁??源롪퀬 ?ㅻ벉??理쒓퀬??寃곌낵臾쇱쓣 戮묒븘?낅땲?? 留뚯빟 蹂??寃곌낵臾쇱씠 20MB瑜??섎뒗?ㅻ㈃, Gifty???묐삊??AI(?)媛 ?먮룞?쇰줈 ?ш린瑜?議곌툑??以꾩뿬媛硫??ㅼ씠踰?釉붾줈洹몄뿉 ??留욌뒗 ?ъ씠利덈줈 ?щ룄?꾪븯??寃곌뎅 ?깃났???낅땲??</p>
+            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">결론: Gifty로 한 번에 해결하세요!</h2>
+            <p>이 모든 복잡한 설정을 외울 필요가 없습니다. <strong>Gifty</strong>는 블로거 여러분을 위해 자동으로 20MB가 넘지 않도록 알고리즘을 깎고 다듬어 최고의 결과물을 뽑아냅니다. 만약 변환 결과물이 20MB를 넘는다면, Gifty의 똑똑한 AI(?)가 자동으로 크기를 조금씩 줄여가며 네이버 블로그에 딱 맞는 사이즈로 재도전하여 결국 성공해 냅니다!</p>
             
-            <p className="mt-8 font-bold text-center">吏湲?諛붾줈 臾대즺濡?Gifty瑜?泥댄뿕??蹂댁꽭??</p>
+            <p className="mt-8 font-bold text-center">지금 바로 무료로 Gifty를 체험해 보세요!</p>
             <div className="text-center mt-6">
               <Link href="/" className="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-xl transition-colors">
-                ?吏?留뚮뱾??媛湲?&rarr;
+                움짤 만들러 가기 &rarr;
               </Link>
             </div>
           </div>
         </article>
       </main>
-
-      
     </div>
   );
 }
