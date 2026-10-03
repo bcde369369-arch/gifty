@@ -20,6 +20,9 @@ export const metadata = {
     title: 'Gifty - 마법처럼 움짤로!',
     description: '설치 없이 브라우저에서 바로 고화질 GIF를 만들어 보세요.',
   },
+  other: {
+    'google-adsense-account': 'ca-pub-7186754693915211'
+  }
 }
 
 export default function RootLayout({
