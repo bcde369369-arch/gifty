@@ -36,7 +36,7 @@ export default function FeedbackBoard() {
                   };
                   (function() {
                     var d = document, s = d.createElement('script');
-                    s.src = 'https://gifty-run.disqus.com/embed.js';
+                    s.src = 'https://https-gifty-run.disqus.com/embed.js';
                     s.setAttribute('data-timestamp', +new Date());
                     (d.head || d.body).appendChild(s);
                   })();
