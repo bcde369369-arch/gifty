@@ -23,6 +23,7 @@ export default function ExperienceDiary() {
   
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   
   // 폼 상태
   const [newTitle, setNewTitle] = useState('');
@@ -45,25 +46,65 @@ export default function ExperienceDiary() {
     setSelectedDate(todayStr);
   }, []);
 
-  const handleAddSchedule = (e: React.FormEvent) => {
+  const openAddModal = () => {
+    setEditingId(null);
+    setNewTitle('');
+    setNewVisitDate('');
+    setNewDeadlineDate('');
+    setNewBenefit('');
+    setNewCash('');
+    setNewExpense('');
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (schedule: Schedule) => {
+    setEditingId(schedule.id);
+    setNewTitle(schedule.title);
+    setNewVisitDate(schedule.visitDate || '');
+    setNewDeadlineDate(schedule.deadlineDate || '');
+    setNewBenefit(schedule.benefitAmount ? String(schedule.benefitAmount) : '');
+    setNewCash(schedule.cashAmount ? String(schedule.cashAmount) : '');
+    setNewExpense(schedule.extraExpense ? String(schedule.extraExpense) : '');
+    setIsModalOpen(true);
+  };
+
+  const handleSaveSchedule = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle || !newDeadlineDate) return alert('캠페인 이름과 포스팅 마감일은 필수입니다!');
 
-    const newSchedule: Schedule = {
-      id: Date.now().toString(),
-      title: newTitle,
-      visitDate: newVisitDate,
-      deadlineDate: newDeadlineDate,
-      benefitAmount: newBenefit ? parseInt(newBenefit.replace(/,/g, ''), 10) : 0,
-      cashAmount: newCash ? parseInt(newCash.replace(/,/g, ''), 10) : 0,
-      extraExpense: newExpense ? parseInt(newExpense.replace(/,/g, ''), 10) : 0,
-    };
+    const benefitAmount = newBenefit ? parseInt(newBenefit.replace(/,/g, ''), 10) : 0;
+    const cashAmount = newCash ? parseInt(newCash.replace(/,/g, ''), 10) : 0;
+    const extraExpense = newExpense ? parseInt(newExpense.replace(/,/g, ''), 10) : 0;
 
-    const updated = [newSchedule, ...schedules];
+    let updated;
+    if (editingId) {
+      updated = schedules.map(s => s.id === editingId ? {
+        ...s,
+        title: newTitle,
+        visitDate: newVisitDate,
+        deadlineDate: newDeadlineDate,
+        benefitAmount,
+        cashAmount,
+        extraExpense
+      } : s);
+    } else {
+      const newSchedule: Schedule = {
+        id: Date.now().toString(),
+        title: newTitle,
+        visitDate: newVisitDate,
+        deadlineDate: newDeadlineDate,
+        benefitAmount,
+        cashAmount,
+        extraExpense,
+      };
+      updated = [newSchedule, ...schedules];
+    }
+
     setSchedules(updated);
     localStorage.setItem('gifty_schedules', JSON.stringify(updated));
     
     // 초기화
+    setEditingId(null);
     setNewTitle('');
     setNewVisitDate('');
     setNewDeadlineDate('');
@@ -202,7 +243,7 @@ export default function ExperienceDiary() {
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold text-slate-800">📅 내 일정</h2>
                 <button 
-                  onClick={() => setIsModalOpen(true)}
+                  onClick={openAddModal}
                   className="flex items-center gap-1 bg-indigo-600 text-white text-sm font-bold px-4 py-2 rounded-xl hover:bg-indigo-700 transition"
                 >
                   <Plus size={16} /> 추가
@@ -289,12 +330,20 @@ export default function ExperienceDiary() {
                               </span>
                             </div>
                           </div>
-                          <button 
-                            onClick={() => handleDelete(schedule.id)}
-                            className="text-xs font-semibold text-slate-400 hover:text-red-500 transition-colors mt-3 md:mt-0 px-3 py-1.5 rounded-lg border border-transparent hover:border-red-100 hover:bg-red-50"
-                          >
-                            삭제
-                          </button>
+                          <div className="flex gap-2 mt-3 md:mt-0">
+                            <button 
+                              onClick={() => handleEdit(schedule)}
+                              className="text-xs font-semibold text-slate-400 hover:text-indigo-600 transition-colors px-3 py-1.5 rounded-lg border border-transparent hover:border-indigo-100 hover:bg-indigo-50"
+                            >
+                              수정
+                            </button>
+                            <button 
+                              onClick={() => handleDelete(schedule.id)}
+                              className="text-xs font-semibold text-slate-400 hover:text-red-500 transition-colors px-3 py-1.5 rounded-lg border border-transparent hover:border-red-100 hover:bg-red-50"
+                            >
+                              삭제
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -310,7 +359,7 @@ export default function ExperienceDiary() {
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold text-slate-800">💰 쏠쏠한 체험단 가계부</h2>
                 <button 
-                  onClick={() => setIsModalOpen(true)}
+                  onClick={openAddModal}
                   className="bg-indigo-600 text-white text-sm font-bold px-4 py-2 rounded-xl hover:bg-indigo-700 transition"
                 >
                   + 내역 추가
@@ -467,13 +516,13 @@ export default function ExperienceDiary() {
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-slate-900">새 체험단 등록</h3>
+              <h3 className="text-xl font-bold text-slate-900">{editingId ? '체험단 일정 수정' : '새 체험단 등록'}</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <X size={24} />
               </button>
             </div>
             
-            <form onSubmit={handleAddSchedule} className="flex flex-col gap-4">
+            <form onSubmit={handleSaveSchedule} className="flex flex-col gap-4">
               {/* 기본 정보 */}
               <div className="bg-slate-50 p-4 rounded-2xl">
                 <h4 className="text-xs font-bold text-indigo-500 mb-3 tracking-wide">기본 정보</h4>
