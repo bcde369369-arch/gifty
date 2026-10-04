@@ -146,13 +146,21 @@ export default function ExperienceDiary() {
     ? schedules.filter(s => s.visitDate === selectedDate || s.deadlineDate === selectedDate)
     : schedules;
 
-  // 금액 계산 (전체 일정 기준)
+  // 금액 계산 (전체 일정 기준 - 상단 요약용)
   const totalBenefit = schedules.reduce((acc, cur) => acc + (cur.benefitAmount || 0), 0);
   const totalCash = schedules.reduce((acc, cur) => acc + (cur.cashAmount || 0), 0);
   const totalExpense = schedules.reduce((acc, cur) => acc + (cur.extraExpense || 0), 0);
-  
-  // 총 이득 = 혜택 + 지원금 - 초과지출
   const netTotal = totalBenefit + totalCash - totalExpense;
+
+  // 금액 계산 (선택된 월 기준 - 가계부 탭용)
+  const currentMonthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const monthlySchedules = schedules.filter(s => {
+    const d = s.visitDate || s.deadlineDate;
+    return d && d.startsWith(currentMonthStr);
+  });
+  const monthlyBenefit = monthlySchedules.reduce((acc, cur) => acc + (cur.benefitAmount || 0), 0);
+  const monthlyCash = monthlySchedules.reduce((acc, cur) => acc + (cur.cashAmount || 0), 0);
+  const monthlyExpense = monthlySchedules.reduce((acc, cur) => acc + (cur.extraExpense || 0), 0);
 
   return (
     <main className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-indigo-200 pb-20">
@@ -366,35 +374,50 @@ export default function ExperienceDiary() {
                 </button>
               </div>
               
+              {/* 월 선택 필터 */}
+              <div className="flex items-center justify-between bg-white border border-slate-200 rounded-2xl p-2 mb-6 shadow-sm">
+                <button onClick={prevMonth} className="p-3 hover:bg-slate-100 rounded-xl text-slate-500 transition-colors">
+                   <ChevronLeft size={20}/>
+                </button>
+                <div className="font-bold text-slate-800 text-lg">
+                  {year}년 {month + 1}월 정산
+                </div>
+                <button onClick={nextMonth} className="p-3 hover:bg-slate-100 rounded-xl text-slate-500 transition-colors">
+                   <ChevronRight size={20}/>
+                </button>
+              </div>
+              
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                <div className="bg-green-50 p-5 rounded-2xl border border-green-100">
-                  <p className="text-green-700 text-xs font-bold mb-1">🎁 혜택 (현물)</p>
-                  <p className="text-xl font-black text-green-700">+{totalBenefit.toLocaleString()}원</p>
+                <div className="bg-green-50 p-5 rounded-2xl border border-green-100 shadow-sm">
+                  <p className="text-green-700 text-xs font-bold mb-1">🎁 월 혜택 (현물)</p>
+                  <p className="text-xl font-black text-green-700">+{monthlyBenefit.toLocaleString()}원</p>
                 </div>
-                <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100">
-                  <p className="text-blue-700 text-xs font-bold mb-1">💸 지원금 (현금/원고료)</p>
-                  <p className="text-xl font-black text-blue-700">+{totalCash.toLocaleString()}원</p>
+                <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 shadow-sm">
+                  <p className="text-blue-700 text-xs font-bold mb-1">💸 월 지원금 (현금/원고료)</p>
+                  <p className="text-xl font-black text-blue-700">+{monthlyCash.toLocaleString()}원</p>
                 </div>
-                <div className="bg-red-50 p-5 rounded-2xl border border-red-100">
-                  <p className="text-red-700 text-xs font-bold mb-1">💳 초과 지출 (내돈내산)</p>
-                  <p className="text-xl font-black text-red-700">-{totalExpense.toLocaleString()}원</p>
+                <div className="bg-red-50 p-5 rounded-2xl border border-red-100 shadow-sm">
+                  <p className="text-red-700 text-xs font-bold mb-1">💳 월 초과 지출 (내돈내산)</p>
+                  <p className="text-xl font-black text-red-700">-{monthlyExpense.toLocaleString()}원</p>
                 </div>
               </div>
 
               {/* 가계부 리스트 */}
               <div>
-                <h3 className="font-bold text-slate-700 mb-4">상세 내역</h3>
-                {schedules.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 text-center">
-                    <p className="text-slate-400 text-sm">기록된 내역이 없습니다.</p>
+                <h3 className="font-bold text-slate-700 mb-4">{month + 1}월 상세 내역</h3>
+                {monthlySchedules.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-center bg-white rounded-2xl border border-slate-100 border-dashed">
+                    <p className="text-slate-400 text-sm">해당 월에 기록된 내역이 없습니다.</p>
                   </div>
                 ) : (
                   <div className="grid gap-3">
-                    {schedules.map((schedule) => (
-                      <div key={schedule.id} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 bg-slate-50">
+                    {monthlySchedules.map((schedule) => (
+                      <div key={schedule.id} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 bg-white shadow-sm">
                         <div>
                           <p className="font-bold text-slate-800">{schedule.title}</p>
-                          <p className="text-xs text-slate-500 mt-1">{schedule.visitDate || schedule.deadlineDate}</p>
+                          <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                            <CalendarIcon size={12} /> {schedule.visitDate || schedule.deadlineDate}
+                          </p>
                         </div>
                         <div className="text-right flex flex-col gap-0.5">
                           {(schedule.benefitAmount || 0) > 0 && (
