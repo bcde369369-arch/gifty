@@ -13,6 +13,7 @@ import FeedbackBoard from '@/components/FeedbackBoard';
 export default function Home() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [showBanner, setShowBanner] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { settings, isLoaded } = useSiteSettings();
 
   return (
@@ -50,10 +51,23 @@ export default function Home() {
             <a href="/remove-bg" className="hover:text-indigo-600 transition-colors text-purple-600">누끼따기(AI) ✂️</a>
             <a href="/guide" className="hover:text-indigo-600 transition-colors text-indigo-600">움짤 꿀팁 📚</a>
           </div>
-          <button className="md:hidden text-slate-500 hover:text-slate-800">
-            <Menu size={24} />
+          <button 
+            className="md:hidden text-slate-500 hover:text-slate-800"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
+            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
+        
+        {/* Mobile Menu Dropdown */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden bg-white border-b border-slate-100 shadow-md w-full flex flex-col p-4 gap-2 text-sm font-bold absolute top-16 left-0">
+            <a href="/" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl hover:bg-slate-50">홈</a>
+            <a href="/experience-diary" className="text-blue-600 hover:bg-blue-50 p-3 rounded-xl">체험단 다이어리 📓</a>
+            <a href="/remove-bg" className="text-purple-600 hover:bg-purple-50 p-3 rounded-xl">누끼따기(AI) ✂️</a>
+            <a href="/guide" className="text-indigo-600 hover:bg-indigo-50 p-3 rounded-xl">움짤 꿀팁 📚</a>
+          </div>
+        )}
       </nav>
 
       {/* Top Affiliate Banner */}
