@@ -8,7 +8,7 @@ export default function UpdateModal() {
 
   useEffect(() => {
     // Check if the user has dismissed the modal in the last 24 hours
-    const hideUntil = localStorage.getItem('hideUpdateModal_v1');
+    const hideUntil = localStorage.getItem('hideUpdateModal_v2');
     if (hideUntil) {
       const hideUntilTime = parseInt(hideUntil, 10);
       if (Date.now() < hideUntilTime) {
@@ -23,7 +23,7 @@ export default function UpdateModal() {
   const handleClose = (hideForToday: boolean) => {
     if (hideForToday) {
       const tomorrow = Date.now() + 24 * 60 * 60 * 1000;
-      localStorage.setItem('hideUpdateModal_v1', tomorrow.toString());
+      localStorage.setItem('hideUpdateModal_v2', tomorrow.toString());
     }
     setIsOpen(false);
   };
@@ -44,40 +44,40 @@ export default function UpdateModal() {
           </button>
           <div className="flex items-center gap-2 mb-2">
             <Sparkles className="text-yellow-300" size={24} />
-            <h2 className="text-xl font-black">Gifty 대규모 업데이트!</h2>
+            <h2 className="text-xl font-black">Gifty 신규 기능 업데이트!</h2>
           </div>
-          <p className="text-indigo-100 text-sm font-medium">여러분의 피드백으로 완성된 킬러 기능들을 만나보세요.</p>
+          <p className="text-indigo-100 text-sm font-medium">블로거 여러분의 불편함을 덜어드릴 강력한 툴들이 추가되었어요!</p>
         </div>
 
         {/* Content */}
         <div className="p-6 space-y-5">
           <div className="flex gap-4 items-start">
-            <div className="bg-blue-100 p-3 rounded-2xl text-blue-600 shrink-0">
-              <Type size={24} />
+            <div className="bg-blue-100 p-3 flex items-center justify-center rounded-2xl text-blue-600 shrink-0 w-12 h-12">
+              <span className="text-2xl">📓</span>
             </div>
             <div>
-              <h3 className="font-bold text-slate-800 text-base">자막 (텍스트) 넣기</h3>
-              <p className="text-sm text-slate-600 mt-1">&quot;가즈아아!&quot; 같은 재미있는 자막을 움짤에 바로 새겨 넣을 수 있어요.</p>
+              <h3 className="font-bold text-slate-800 text-base">체험단 다이어리 (가계부 연동)</h3>
+              <p className="text-sm text-slate-600 mt-1">방문/마감일정 관리는 물론, 제공 혜택과 지원금(원고료)까지 자동으로 합산해 순수익을 알려줍니다.</p>
             </div>
           </div>
 
           <div className="flex gap-4 items-start">
-            <div className="bg-green-100 p-3 rounded-2xl text-green-600 shrink-0">
-              <Zap size={24} />
+            <div className="bg-purple-100 p-3 flex items-center justify-center rounded-2xl text-purple-600 shrink-0 w-12 h-12">
+              <span className="text-2xl">✂️</span>
             </div>
             <div>
-              <h3 className="font-bold text-slate-800 text-base">재생 속도 조절</h3>
-              <p className="text-sm text-slate-600 mt-1">2배 빠르게, 또는 0.5배 느리게! 개그 짤이나 감성 짤을 쉽게 만들어보세요.</p>
+              <h3 className="font-bold text-slate-800 text-base">AI 사진 누끼따기 (무료)</h3>
+              <p className="text-sm text-slate-600 mt-1">회원가입 없이, 100% 무료로 이미지 배경을 제거해 드립니다. 블로그 썸네일 만들 때 필수!</p>
             </div>
           </div>
 
           <div className="flex gap-4 items-start">
-            <div className="bg-purple-100 p-3 rounded-2xl text-purple-600 shrink-0">
-              <ImageIcon size={24} />
+            <div className="bg-emerald-100 p-3 flex items-center justify-center rounded-2xl text-emerald-600 shrink-0 w-12 h-12">
+              <span className="text-2xl">📚</span>
             </div>
             <div>
-              <h3 className="font-bold text-slate-800 text-base">내 블로그 로고 달기</h3>
-              <p className="text-sm text-slate-600 mt-1">불펌 방지! 내 블로그 로고를 업로드하면 우측 하단에 예쁘게 박힙니다.</p>
+              <h3 className="font-bold text-slate-800 text-base">체험단 사이트 & 움짤 꿀팁</h3>
+              <p className="text-sm text-slate-600 mt-1">블로거라면 꼭 알아야 할 꿀팁과 알짜배기 체험단 사이트들을 한 곳에 모아두었습니다.</p>
             </div>
           </div>
         </div>

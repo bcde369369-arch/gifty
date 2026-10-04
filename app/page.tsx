@@ -24,7 +24,7 @@ export default function Home() {
       {showBanner && (
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 text-sm font-semibold flex items-center justify-center gap-2 relative">
           <span className="animate-pulse">✨</span>
-          <span>[대규모 업데이트] 이제 움짤에 <strong>자막</strong>을 넣고, 내 <strong>블로그 로고</strong>도 박을 수 있어요!</span>
+          <span>[신규 업데이트] 블로거를 위한 <strong>체험단 다이어리</strong>와 <strong>AI 무료 누끼따기</strong>가 추가되었어요!</span>
           <button 
             onClick={() => setShowBanner(false)}
             className="absolute right-4 p-1 hover:bg-white/20 rounded-full transition-colors"
