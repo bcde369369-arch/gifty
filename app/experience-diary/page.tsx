@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Calendar as CalendarIcon, Calculator, Link as LinkIcon, ArrowLeft, Plus, X } from 'lucide-react';
+import { Sparkles, Calendar as CalendarIcon, Calculator, Link as LinkIcon, ArrowLeft, Plus, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
 interface Schedule {
@@ -23,15 +23,22 @@ export default function ExperienceDiary() {
   const [newVisitDate, setNewVisitDate] = useState('');
   const [newDeadlineDate, setNewDeadlineDate] = useState('');
 
-  // 브라우저 저장소(localStorage)에서 데이터 불러오기
+  // 캘린더 상태
+  const today = new Date();
+  const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+  const [selectedDate, setSelectedDate] = useState<string>(''); // 'YYYY-MM-DD'
+
+  // 초기 데이터 로드
   useEffect(() => {
     const saved = localStorage.getItem('gifty_schedules');
     if (saved) {
       setSchedules(JSON.parse(saved));
     }
+    // 기본 선택일을 오늘로 설정
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    setSelectedDate(todayStr);
   }, []);
 
-  // 일정 추가 함수
   const handleAddSchedule = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle || !newDeadlineDate) return alert('캠페인 이름과 포스팅 마감일은 필수입니다!');
@@ -45,16 +52,14 @@ export default function ExperienceDiary() {
 
     const updated = [newSchedule, ...schedules];
     setSchedules(updated);
-    localStorage.setItem('gifty_schedules', JSON.stringify(updated)); // 로컬에 저장
+    localStorage.setItem('gifty_schedules', JSON.stringify(updated));
     
-    // 초기화 및 모달 닫기
     setNewTitle('');
     setNewVisitDate('');
     setNewDeadlineDate('');
     setIsModalOpen(false);
   };
 
-  // 일정 삭제 함수
   const handleDelete = (id: string) => {
     if (!confirm('정말 삭제하시겠습니까?')) return;
     const updated = schedules.filter(s => s.id !== id);
@@ -62,9 +67,34 @@ export default function ExperienceDiary() {
     localStorage.setItem('gifty_schedules', JSON.stringify(updated));
   };
 
+  // 캘린더 계산 로직
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDay = new Date(year, month, 1).getDay();
+  
+  const days = [];
+  for (let i = 0; i < firstDay; i++) {
+    days.push(null);
+  }
+  for (let i = 1; i <= daysInMonth; i++) {
+    days.push(new Date(year, month, i));
+  }
+
+  const prevMonth = () => setCurrentMonth(new Date(year, month - 1, 1));
+  const nextMonth = () => setCurrentMonth(new Date(year, month + 1, 1));
+
+  const formatDateString = (d: Date) => {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  // 선택된 날짜의 일정 필터링
+  const filteredSchedules = selectedDate 
+    ? schedules.filter(s => s.visitDate === selectedDate || s.deadlineDate === selectedDate)
+    : schedules;
+
   return (
     <main className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-indigo-200 pb-20">
-      {/* Navigation */}
       <nav className="w-full bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -84,10 +114,7 @@ export default function ExperienceDiary() {
         </div>
       </nav>
 
-      {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 mt-8">
-        
-        {/* Header Section */}
         <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 mb-8 text-center md:text-left flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
             <h1 className="text-3xl font-extrabold text-slate-900 mb-2">블로거를 위한 체험단 다이어리</h1>
@@ -102,14 +129,11 @@ export default function ExperienceDiary() {
           </div>
         </div>
 
-        {/* Custom Tabs */}
         <div className="flex bg-slate-200/50 p-1 rounded-2xl mb-8">
           <button
             onClick={() => setActiveTab('schedule')}
             className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition-all ${
-              activeTab === 'schedule' 
-                ? 'bg-white text-indigo-600 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700'
+              activeTab === 'schedule' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
             <CalendarIcon size={18} /> 내 일정
@@ -117,9 +141,7 @@ export default function ExperienceDiary() {
           <button
             onClick={() => setActiveTab('ledger')}
             className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition-all ${
-              activeTab === 'ledger' 
-                ? 'bg-white text-indigo-600 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700'
+              activeTab === 'ledger' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
             <Calculator size={18} /> 가계부
@@ -127,68 +149,123 @@ export default function ExperienceDiary() {
           <button
             onClick={() => setActiveTab('sites')}
             className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition-all ${
-              activeTab === 'sites' 
-                ? 'bg-white text-indigo-600 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700'
+              activeTab === 'sites' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
             <LinkIcon size={18} /> 체험단 모음
           </button>
         </div>
 
-        {/* Tab Content */}
         <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-slate-100 min-h-[400px]">
           
-          {/* 1. Schedule Tab */}
+          {/* 1. Schedule Tab (하이브리드 달력) */}
           {activeTab === 'schedule' && (
             <div className="animate-in fade-in duration-300">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-slate-800">📅 이번 달 내 일정</h2>
+                <h2 className="text-xl font-bold text-slate-800">📅 내 일정</h2>
                 <button 
                   onClick={() => setIsModalOpen(true)}
                   className="flex items-center gap-1 bg-indigo-600 text-white text-sm font-bold px-4 py-2 rounded-xl hover:bg-indigo-700 transition"
                 >
-                  <Plus size={16} /> 일정 추가
+                  <Plus size={16} /> 추가
                 </button>
               </div>
 
-              {schedules.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 text-center">
-                  <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-slate-300 mb-4">
-                    <CalendarIcon size={32} />
-                  </div>
-                  <h3 className="text-slate-600 font-semibold">아직 등록된 일정이 없어요.</h3>
-                  <p className="text-slate-400 text-sm mt-1">체험단에 당첨되셨다면 방문일과 포스팅 마감일을 등록해보세요!</p>
+              {/* 캘린더 영역 */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-8 select-none">
+                <div className="flex justify-between items-center mb-4 px-2">
+                  <button onClick={prevMonth} className="p-2 hover:bg-slate-200 rounded-lg text-slate-500"><ChevronLeft size={20}/></button>
+                  <h3 className="font-bold text-lg text-slate-800">{year}년 {month + 1}월</h3>
+                  <button onClick={nextMonth} className="p-2 hover:bg-slate-200 rounded-lg text-slate-500"><ChevronRight size={20}/></button>
                 </div>
-              ) : (
-                <div className="grid gap-4">
-                  {schedules.map((schedule) => (
-                    <div key={schedule.id} className="flex flex-col md:flex-row md:items-center justify-between p-5 rounded-2xl border border-slate-100 bg-slate-50 hover:border-indigo-200 transition-colors">
-                      <div className="mb-3 md:mb-0">
-                        <h3 className="font-bold text-lg text-slate-800">{schedule.title}</h3>
-                        <div className="flex items-center gap-4 mt-2 text-sm text-slate-500">
-                          {schedule.visitDate && (
-                            <span className="flex items-center gap-1">
-                              <CalendarIcon size={14} className="text-indigo-400" />
-                              방문일: {schedule.visitDate}
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1">
-                            <CalendarIcon size={14} className="text-pink-400" />
-                            마감일: <strong className="text-pink-500">{schedule.deadlineDate}</strong>
-                          </span>
-                        </div>
-                      </div>
+                <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-400 mb-2">
+                  <div className="text-red-400">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div className="text-blue-400">토</div>
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {days.map((d, i) => {
+                    if (!d) return <div key={i} className="aspect-square"></div>;
+                    const dateStr = formatDateString(d);
+                    const isSelected = selectedDate === dateStr;
+                    const isToday = formatDateString(today) === dateStr;
+                    
+                    // 해당 날짜에 일정이 있는지 체크
+                    const hasVisit = schedules.some(s => s.visitDate === dateStr);
+                    const hasDeadline = schedules.some(s => s.deadlineDate === dateStr);
+
+                    return (
                       <button 
-                        onClick={() => handleDelete(schedule.id)}
-                        className="text-xs font-semibold text-slate-400 hover:text-red-500 transition-colors self-start md:self-center bg-white px-3 py-1.5 rounded-lg border border-slate-200"
+                        key={i} 
+                        onClick={() => setSelectedDate(isSelected ? '' : dateStr)}
+                        className={`aspect-square flex flex-col items-center justify-center rounded-xl text-sm font-medium transition-all relative ${
+                          isSelected ? 'bg-indigo-600 text-white shadow-md' 
+                          : isToday ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' 
+                          : 'hover:bg-slate-200 text-slate-700'
+                        }`}
                       >
-                        삭제
+                        {d.getDate()}
+                        <div className="flex gap-1 mt-1">
+                          {hasVisit && <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-indigo-400'}`}></div>}
+                          {hasDeadline && <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-pink-400'}`}></div>}
+                        </div>
                       </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
-              )}
+              </div>
+
+              {/* 선택된 날짜의 리스트 영역 */}
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-slate-700">
+                    {selectedDate ? `${selectedDate.split('-')[1]}월 ${selectedDate.split('-')[2]}일 일정` : '전체 일정'}
+                  </h3>
+                  {selectedDate && (
+                    <button onClick={() => setSelectedDate('')} className="text-xs text-indigo-600 font-semibold hover:underline">
+                      전체 보기
+                    </button>
+                  )}
+                </div>
+
+                {filteredSchedules.length === 0 ? (
+                  <div className="bg-slate-50 rounded-2xl py-8 text-center text-slate-400 text-sm border border-slate-100">
+                    해당 날짜에 일정이 없습니다.
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {filteredSchedules.map((schedule) => {
+                      const isDeadlineToday = schedule.deadlineDate === selectedDate;
+                      return (
+                        <div key={schedule.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-sm transition-all group">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              {isDeadlineToday && <span className="bg-pink-100 text-pink-600 text-[10px] font-extrabold px-2 py-0.5 rounded-full">마감일</span>}
+                              <h3 className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{schedule.title}</h3>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium">
+                              {schedule.visitDate && (
+                                <span className={`flex items-center gap-1 ${schedule.visitDate === selectedDate ? 'text-indigo-600 font-bold' : ''}`}>
+                                  <CalendarIcon size={12} />
+                                  방문: {schedule.visitDate}
+                                </span>
+                              )}
+                              <span className={`flex items-center gap-1 ${schedule.deadlineDate === selectedDate ? 'text-pink-600 font-bold' : ''}`}>
+                                <CalendarIcon size={12} />
+                                마감: {schedule.deadlineDate}
+                              </span>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => handleDelete(schedule.id)}
+                            className="text-xs font-semibold text-slate-400 hover:text-red-500 transition-colors mt-3 md:mt-0 px-3 py-1.5 rounded-lg border border-transparent hover:border-red-100 hover:bg-red-50"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
