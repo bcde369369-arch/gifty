@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Calendar as CalendarIcon, Calculator, Link as LinkIcon, ArrowLeft, Plus, X, ChevronLeft, ChevronRight, Coins } from 'lucide-react';
+import { Sparkles, Calendar as CalendarIcon, Calculator, Link as LinkIcon, ArrowLeft, Plus, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
 interface Schedule {
@@ -28,8 +28,7 @@ export default function ExperienceDiary() {
   const [newCash, setNewCash] = useState('');
   const [newExpense, setNewExpense] = useState('');
 
-  const today = new Date();
-  const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+  const [currentMonth, setCurrentMonth] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState<string>('');
 
   useEffect(() => {
@@ -37,7 +36,8 @@ export default function ExperienceDiary() {
     if (saved) {
       setSchedules(JSON.parse(saved));
     }
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     setSelectedDate(todayStr);
   }, []);
 
@@ -202,7 +202,7 @@ export default function ExperienceDiary() {
                     if (!d) return <div key={i} className="aspect-square"></div>;
                     const dateStr = formatDateString(d);
                     const isSelected = selectedDate === dateStr;
-                    const isToday = formatDateString(today) === dateStr;
+                    const isToday = formatDateString(new Date()) === dateStr;
                     
                     const hasVisit = schedules.some(s => s.visitDate === dateStr);
                     const hasDeadline = schedules.some(s => s.deadlineDate === dateStr);
