@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Sparkles, Calendar as CalendarIcon, Calculator, Link as LinkIcon, Menu, ArrowLeft } from 'lucide-react';
+import { Sparkles, Calendar as CalendarIcon, Calculator, Link as LinkIcon, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 export default function ExperienceDiary() {

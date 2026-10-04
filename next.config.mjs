@@ -12,6 +12,11 @@ const nextConfig = {
       test: /\.node$/,
       use: 'ignore-loader',
     });
+    config.module.rules.push({
+      test: /\.m?js$/,
+      type: "javascript/auto",
+      resolve: { fullySpecified: false },
+    });
     return config;
   }
 };
