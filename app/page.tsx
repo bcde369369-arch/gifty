@@ -70,6 +70,21 @@ export default function Home() {
         )}
       </nav>
 
+      {/* Mobile Quick Links (Category Bar) */}
+      <div className="md:hidden w-full bg-white border-b border-slate-100 overflow-x-auto whitespace-nowrap scrollbar-hide shadow-sm z-40 relative">
+        <div className="px-4 py-3 flex gap-2.5">
+          <a href="/experience-diary" className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-50/80 text-blue-700 font-extrabold text-[13px] rounded-full border border-blue-200/50 shadow-sm active:scale-95 transition-transform">
+            📓 체험단 다이어리
+          </a>
+          <a href="/remove-bg" className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-50/80 text-purple-700 font-extrabold text-[13px] rounded-full border border-purple-200/50 shadow-sm active:scale-95 transition-transform">
+            ✂️ 누끼따기(AI)
+          </a>
+          <a href="/guide" className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-50/80 text-emerald-700 font-extrabold text-[13px] rounded-full border border-emerald-200/50 shadow-sm active:scale-95 transition-transform">
+            📚 블로그 꿀팁
+          </a>
+        </div>
+      </div>
+
       {/* Top Affiliate Banner */}
       <div className="w-full bg-slate-900 border-b border-slate-800 py-0 hidden md:block">
         <a 
