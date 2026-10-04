@@ -386,9 +386,25 @@ export default function ExperienceDiary() {
                   </div>
                 </a>
                 
-                <div className="flex items-center justify-center gap-4 p-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50">
-                  <p className="text-sm font-semibold text-slate-500">+ 더 많은 사이트 업데이트 예정</p>
-                </div>
+                <a href="https://강남맛집.net/" target="_blank" rel="noreferrer" className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all group">
+                  <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 text-xs font-bold group-hover:bg-orange-50 group-hover:text-orange-500">
+                    강남
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800 group-hover:text-orange-600">강남맛집</h3>
+                    <p className="text-xs text-slate-500 mt-1">블로거 필수 맛집 체험단</p>
+                  </div>
+                </a>
+
+                <a href="https://www.supermembers.co.kr/" target="_blank" rel="noreferrer" className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all group">
+                  <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 text-xs font-bold group-hover:bg-emerald-50 group-hover:text-emerald-500">
+                    슈퍼
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800 group-hover:text-emerald-600">슈퍼멤버스</h3>
+                    <p className="text-xs text-slate-500 mt-1">예약 없이 앱으로 바로 할인 혜택</p>
+                  </div>
+                </a>
               </div>
             </div>
           )}
