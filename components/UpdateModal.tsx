@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { X, Sparkles, Zap, Image as ImageIcon, Type } from 'lucide-react';
+import { X, Sparkles } from 'lucide-react';
 
 export default function UpdateModal() {
   const [isOpen, setIsOpen] = useState(false);
