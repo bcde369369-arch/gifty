@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Calendar as CalendarIcon, Calculator, Link as LinkIcon, ArrowLeft, Plus, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Sparkles, Calendar as CalendarIcon, Calculator, Link as LinkIcon, ArrowLeft, Plus, X, ChevronLeft, ChevronRight, Coins } from 'lucide-react';
 import Link from 'next/link';
 
 interface Schedule {
@@ -9,8 +9,9 @@ interface Schedule {
   title: string;
   visitDate: string;
   deadlineDate: string;
-  benefitAmount?: number; // 제공받은 혜택 금액
-  extraExpense?: number;  // 추가 지출 금액
+  benefitAmount?: number; // 제공받은 혜택 (식사권/제품 등)
+  cashAmount?: number;    // 원고료/지원금 (현금 수익)
+  extraExpense?: number;  // 추가 지출 (내돈내산)
 }
 
 export default function ExperienceDiary() {
@@ -24,6 +25,7 @@ export default function ExperienceDiary() {
   const [newVisitDate, setNewVisitDate] = useState('');
   const [newDeadlineDate, setNewDeadlineDate] = useState('');
   const [newBenefit, setNewBenefit] = useState('');
+  const [newCash, setNewCash] = useState('');
   const [newExpense, setNewExpense] = useState('');
 
   const today = new Date();
@@ -49,6 +51,7 @@ export default function ExperienceDiary() {
       visitDate: newVisitDate,
       deadlineDate: newDeadlineDate,
       benefitAmount: newBenefit ? parseInt(newBenefit.replace(/,/g, ''), 10) : 0,
+      cashAmount: newCash ? parseInt(newCash.replace(/,/g, ''), 10) : 0,
       extraExpense: newExpense ? parseInt(newExpense.replace(/,/g, ''), 10) : 0,
     };
 
@@ -61,6 +64,7 @@ export default function ExperienceDiary() {
     setNewVisitDate('');
     setNewDeadlineDate('');
     setNewBenefit('');
+    setNewCash('');
     setNewExpense('');
     setIsModalOpen(false);
   };
@@ -99,7 +103,11 @@ export default function ExperienceDiary() {
 
   // 금액 계산 (전체 일정 기준)
   const totalBenefit = schedules.reduce((acc, cur) => acc + (cur.benefitAmount || 0), 0);
+  const totalCash = schedules.reduce((acc, cur) => acc + (cur.cashAmount || 0), 0);
   const totalExpense = schedules.reduce((acc, cur) => acc + (cur.extraExpense || 0), 0);
+  
+  // 총 이득 = 혜택 + 지원금 - 초과지출
+  const netTotal = totalBenefit + totalCash - totalExpense;
 
   return (
     <main className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-indigo-200 pb-20">
@@ -131,8 +139,8 @@ export default function ExperienceDiary() {
           <div className="bg-indigo-50 text-indigo-700 px-5 py-4 rounded-2xl flex items-center gap-4 border border-indigo-100">
             <div className="bg-white p-3 rounded-xl shadow-sm"><Sparkles size={24} className="text-indigo-500"/></div>
             <div className="text-left">
-              <p className="text-sm font-bold text-indigo-500 mb-0.5">총 절약한 금액</p>
-              <p className="text-2xl font-black">{totalBenefit.toLocaleString()}원</p>
+              <p className="text-sm font-bold text-indigo-500 mb-0.5">총 이득 금액 (순수익)</p>
+              <p className="text-2xl font-black">{netTotal.toLocaleString()}원</p>
             </div>
           </div>
         </div>
@@ -287,14 +295,18 @@ export default function ExperienceDiary() {
                 </button>
               </div>
               
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div className="bg-green-50 p-6 rounded-2xl border border-green-100">
-                  <p className="text-green-700 text-sm font-bold mb-1">총 혜택(제공) 금액</p>
-                  <p className="text-2xl font-black text-green-700">+{totalBenefit.toLocaleString()}원</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div className="bg-green-50 p-5 rounded-2xl border border-green-100">
+                  <p className="text-green-700 text-xs font-bold mb-1">🎁 혜택 (현물)</p>
+                  <p className="text-xl font-black text-green-700">+{totalBenefit.toLocaleString()}원</p>
                 </div>
-                <div className="bg-red-50 p-6 rounded-2xl border border-red-100">
-                  <p className="text-red-700 text-sm font-bold mb-1">초과 지출(내돈내산)</p>
-                  <p className="text-2xl font-black text-red-700">-{totalExpense.toLocaleString()}원</p>
+                <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100">
+                  <p className="text-blue-700 text-xs font-bold mb-1">💸 지원금 (현금/원고료)</p>
+                  <p className="text-xl font-black text-blue-700">+{totalCash.toLocaleString()}원</p>
+                </div>
+                <div className="bg-red-50 p-5 rounded-2xl border border-red-100">
+                  <p className="text-red-700 text-xs font-bold mb-1">💳 초과 지출 (내돈내산)</p>
+                  <p className="text-xl font-black text-red-700">-{totalExpense.toLocaleString()}원</p>
                 </div>
               </div>
 
@@ -313,15 +325,18 @@ export default function ExperienceDiary() {
                           <p className="font-bold text-slate-800">{schedule.title}</p>
                           <p className="text-xs text-slate-500 mt-1">{schedule.visitDate || schedule.deadlineDate}</p>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right flex flex-col gap-0.5">
                           {(schedule.benefitAmount || 0) > 0 && (
-                            <p className="text-sm font-bold text-green-600">+{schedule.benefitAmount?.toLocaleString()}원</p>
+                            <p className="text-xs font-bold text-green-600">혜택 +{schedule.benefitAmount?.toLocaleString()}원</p>
+                          )}
+                          {(schedule.cashAmount || 0) > 0 && (
+                            <p className="text-xs font-bold text-blue-600">지원금 +{schedule.cashAmount?.toLocaleString()}원</p>
                           )}
                           {(schedule.extraExpense || 0) > 0 && (
-                            <p className="text-sm font-bold text-red-500">-{schedule.extraExpense?.toLocaleString()}원</p>
+                            <p className="text-xs font-bold text-red-500">지출 -{schedule.extraExpense?.toLocaleString()}원</p>
                           )}
-                          {!schedule.benefitAmount && !schedule.extraExpense && (
-                            <p className="text-sm text-slate-400 font-medium">금액 미입력</p>
+                          {!schedule.benefitAmount && !schedule.extraExpense && !schedule.cashAmount && (
+                            <p className="text-xs text-slate-400 font-medium">금액 미입력</p>
                           )}
                         </div>
                       </div>
@@ -435,22 +450,35 @@ export default function ExperienceDiary() {
               <div className="bg-green-50/50 p-4 rounded-2xl border border-green-50">
                 <h4 className="text-xs font-bold text-green-600 mb-3 tracking-wide">가계부 정보 (선택)</h4>
                 <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">제공받은 혜택 (원)</label>
-                    <input 
-                      type="number" 
-                      placeholder="예: 30000"
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all text-sm"
-                      value={newBenefit}
-                      onChange={(e) => setNewBenefit(e.target.value)}
-                    />
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="block text-xs font-bold text-slate-700 mb-1">제공 혜택(현물) <span className="text-slate-400 font-normal">원</span></label>
+                      <input 
+                        type="number" 
+                        placeholder="예: 30000"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all text-sm"
+                        value={newBenefit}
+                        onChange={(e) => setNewBenefit(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-xs font-bold text-slate-700 mb-1">지원금(원고료) <span className="text-slate-400 font-normal">원</span></label>
+                      <input 
+                        type="number" 
+                        placeholder="예: 10000"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all text-sm"
+                        value={newCash}
+                        onChange={(e) => setNewCash(e.target.value)}
+                      />
+                    </div>
                   </div>
+                  
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">초과 지출 내돈내산 (원)</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">초과 지출 내돈내산 <span className="text-slate-400 font-normal">원</span></label>
                     <input 
                       type="number" 
                       placeholder="예: 5000"
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-all text-sm"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-all text-sm"
                       value={newExpense}
                       onChange={(e) => setNewExpense(e.target.value)}
                     />
