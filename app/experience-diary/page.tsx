@@ -427,6 +427,16 @@ export default function ExperienceDiary() {
                     <p className="text-xs text-slate-500 mt-1">예약 없이 앱으로 바로 할인 혜택</p>
                   </div>
                 </a>
+
+                <a href="https://www.reviewnote.co.kr/" target="_blank" rel="noreferrer" className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all group">
+                  <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 text-xs font-bold group-hover:bg-sky-50 group-hover:text-sky-500">
+                    리뷰
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800 group-hover:text-sky-600">리뷰노트</h3>
+                    <p className="text-xs text-slate-500 mt-1">최근 가장 핫한 신흥 체험단</p>
+                  </div>
+                </a>
               </div>
             </div>
           )}
