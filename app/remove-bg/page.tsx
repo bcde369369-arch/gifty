@@ -6,8 +6,11 @@ import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { Sparkles, ArrowLeft, Upload, Download, Loader2, Image as ImageIcon } from 'lucide-react';
 import imglyRemoveBackground from '@imgly/background-removal';
+import CoupangBanner from '@/components/CoupangBanner';
+import { useSiteSettings } from '@/lib/settings';
 
 export default function RemoveBg() {
+  const { settings, isLoaded } = useSiteSettings();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
@@ -216,6 +219,27 @@ export default function RemoveBg() {
             className="hidden" 
           />
         </div>
+
+        {/* Global Coupang Partners Banner */}
+        {isLoaded && (settings.coupangBannerHtml || settings.coupangBannerHtmlMobile) && (
+          <div className="max-w-4xl mx-auto px-4 mt-12 mb-8">
+            <div className="bg-white rounded-3xl p-4 shadow-sm border border-slate-100 flex flex-col justify-center items-center overflow-hidden">
+              <p className="text-[10px] text-slate-400 mb-2 font-bold uppercase tracking-wider self-start">AD</p>
+              <div className="w-full max-w-[680px]">
+                {settings.coupangBannerHtml && (
+                  <div className="hidden md:block w-full">
+                    <CoupangBanner htmlCode={settings.coupangBannerHtml} />
+                  </div>
+                )}
+                {settings.coupangBannerHtmlMobile && (
+                  <div className="md:hidden w-full">
+                    <CoupangBanner htmlCode={settings.coupangBannerHtmlMobile} />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </main>
       
       <div className="mt-auto"></div>
