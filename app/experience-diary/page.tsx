@@ -9,12 +9,13 @@ interface Schedule {
   title: string;
   visitDate: string;
   deadlineDate: string;
+  benefitAmount?: number; // 제공받은 혜택 금액
+  extraExpense?: number;  // 추가 지출 금액
 }
 
 export default function ExperienceDiary() {
   const [activeTab, setActiveTab] = useState<'schedule' | 'ledger' | 'sites'>('schedule');
   
-  // 상태 관리
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
@@ -22,19 +23,18 @@ export default function ExperienceDiary() {
   const [newTitle, setNewTitle] = useState('');
   const [newVisitDate, setNewVisitDate] = useState('');
   const [newDeadlineDate, setNewDeadlineDate] = useState('');
+  const [newBenefit, setNewBenefit] = useState('');
+  const [newExpense, setNewExpense] = useState('');
 
-  // 캘린더 상태
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
-  const [selectedDate, setSelectedDate] = useState<string>(''); // 'YYYY-MM-DD'
+  const [selectedDate, setSelectedDate] = useState<string>('');
 
-  // 초기 데이터 로드
   useEffect(() => {
     const saved = localStorage.getItem('gifty_schedules');
     if (saved) {
       setSchedules(JSON.parse(saved));
     }
-    // 기본 선택일을 오늘로 설정
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     setSelectedDate(todayStr);
   }, []);
@@ -48,15 +48,20 @@ export default function ExperienceDiary() {
       title: newTitle,
       visitDate: newVisitDate,
       deadlineDate: newDeadlineDate,
+      benefitAmount: newBenefit ? parseInt(newBenefit.replace(/,/g, ''), 10) : 0,
+      extraExpense: newExpense ? parseInt(newExpense.replace(/,/g, ''), 10) : 0,
     };
 
     const updated = [newSchedule, ...schedules];
     setSchedules(updated);
     localStorage.setItem('gifty_schedules', JSON.stringify(updated));
     
+    // 초기화
     setNewTitle('');
     setNewVisitDate('');
     setNewDeadlineDate('');
+    setNewBenefit('');
+    setNewExpense('');
     setIsModalOpen(false);
   };
 
@@ -67,7 +72,7 @@ export default function ExperienceDiary() {
     localStorage.setItem('gifty_schedules', JSON.stringify(updated));
   };
 
-  // 캘린더 계산 로직
+  // 캘린더 로직
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -88,10 +93,13 @@ export default function ExperienceDiary() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
-  // 선택된 날짜의 일정 필터링
   const filteredSchedules = selectedDate 
     ? schedules.filter(s => s.visitDate === selectedDate || s.deadlineDate === selectedDate)
     : schedules;
+
+  // 금액 계산 (전체 일정 기준)
+  const totalBenefit = schedules.reduce((acc, cur) => acc + (cur.benefitAmount || 0), 0);
+  const totalExpense = schedules.reduce((acc, cur) => acc + (cur.extraExpense || 0), 0);
 
   return (
     <main className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-indigo-200 pb-20">
@@ -120,11 +128,11 @@ export default function ExperienceDiary() {
             <h1 className="text-3xl font-extrabold text-slate-900 mb-2">블로거를 위한 체험단 다이어리</h1>
             <p className="text-slate-500">일정 관리부터 가계부 작성, 유용한 사이트 모음까지 한 번에 해결하세요!</p>
           </div>
-          <div className="bg-indigo-50 text-indigo-700 px-4 py-3 rounded-2xl flex items-center gap-3">
-            <div className="bg-white p-2 rounded-xl shadow-sm"><Sparkles size={18} className="text-indigo-500"/></div>
+          <div className="bg-indigo-50 text-indigo-700 px-5 py-4 rounded-2xl flex items-center gap-4 border border-indigo-100">
+            <div className="bg-white p-3 rounded-xl shadow-sm"><Sparkles size={24} className="text-indigo-500"/></div>
             <div className="text-left">
-              <p className="text-xs font-bold text-indigo-400">이번 달 절약 금액</p>
-              <p className="text-lg font-black">0 원</p>
+              <p className="text-sm font-bold text-indigo-500 mb-0.5">총 절약한 금액</p>
+              <p className="text-2xl font-black">{totalBenefit.toLocaleString()}원</p>
             </div>
           </div>
         </div>
@@ -158,7 +166,7 @@ export default function ExperienceDiary() {
 
         <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-slate-100 min-h-[400px]">
           
-          {/* 1. Schedule Tab (하이브리드 달력) */}
+          {/* 1. Schedule Tab */}
           {activeTab === 'schedule' && (
             <div className="animate-in fade-in duration-300">
               <div className="flex justify-between items-center mb-6">
@@ -171,7 +179,7 @@ export default function ExperienceDiary() {
                 </button>
               </div>
 
-              {/* 캘린더 영역 */}
+              {/* Calendar */}
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-8 select-none">
                 <div className="flex justify-between items-center mb-4 px-2">
                   <button onClick={prevMonth} className="p-2 hover:bg-slate-200 rounded-lg text-slate-500"><ChevronLeft size={20}/></button>
@@ -188,7 +196,6 @@ export default function ExperienceDiary() {
                     const isSelected = selectedDate === dateStr;
                     const isToday = formatDateString(today) === dateStr;
                     
-                    // 해당 날짜에 일정이 있는지 체크
                     const hasVisit = schedules.some(s => s.visitDate === dateStr);
                     const hasDeadline = schedules.some(s => s.deadlineDate === dateStr);
 
@@ -213,7 +220,7 @@ export default function ExperienceDiary() {
                 </div>
               </div>
 
-              {/* 선택된 날짜의 리스트 영역 */}
+              {/* Schedule List */}
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-slate-700">
@@ -241,16 +248,14 @@ export default function ExperienceDiary() {
                               {isDeadlineToday && <span className="bg-pink-100 text-pink-600 text-[10px] font-extrabold px-2 py-0.5 rounded-full">마감일</span>}
                               <h3 className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{schedule.title}</h3>
                             </div>
-                            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium">
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium mt-2">
                               {schedule.visitDate && (
                                 <span className={`flex items-center gap-1 ${schedule.visitDate === selectedDate ? 'text-indigo-600 font-bold' : ''}`}>
-                                  <CalendarIcon size={12} />
-                                  방문: {schedule.visitDate}
+                                  <CalendarIcon size={12} /> 방문: {schedule.visitDate}
                                 </span>
                               )}
                               <span className={`flex items-center gap-1 ${schedule.deadlineDate === selectedDate ? 'text-pink-600 font-bold' : ''}`}>
-                                <CalendarIcon size={12} />
-                                마감: {schedule.deadlineDate}
+                                <CalendarIcon size={12} /> 마감: {schedule.deadlineDate}
                               </span>
                             </div>
                           </div>
@@ -275,7 +280,7 @@ export default function ExperienceDiary() {
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold text-slate-800">💰 쏠쏠한 체험단 가계부</h2>
                 <button 
-                  onClick={() => alert('가계부 추가 기능은 다음 업데이트에 추가됩니다!')}
+                  onClick={() => setIsModalOpen(true)}
                   className="bg-indigo-600 text-white text-sm font-bold px-4 py-2 rounded-xl hover:bg-indigo-700 transition"
                 >
                   + 내역 추가
@@ -284,17 +289,45 @@ export default function ExperienceDiary() {
               
               <div className="grid grid-cols-2 gap-4 mb-8">
                 <div className="bg-green-50 p-6 rounded-2xl border border-green-100">
-                  <p className="text-green-600 text-sm font-bold mb-1">총 혜택 받은 금액</p>
-                  <p className="text-2xl font-black text-green-700">0원</p>
+                  <p className="text-green-700 text-sm font-bold mb-1">총 혜택(제공) 금액</p>
+                  <p className="text-2xl font-black text-green-700">+{totalBenefit.toLocaleString()}원</p>
                 </div>
                 <div className="bg-red-50 p-6 rounded-2xl border border-red-100">
-                  <p className="text-red-600 text-sm font-bold mb-1">초과 지출한 내돈내산</p>
-                  <p className="text-2xl font-black text-red-700">0원</p>
+                  <p className="text-red-700 text-sm font-bold mb-1">초과 지출(내돈내산)</p>
+                  <p className="text-2xl font-black text-red-700">-{totalExpense.toLocaleString()}원</p>
                 </div>
               </div>
 
-              <div className="flex flex-col items-center justify-center py-10 text-center">
-                <p className="text-slate-400 text-sm">아직 기록된 가계부 내역이 없습니다.</p>
+              {/* 가계부 리스트 */}
+              <div>
+                <h3 className="font-bold text-slate-700 mb-4">상세 내역</h3>
+                {schedules.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-center">
+                    <p className="text-slate-400 text-sm">기록된 내역이 없습니다.</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {schedules.map((schedule) => (
+                      <div key={schedule.id} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 bg-slate-50">
+                        <div>
+                          <p className="font-bold text-slate-800">{schedule.title}</p>
+                          <p className="text-xs text-slate-500 mt-1">{schedule.visitDate || schedule.deadlineDate}</p>
+                        </div>
+                        <div className="text-right">
+                          {(schedule.benefitAmount || 0) > 0 && (
+                            <p className="text-sm font-bold text-green-600">+{schedule.benefitAmount?.toLocaleString()}원</p>
+                          )}
+                          {(schedule.extraExpense || 0) > 0 && (
+                            <p className="text-sm font-bold text-red-500">-{schedule.extraExpense?.toLocaleString()}원</p>
+                          )}
+                          {!schedule.benefitAmount && !schedule.extraExpense && (
+                            <p className="text-sm text-slate-400 font-medium">금액 미입력</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -350,49 +383,82 @@ export default function ExperienceDiary() {
       {/* 일정 추가 모달 */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-xl animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-slate-900">새 일정 추가</h3>
+              <h3 className="text-xl font-bold text-slate-900">새 체험단 등록</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <X size={24} />
               </button>
             </div>
             
             <form onSubmit={handleAddSchedule} className="flex flex-col gap-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">체험단(캠페인) 이름 <span className="text-red-500">*</span></label>
-                <input 
-                  type="text" 
-                  required
-                  placeholder="예: 강남역 OOO 맛집"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">방문/예약일 (선택)</label>
-                <input 
-                  type="date" 
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all"
-                  value={newVisitDate}
-                  onChange={(e) => setNewVisitDate(e.target.value)}
-                />
+              {/* 기본 정보 */}
+              <div className="bg-slate-50 p-4 rounded-2xl">
+                <h4 className="text-xs font-bold text-indigo-500 mb-3 tracking-wide">기본 정보</h4>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">체험단(캠페인) 이름 <span className="text-red-500">*</span></label>
+                    <input 
+                      type="text" 
+                      required
+                      placeholder="예: 강남역 OOO 맛집"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all text-sm"
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="block text-sm font-bold text-slate-700 mb-1">방문/예약일</label>
+                      <input 
+                        type="date" 
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all text-sm"
+                        value={newVisitDate}
+                        onChange={(e) => setNewVisitDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-sm font-bold text-slate-700 mb-1">포스팅 마감일 <span className="text-red-500">*</span></label>
+                      <input 
+                        type="date" 
+                        required
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all text-sm"
+                        value={newDeadlineDate}
+                        onChange={(e) => setNewDeadlineDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">포스팅 마감일 <span className="text-red-500">*</span></label>
-                <input 
-                  type="date" 
-                  required
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all"
-                  value={newDeadlineDate}
-                  onChange={(e) => setNewDeadlineDate(e.target.value)}
-                />
+              {/* 가계부 정보 */}
+              <div className="bg-green-50/50 p-4 rounded-2xl border border-green-50">
+                <h4 className="text-xs font-bold text-green-600 mb-3 tracking-wide">가계부 정보 (선택)</h4>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">제공받은 혜택 (원)</label>
+                    <input 
+                      type="number" 
+                      placeholder="예: 30000"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all text-sm"
+                      value={newBenefit}
+                      onChange={(e) => setNewBenefit(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">초과 지출 내돈내산 (원)</label>
+                    <input 
+                      type="number" 
+                      placeholder="예: 5000"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-all text-sm"
+                      value={newExpense}
+                      onChange={(e) => setNewExpense(e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="flex gap-3 mt-4">
+              <div className="flex gap-3 mt-2">
                 <button 
                   type="button" 
                   onClick={() => setIsModalOpen(false)}
