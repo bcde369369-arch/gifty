@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Calendar as CalendarIcon, Calculator, Link as LinkIcon, ArrowLeft, Plus, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import CoupangBanner from '@/components/CoupangBanner';
+import { useSiteSettings } from '@/lib/settings';
 
 interface Schedule {
   id: string;
@@ -15,6 +17,7 @@ interface Schedule {
 }
 
 export default function ExperienceDiary() {
+  const { settings, isLoaded } = useSiteSettings();
   const [activeTab, setActiveTab] = useState<'schedule' | 'ledger' | 'sites'>('schedule');
   
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -411,13 +414,23 @@ export default function ExperienceDiary() {
         </div>
 
         {/* 쿠팡 파트너스 광고 배너 영역 */}
-        <div className="mt-10 mb-8 bg-white p-4 rounded-3xl border border-slate-100 shadow-sm text-center">
-          <p className="text-xs text-slate-400 mb-2 font-semibold uppercase tracking-wider">AD</p>
-          <div className="w-full min-h-[120px] bg-slate-50 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 hover:border-slate-300 transition-colors cursor-pointer group">
-            <h3 className="text-slate-500 font-bold group-hover:text-slate-600 transition-colors">쿠팡 파트너스 배너 영역</h3>
-            <p className="text-slate-400 text-sm mt-1">블로거 필수템(카메라, 조명 등) 광고가 들어가면 좋습니다.</p>
+        {isLoaded && (settings.coupangBannerHtml || settings.coupangBannerHtmlMobile) && (
+          <div className="mt-10 mb-8 bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-center items-center overflow-hidden">
+            <p className="text-[10px] text-slate-400 mb-2 font-bold uppercase tracking-wider self-start">AD</p>
+            <div className="w-full max-w-[680px]">
+              {settings.coupangBannerHtml && (
+                <div className="hidden md:block w-full">
+                  <CoupangBanner htmlCode={settings.coupangBannerHtml} />
+                </div>
+              )}
+              {settings.coupangBannerHtmlMobile && (
+                <div className="md:hidden w-full">
+                  <CoupangBanner htmlCode={settings.coupangBannerHtmlMobile} />
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* 일정 추가 모달 */}
