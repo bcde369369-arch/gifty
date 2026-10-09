@@ -327,11 +327,25 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
             <a
               href={gifUrl}
               download="gifty-magic.gif"
-              onClick={() => {
-                const userAgent = navigator.userAgent.toLowerCase();
-                const isInAppBrowser = /kakaotalk|instagram|facebook|line|band/.test(userAgent);
+              onClick={(e) => {
+                const targetUrl = window.location.href;
+                const ua = navigator.userAgent.toLowerCase();
+                const isInAppBrowser = /kakaotalk|instagram|facebook|line|band/.test(ua);
                 if (isInAppBrowser) {
-                  alert('카카오톡, 인스타그램 등 앱 내 브라우저에서는 파일 다운로드가 차단될 수 있습니다.\n\n다운로드가 안 될 경우:\n1. 위 완성된 움짤 이미지를 길게 꾹 눌러 [사진 앱에 저장]을 시도해보세요.\n2. 화면 하단이나 우측 상단의 [︙] 메뉴를 눌러 [다른 브라우저로 열기(Safari, Chrome)]로 다시 접속해주세요.');
+                  e.preventDefault();
+                  if (ua.match(/kakaotalk/i)) {
+                    alert('현재 브라우저에서는 움짤 저장이 불가능합니다. 기본 브라우저(Safari/Chrome)로 이동합니다!');
+                    window.location.href = `kakaotalk://web/openExternal?url=${encodeURIComponent(targetUrl)}`;
+                  } else if (ua.match(/line/i)) {
+                    alert('현재 브라우저에서는 움짤 저장이 불가능합니다. 기본 브라우저(Safari/Chrome)로 이동합니다!');
+                    window.location.href = targetUrl.includes('?') ? targetUrl + '&openExternalBrowser=1' : targetUrl + '?openExternalBrowser=1';
+                  } else {
+                    navigator.clipboard.writeText(targetUrl).then(() => {
+                      alert('현재 브라우저에서는 움짤 저장이 불가능합니다.\n링크가 복사되었으니 Safari 또는 Chrome 주소창에 붙여넣어 주세요!');
+                    }).catch(() => {
+                      alert('현재 브라우저에서는 움짤 저장이 불가능합니다.\n화면의 [︙] 메뉴를 눌러 [다른 브라우저로 열기]를 선택해주세요.');
+                    });
+                  }
                 }
               }}
               className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-md hover:bg-indigo-700 hover:shadow-lg transition-all"
