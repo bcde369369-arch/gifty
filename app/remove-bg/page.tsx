@@ -52,7 +52,7 @@ export default function RemoveBg() {
     
     try {
       const config = {
-        model: 'small' as const, // 모바일 메모리 부족 방지를 위해 가벼운 모델 사용
+        model: 'medium' as const, // 누끼 품질 향상을 위해 medium 모델 사용
         progress: (key: string, current: number, total: number) => {
           const percent = Math.round((current / total) * 100);
           if (key.includes('fetch')) {
