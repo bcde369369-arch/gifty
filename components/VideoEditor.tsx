@@ -327,6 +327,13 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
             <a
               href={gifUrl}
               download="gifty-magic.gif"
+              onClick={() => {
+                const userAgent = navigator.userAgent.toLowerCase();
+                const isInAppBrowser = /kakaotalk|instagram|facebook|line|band/.test(userAgent);
+                if (isInAppBrowser) {
+                  alert('카카오톡, 인스타그램 등 앱 내 브라우저에서는 파일 다운로드가 차단될 수 있습니다.\n\n다운로드가 안 될 경우:\n1. 위 완성된 움짤 이미지를 길게 꾹 눌러 [사진 앱에 저장]을 시도해보세요.\n2. 화면 하단이나 우측 상단의 [︙] 메뉴를 눌러 [다른 브라우저로 열기(Safari, Chrome)]로 다시 접속해주세요.');
+                }
+              }}
               className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-md hover:bg-indigo-700 hover:shadow-lg transition-all"
             >
               <Download size={18} />

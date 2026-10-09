@@ -1,25 +1,50 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Dropzone from '@/components/Dropzone';
 import VideoEditor from '@/components/VideoEditor';
 import ShareButton from '@/components/ShareButton';
 import UpdateModal from '@/components/UpdateModal';
 import CoupangBanner from '@/components/CoupangBanner';
-import { Sparkles, Video, Wand2, DownloadCloud, Menu, ExternalLink, X } from 'lucide-react';
+import { Sparkles, Video, Wand2, DownloadCloud, Menu, ExternalLink, X, AlertTriangle } from 'lucide-react';
 import { useSiteSettings } from '@/lib/settings';
 import FeedbackBoard from '@/components/FeedbackBoard';
 
 export default function Home() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [showBanner, setShowBanner] = useState(true);
+  const [showInAppWarning, setShowInAppWarning] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { settings, isLoaded } = useSiteSettings();
+
+  useEffect(() => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    if (/kakaotalk|instagram|facebook|line|band/.test(userAgent)) {
+      setShowInAppWarning(true);
+    }
+  }, []);
 
   return (
     <main className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-indigo-200">
       <UpdateModal />
       
+      {/* In-App Browser Warning Banner */}
+      {showInAppWarning && (
+        <div className="bg-red-500 text-white px-4 py-3 text-sm font-bold flex flex-col items-center justify-center gap-1 relative z-50">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={18} />
+            <span>카카오톡/인스타 브라우저에서는 다운로드가 안 될 수 있습니다!</span>
+          </div>
+          <span className="text-xs opacity-90 font-medium">화면 우측 하단/상단 [︙] 메뉴를 눌러 [다른 브라우저로 열기]를 권장합니다.</span>
+          <button 
+            onClick={() => setShowInAppWarning(false)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-white/20 rounded-full transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Top Announcement Banner */}
       {showBanner && (
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 text-sm font-semibold flex items-center justify-center gap-2 relative">
