@@ -5,7 +5,7 @@
 import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { Sparkles, ArrowLeft, Upload, Download, Loader2, Image as ImageIcon, Menu, X } from 'lucide-react';
-import imglyRemoveBackground from '@imgly/background-removal';
+import { removeBackground } from '@imgly/background-removal';
 import CoupangBanner from '@/components/CoupangBanner';
 import { useSiteSettings } from '@/lib/settings';
 
@@ -52,6 +52,7 @@ export default function RemoveBg() {
     
     try {
       const config = {
+        model: 'small' as const, // 모바일 메모리 부족 방지를 위해 가벼운 모델 사용
         progress: (key: string, current: number, total: number) => {
           const percent = Math.round((current / total) * 100);
           if (key.includes('fetch')) {
@@ -60,10 +61,10 @@ export default function RemoveBg() {
             setProgressText('배경 지우는 중... (약 2~5초 소요)');
           }
         },
-        publicPath: 'https://unpkg.com/@imgly/background-removal@1.4.5/dist/'
+        publicPath: 'https://unpkg.com/@imgly/background-removal@1.7.0/dist/'
       };
 
-      const resultBlob = await imglyRemoveBackground(selectedFile, config);
+      const resultBlob = await removeBackground(selectedFile, config);
       const url = URL.createObjectURL(resultBlob);
       setResultUrl(url);
       setProgressText('완료!');
