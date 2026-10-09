@@ -24,21 +24,46 @@ export default function Home() {
     }
   }, []);
 
+  const handleOpenExternal = () => {
+    const targetUrl = window.location.href;
+    const ua = navigator.userAgent.toLowerCase();
+    
+    if (ua.match(/kakaotalk/i)) {
+      window.location.href = `kakaotalk://web/openExternal?url=${encodeURIComponent(targetUrl)}`;
+    } else if (ua.match(/line/i)) {
+      window.location.href = targetUrl.includes('?') ? targetUrl + '&openExternalBrowser=1' : targetUrl + '?openExternalBrowser=1';
+    } else {
+      navigator.clipboard.writeText(targetUrl).then(() => {
+        alert('링크가 복사되었습니다. Safari 또는 Chrome 앱을 열고 주소창에 붙여넣어 주세요!');
+      }).catch(() => {
+        alert('화면의 [︙] 메뉴를 눌러 [다른 브라우저로 열기]를 선택해주세요.');
+      });
+    }
+  };
+
   return (
     <main className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-indigo-200">
       <UpdateModal />
       
       {/* In-App Browser Warning Banner */}
       {showInAppWarning && (
-        <div className="bg-red-500 text-white px-4 py-3 text-sm font-bold flex flex-col items-center justify-center gap-1 relative z-50">
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={18} />
-            <span>카카오톡/인스타 브라우저에서는 다운로드가 안 될 수 있습니다!</span>
+        <div className="bg-red-500 text-white px-4 py-4 text-sm font-bold flex flex-col items-center justify-center gap-3 relative z-50">
+          <div className="flex items-center gap-2 text-center text-base">
+            <AlertTriangle size={20} />
+            <span>현재 브라우저에서는 움짤 다운로드가 안 됩니다!</span>
           </div>
-          <span className="text-xs opacity-90 font-medium">화면 우측 하단/상단 [︙] 메뉴를 눌러 [다른 브라우저로 열기]를 권장합니다.</span>
+          <p className="text-xs opacity-90 font-medium text-center">
+            정상적인 저장을 위해 반드시 기본 브라우저(Safari/Chrome)로 이동해주세요.
+          </p>
+          <button 
+            onClick={handleOpenExternal}
+            className="bg-white text-red-600 px-6 py-2.5 rounded-full font-black text-sm shadow-md hover:bg-red-50 transition-colors flex items-center gap-2"
+          >
+            🚀 기본 브라우저로 이동하기
+          </button>
           <button 
             onClick={() => setShowInAppWarning(false)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-white/20 rounded-full transition-colors"
+            className="absolute right-4 top-4 p-1 hover:bg-white/20 rounded-full transition-colors"
           >
             <X size={16} />
           </button>
