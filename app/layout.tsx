@@ -24,6 +24,8 @@ export const metadata = {
   }
 }
 
+import PWAInstallPrompt from '@/components/PWAInstallPrompt';
+
 export default function RootLayout({
   children,
 }: {
@@ -40,6 +42,7 @@ export default function RootLayout({
       </head>
       <body>
         {children}
+        <PWAInstallPrompt />
         <Analytics />
       </body>
     </html>
