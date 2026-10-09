@@ -60,8 +60,7 @@ export default function RemoveBg() {
           } else {
             setProgressText('배경 지우는 중... (약 2~5초 소요)');
           }
-        },
-        publicPath: 'https://unpkg.com/@imgly/background-removal@1.7.0/dist/'
+        }
       };
 
       const resultBlob = await removeBackground(selectedFile, config);
