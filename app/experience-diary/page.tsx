@@ -221,9 +221,10 @@ export default function ExperienceDiary() {
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
             <a href="/" className="hover:text-indigo-600 transition-colors">홈</a>
+            <a href="/community" className="hover:text-indigo-600 transition-colors text-indigo-600 font-extrabold flex items-center gap-1">커뮤니티 💬</a>
             <a href="/experience-diary" className="hover:text-indigo-600 transition-colors text-blue-600">체험단 다이어리 📓</a>
             <a href="/remove-bg" className="hover:text-indigo-600 transition-colors text-purple-600">누끼따기(AI) ✂️</a>
-            <a href="/guide" className="hover:text-indigo-600 transition-colors text-indigo-600">움짤 꿀팁 📚</a>
+            <a href="/guide" className="hover:text-indigo-600 transition-colors text-slate-600">움짤 꿀팁 📚</a>
           </div>
           <button 
             className="md:hidden text-slate-500 hover:text-slate-800"
@@ -237,9 +238,10 @@ export default function ExperienceDiary() {
         {isMobileMenuOpen && (
           <div className="md:hidden bg-white border-b border-slate-100 shadow-md w-full flex flex-col p-4 gap-2 text-sm font-bold absolute top-16 left-0">
             <a href="/" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl hover:bg-slate-50">홈</a>
+            <a href="/community" className="text-indigo-600 hover:bg-indigo-50 p-3 rounded-xl">커뮤니티 💬</a>
             <a href="/experience-diary" className="text-blue-600 hover:bg-blue-50 p-3 rounded-xl">체험단 다이어리 📓</a>
             <a href="/remove-bg" className="text-purple-600 hover:bg-purple-50 p-3 rounded-xl">누끼따기(AI) ✂️</a>
-            <a href="/guide" className="text-indigo-600 hover:bg-indigo-50 p-3 rounded-xl">움짤 꿀팁 📚</a>
+            <a href="/guide" className="text-slate-600 hover:bg-slate-50 p-3 rounded-xl">움짤 꿀팁 📚</a>
           </div>
         )}
       </nav>
@@ -476,6 +478,25 @@ export default function ExperienceDiary() {
                   <p className="text-[11px] text-red-600 font-medium mt-2">내돈내산 추가금</p>
                 </div>
               </div>
+
+              {/* 커뮤니티 자랑하기 배너 */}
+              {monthlyCount > 0 && (
+                <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
+                  <div className="flex items-center gap-3 text-center sm:text-left">
+                    <span className="text-2xl">🎉</span>
+                    <div>
+                      <p className="font-extrabold text-sm">이번 달 {monthlyCount}건 완주! 정산 내역을 자랑해보세요</p>
+                      <p className="text-xs text-indigo-100 opacity-90">블로거 커뮤니티에서 응원과 꿀팁을 함께 나눌 수 있어요.</p>
+                    </div>
+                  </div>
+                  <Link
+                    href="/community"
+                    className="px-4 py-2 bg-white text-indigo-700 font-black rounded-xl text-xs hover:bg-indigo-50 transition-colors shadow-sm whitespace-nowrap active:scale-95"
+                  >
+                    커뮤니티에 자랑하기 📢
+                  </Link>
+                </div>
+              )}
 
               {/* 체험단별 진행 횟수 통계 */}
               {monthlyCount > 0 && (

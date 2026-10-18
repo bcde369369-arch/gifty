@@ -102,9 +102,10 @@ export default function RemoveBg() {
           </Link>
           <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
             <a href="/" className="hover:text-indigo-600 transition-colors">홈</a>
+            <a href="/community" className="hover:text-indigo-600 transition-colors text-indigo-600 font-extrabold flex items-center gap-1">커뮤니티 💬</a>
             <a href="/experience-diary" className="hover:text-indigo-600 transition-colors text-blue-600">체험단 다이어리 📓</a>
             <a href="/remove-bg" className="hover:text-indigo-600 transition-colors text-purple-600">누끼따기(AI) ✂️</a>
-            <a href="/guide" className="hover:text-indigo-600 transition-colors text-indigo-600">움짤 꿀팁 📚</a>
+            <a href="/guide" className="hover:text-indigo-600 transition-colors text-slate-600">움짤 꿀팁 📚</a>
           </div>
           <button 
             className="md:hidden text-slate-500 hover:text-slate-800"
@@ -118,9 +119,10 @@ export default function RemoveBg() {
         {isMobileMenuOpen && (
           <div className="md:hidden bg-white border-b border-slate-100 shadow-md w-full flex flex-col p-4 gap-2 text-sm font-bold absolute top-16 left-0">
             <a href="/" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl hover:bg-slate-50">홈</a>
+            <a href="/community" className="text-indigo-600 hover:bg-indigo-50 p-3 rounded-xl">커뮤니티 💬</a>
             <a href="/experience-diary" className="text-blue-600 hover:bg-blue-50 p-3 rounded-xl">체험단 다이어리 📓</a>
             <a href="/remove-bg" className="text-purple-600 hover:bg-purple-50 p-3 rounded-xl">누끼따기(AI) ✂️</a>
-            <a href="/guide" className="text-indigo-600 hover:bg-indigo-50 p-3 rounded-xl">움짤 꿀팁 📚</a>
+            <a href="/guide" className="text-slate-600 hover:bg-slate-50 p-3 rounded-xl">움짤 꿀팁 📚</a>
           </div>
         )}
       </nav>
