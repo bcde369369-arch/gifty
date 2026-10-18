@@ -9,12 +9,15 @@ import { useSiteSettings } from '@/lib/settings';
 interface Schedule {
   id: string;
   title: string;
+  platform?: string;      // 체험단 플랫폼/출처 (예: 레뷰, 리뷰노트, 강남맛집 등)
   visitDate: string;
   deadlineDate: string;
   benefitAmount?: number; // 제공받은 혜택 (식사권/제품 등)
   cashAmount?: number;    // 원고료/지원금 (현금 수익)
   extraExpense?: number;  // 추가 지출 (내돈내산)
 }
+
+const POPULAR_PLATFORMS = ['레뷰', '리뷰노트', '강남맛집', '디너의여왕', '미블', '포블로그', '인스타협찬', '기타'];
 
 export default function ExperienceDiary() {
   const { settings, isLoaded } = useSiteSettings();
@@ -27,6 +30,9 @@ export default function ExperienceDiary() {
   
   // 폼 상태
   const [newTitle, setNewTitle] = useState('');
+  const [newPlatform, setNewPlatform] = useState('');
+  const [customPlatform, setCustomPlatform] = useState('');
+  const [isCustomPlatform, setIsCustomPlatform] = useState(false);
   const [newVisitDate, setNewVisitDate] = useState('');
   const [newDeadlineDate, setNewDeadlineDate] = useState('');
   const [newBenefit, setNewBenefit] = useState('');
@@ -35,6 +41,7 @@ export default function ExperienceDiary() {
 
   const [currentMonth, setCurrentMonth] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedPlatformFilter, setSelectedPlatformFilter] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('gifty_schedules');
@@ -49,6 +56,9 @@ export default function ExperienceDiary() {
   const openAddModal = () => {
     setEditingId(null);
     setNewTitle('');
+    setNewPlatform('');
+    setCustomPlatform('');
+    setIsCustomPlatform(false);
     setNewVisitDate('');
     setNewDeadlineDate('');
     setNewBenefit('');
@@ -60,6 +70,16 @@ export default function ExperienceDiary() {
   const handleEdit = (schedule: Schedule) => {
     setEditingId(schedule.id);
     setNewTitle(schedule.title);
+    const plat = schedule.platform || '';
+    if (plat && !POPULAR_PLATFORMS.includes(plat)) {
+      setNewPlatform('');
+      setCustomPlatform(plat);
+      setIsCustomPlatform(true);
+    } else {
+      setNewPlatform(plat);
+      setCustomPlatform('');
+      setIsCustomPlatform(false);
+    }
     setNewVisitDate(schedule.visitDate || '');
     setNewDeadlineDate(schedule.deadlineDate || '');
     setNewBenefit(schedule.benefitAmount ? String(schedule.benefitAmount) : '');
@@ -75,12 +95,14 @@ export default function ExperienceDiary() {
     const benefitAmount = newBenefit ? parseInt(newBenefit.replace(/,/g, ''), 10) : 0;
     const cashAmount = newCash ? parseInt(newCash.replace(/,/g, ''), 10) : 0;
     const extraExpense = newExpense ? parseInt(newExpense.replace(/,/g, ''), 10) : 0;
+    const platformToSave = isCustomPlatform ? customPlatform.trim() : newPlatform.trim();
 
     let updated;
     if (editingId) {
       updated = schedules.map(s => s.id === editingId ? {
         ...s,
         title: newTitle,
+        platform: platformToSave || undefined,
         visitDate: newVisitDate,
         deadlineDate: newDeadlineDate,
         benefitAmount,
@@ -91,6 +113,7 @@ export default function ExperienceDiary() {
       const newSchedule: Schedule = {
         id: Date.now().toString(),
         title: newTitle,
+        platform: platformToSave || undefined,
         visitDate: newVisitDate,
         deadlineDate: newDeadlineDate,
         benefitAmount,
@@ -106,6 +129,9 @@ export default function ExperienceDiary() {
     // 초기화
     setEditingId(null);
     setNewTitle('');
+    setNewPlatform('');
+    setCustomPlatform('');
+    setIsCustomPlatform(false);
     setNewVisitDate('');
     setNewDeadlineDate('');
     setNewBenefit('');
@@ -152,15 +178,32 @@ export default function ExperienceDiary() {
   const totalExpense = schedules.reduce((acc, cur) => acc + (cur.extraExpense || 0), 0);
   const netTotal = totalBenefit + totalCash - totalExpense;
 
-  // 금액 계산 (선택된 월 기준 - 가계부 탭용)
+  // 금액 및 건수 계산 (선택된 월 기준 - 가계부 탭용)
   const currentMonthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
   const monthlySchedules = schedules.filter(s => {
     const d = s.visitDate || s.deadlineDate;
     return d && d.startsWith(currentMonthStr);
   });
+  const monthlyCount = monthlySchedules.length;
   const monthlyBenefit = monthlySchedules.reduce((acc, cur) => acc + (cur.benefitAmount || 0), 0);
   const monthlyCash = monthlySchedules.reduce((acc, cur) => acc + (cur.cashAmount || 0), 0);
   const monthlyExpense = monthlySchedules.reduce((acc, cur) => acc + (cur.extraExpense || 0), 0);
+  const monthlyNetProfit = monthlyBenefit + monthlyCash - monthlyExpense;
+  const avgPerCase = monthlyCount > 0 ? Math.round((monthlyBenefit + monthlyCash) / monthlyCount) : 0;
+
+  // 플랫폼별 횟수 집계
+  const platformStats = monthlySchedules.reduce((acc, cur) => {
+    const p = cur.platform?.trim() || '미지정';
+    acc[p] = (acc[p] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const sortedPlatformStats = Object.entries(platformStats).sort((a, b) => b[1] - a[1]);
+
+  // 플랫폼 필터 적용된 가계부 목록
+  const displayedMonthlySchedules = selectedPlatformFilter
+    ? monthlySchedules.filter(s => (s.platform?.trim() || '미지정') === selectedPlatformFilter)
+    : monthlySchedules;
 
   return (
     <main className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-indigo-200 pb-20">
@@ -323,8 +366,13 @@ export default function ExperienceDiary() {
                       return (
                         <div key={schedule.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-sm transition-all group">
                           <div>
-                            <div className="flex items-center gap-2 mb-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
                               {isDeadlineToday && <span className="bg-pink-100 text-pink-600 text-[10px] font-extrabold px-2 py-0.5 rounded-full">마감일</span>}
+                              {schedule.platform && (
+                                <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-extrabold px-2 py-0.5 rounded-md">
+                                  {schedule.platform}
+                                </span>
+                              )}
                               <h3 className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{schedule.title}</h3>
                             </div>
                             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium mt-2">
@@ -379,42 +427,147 @@ export default function ExperienceDiary() {
                 <button onClick={prevMonth} className="p-3 hover:bg-slate-100 rounded-xl text-slate-500 transition-colors">
                    <ChevronLeft size={20}/>
                 </button>
-                <div className="font-bold text-slate-800 text-lg">
-                  {year}년 {month + 1}월 정산
+                <div className="text-center">
+                  <div className="font-bold text-slate-800 text-lg">
+                    {year}년 {month + 1}월 정산
+                  </div>
+                  <div className="text-xs font-semibold text-slate-500 mt-0.5">
+                    월 순이득: <span className={monthlyNetProfit >= 0 ? "text-indigo-600 font-bold" : "text-red-500 font-bold"}>
+                      {monthlyNetProfit >= 0 ? `+${monthlyNetProfit.toLocaleString()}원` : `-${Math.abs(monthlyNetProfit).toLocaleString()}원`}
+                    </span>
+                  </div>
                 </div>
                 <button onClick={nextMonth} className="p-3 hover:bg-slate-100 rounded-xl text-slate-500 transition-colors">
                    <ChevronRight size={20}/>
                 </button>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                <div className="bg-green-50 p-5 rounded-2xl border border-green-100 shadow-sm">
-                  <p className="text-green-700 text-xs font-bold mb-1">🎁 월 혜택 (현물)</p>
-                  <p className="text-xl font-black text-green-700">+{monthlyBenefit.toLocaleString()}원</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+                <div className="bg-indigo-50/80 p-4 md:p-5 rounded-2xl border border-indigo-100 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <p className="text-indigo-700 text-xs font-bold mb-1">🎯 총 체험 건수</p>
+                    <p className="text-xl md:text-2xl font-black text-indigo-900">{monthlyCount}건</p>
+                  </div>
+                  {monthlyCount > 0 && (
+                    <p className="text-[11px] text-indigo-600 font-semibold mt-2">
+                      건당 약 {avgPerCase.toLocaleString()}원
+                    </p>
+                  )}
                 </div>
-                <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 shadow-sm">
-                  <p className="text-blue-700 text-xs font-bold mb-1">💸 월 지원금 (현금/원고료)</p>
-                  <p className="text-xl font-black text-blue-700">+{monthlyCash.toLocaleString()}원</p>
+                <div className="bg-green-50 p-4 md:p-5 rounded-2xl border border-green-100 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <p className="text-green-700 text-xs font-bold mb-1">🎁 월 혜택 (현물)</p>
+                    <p className="text-xl md:text-2xl font-black text-green-700">+{monthlyBenefit.toLocaleString()}원</p>
+                  </div>
+                  <p className="text-[11px] text-green-600 font-medium mt-2">식사권/협찬품</p>
                 </div>
-                <div className="bg-red-50 p-5 rounded-2xl border border-red-100 shadow-sm">
-                  <p className="text-red-700 text-xs font-bold mb-1">💳 월 초과 지출 (내돈내산)</p>
-                  <p className="text-xl font-black text-red-700">-{monthlyExpense.toLocaleString()}원</p>
+                <div className="bg-blue-50 p-4 md:p-5 rounded-2xl border border-blue-100 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <p className="text-blue-700 text-xs font-bold mb-1">💸 월 지원금 (현금)</p>
+                    <p className="text-xl md:text-2xl font-black text-blue-700">+{monthlyCash.toLocaleString()}원</p>
+                  </div>
+                  <p className="text-[11px] text-blue-600 font-medium mt-2">원고료/교통비</p>
+                </div>
+                <div className="bg-red-50 p-4 md:p-5 rounded-2xl border border-red-100 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <p className="text-red-700 text-xs font-bold mb-1">💳 초과 지출</p>
+                    <p className="text-xl md:text-2xl font-black text-red-700">-{monthlyExpense.toLocaleString()}원</p>
+                  </div>
+                  <p className="text-[11px] text-red-600 font-medium mt-2">내돈내산 추가금</p>
                 </div>
               </div>
 
+              {/* 체험단별 진행 횟수 통계 */}
+              {monthlyCount > 0 && (
+                <div className="bg-slate-50 border border-slate-200/70 rounded-2xl p-4 md:p-5 mb-8">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs md:text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                        <span>🏷️ 체험단별 진행 횟수</span>
+                      </h4>
+                      <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                        총 {monthlyCount}건
+                      </span>
+                    </div>
+                    {selectedPlatformFilter && (
+                      <button 
+                        onClick={() => setSelectedPlatformFilter(null)} 
+                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline"
+                      >
+                        전체 보기
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2">
+                    {sortedPlatformStats.map(([platName, count]) => {
+                      const percent = Math.round((count / monthlyCount) * 100);
+                      const isSelected = selectedPlatformFilter === platName;
+                      return (
+                        <button
+                          key={platName}
+                          onClick={() => setSelectedPlatformFilter(isSelected ? null : platName)}
+                          className={`flex items-center gap-1.5 md:gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs font-bold transition-all ${
+                            isSelected 
+                              ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-200 scale-105' 
+                              : 'bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 shadow-sm'
+                          }`}
+                        >
+                          <span>{platName}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                            isSelected ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                          }`}>
+                            {count}건
+                          </span>
+                          <span className={`text-[10px] ${isSelected ? 'text-indigo-200' : 'text-slate-400'}`}>
+                            ({percent}%)
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedPlatformFilter && (
+                    <p className="text-xs text-indigo-600 font-medium mt-3">
+                      * <strong>{selectedPlatformFilter}</strong> ({displayedMonthlySchedules.length}건) 내역만 필터링되어 표시 중입니다.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* 가계부 리스트 */}
               <div>
-                <h3 className="font-bold text-slate-700 mb-4">{month + 1}월 상세 내역</h3>
-                {monthlySchedules.length === 0 ? (
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-slate-700">
+                    {month + 1}월 상세 내역 {selectedPlatformFilter ? `(${selectedPlatformFilter} ${displayedMonthlySchedules.length}건)` : `(총 ${monthlyCount}건)`}
+                  </h3>
+                  {selectedPlatformFilter && (
+                    <button onClick={() => setSelectedPlatformFilter(null)} className="text-xs text-indigo-600 font-semibold hover:underline">
+                      필터 해제
+                    </button>
+                  )}
+                </div>
+
+                {displayedMonthlySchedules.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-10 text-center bg-white rounded-2xl border border-slate-100 border-dashed">
-                    <p className="text-slate-400 text-sm">해당 월에 기록된 내역이 없습니다.</p>
+                    <p className="text-slate-400 text-sm">
+                      {selectedPlatformFilter 
+                        ? `'${selectedPlatformFilter}'에 해당하는 내역이 없습니다.` 
+                        : '해당 월에 기록된 내역이 없습니다.'}
+                    </p>
                   </div>
                 ) : (
                   <div className="grid gap-3">
-                    {monthlySchedules.map((schedule) => (
-                      <div key={schedule.id} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 bg-white shadow-sm">
+                    {displayedMonthlySchedules.map((schedule) => (
+                      <div key={schedule.id} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 bg-white shadow-sm hover:border-indigo-100 transition-colors">
                         <div>
-                          <p className="font-bold text-slate-800">{schedule.title}</p>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {schedule.platform && (
+                              <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-extrabold px-2 py-0.5 rounded-md">
+                                {schedule.platform}
+                              </span>
+                            )}
+                            <p className="font-bold text-slate-800">{schedule.title}</p>
+                          </div>
                           <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
                             <CalendarIcon size={12} /> {schedule.visitDate || schedule.deadlineDate}
                           </p>
@@ -560,6 +713,63 @@ export default function ExperienceDiary() {
                       value={newTitle}
                       onChange={(e) => setNewTitle(e.target.value)}
                     />
+                  </div>
+
+                  {/* 플랫폼 선택 */}
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                      체험단 플랫폼 / 출처 <span className="text-slate-400 font-normal text-xs">(선택)</span>
+                    </label>
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {POPULAR_PLATFORMS.map((plat) => {
+                        const isSelected = newPlatform === plat && !isCustomPlatform;
+                        return (
+                          <button
+                            key={plat}
+                            type="button"
+                            onClick={() => {
+                              if (isSelected) {
+                                setNewPlatform('');
+                              } else {
+                                setNewPlatform(plat);
+                                setIsCustomPlatform(false);
+                              }
+                            }}
+                            className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                              isSelected 
+                                ? 'bg-indigo-600 text-white shadow-sm' 
+                                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                            }`}
+                          >
+                            {plat}
+                          </button>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCustomPlatform(!isCustomPlatform);
+                          setNewPlatform('');
+                        }}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                          isCustomPlatform 
+                            ? 'bg-indigo-600 text-white shadow-sm' 
+                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                        }`}
+                      >
+                        직접 입력 ✎
+                      </button>
+                    </div>
+                    {isCustomPlatform && (
+                      <input 
+                        type="text" 
+                        placeholder="체험단 이름을 직접 입력해주세요 (예: 오마이블로그, 카카오뷰)"
+                        className="w-full px-3 py-2 rounded-xl border border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100 text-xs font-medium"
+                        value={customPlatform}
+                        onChange={(e) => setCustomPlatform(e.target.value)}
+                        autoFocus
+                      />
+                    )}
                   </div>
                   <div className="flex gap-3">
                     <div className="flex-1">
