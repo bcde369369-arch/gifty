@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Sparkles, Calendar as CalendarIcon, Calculator, Link as LinkIcon, ArrowLeft, Plus, X, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Sparkles, Calendar as CalendarIcon, Calculator, Link as LinkIcon, ArrowLeft, Plus, X, ChevronLeft, ChevronRight, Menu, Download, Upload } from 'lucide-react';
 import Link from 'next/link';
 import CoupangBanner from '@/components/CoupangBanner';
 import { useSiteSettings } from '@/lib/settings';
@@ -43,15 +43,73 @@ export default function ExperienceDiary() {
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedPlatformFilter, setSelectedPlatformFilter] = useState<string | null>(null);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const saved = localStorage.getItem('gifty_schedules');
     if (saved) {
       setSchedules(JSON.parse(saved));
     }
-    const d = new Date();
-    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    setSelectedDate(todayStr);
+    // 기본 선택을 빈 값('')으로 두어 접속 시 전체 일정이 바로 보이도록 설정
+    setSelectedDate('');
   }, []);
+
+  // 1. 데이터 백업 (JSON 파일 다운로드)
+  const handleExportBackup = () => {
+    if (schedules.length === 0) {
+      alert('백업할 일정 데이터가 없습니다.');
+      return;
+    }
+    const dataStr = JSON.stringify(schedules, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const d = new Date();
+    const dateStr = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    a.href = url;
+    a.download = `gifty-schedules-backup-${dateStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    alert(`총 ${schedules.length}개의 일정이 백업 파일로 안전하게 다운로드되었습니다!\n브라우저를 변경하거나 폰을 바꿀 때 [복원하기]로 불러올 수 있습니다.`);
+  };
+
+  // 2. 데이터 복원 (JSON 파일 불러오기 & 병합)
+  const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsed = JSON.parse(content);
+        if (!Array.isArray(parsed)) {
+          throw new Error('올바른 백업 파일 형식이 아닙니다.');
+        }
+
+        const validSchedules: Schedule[] = parsed.filter(item => item && item.id && item.title && item.deadlineDate);
+
+        if (validSchedules.length === 0) {
+          alert('가져올 유효한 일정이 백업 파일에 없습니다.');
+          return;
+        }
+
+        // 기존 데이터와 중복되지 않는 것만 병합
+        const merged = [...validSchedules, ...schedules.filter(s => !validSchedules.some(v => v.id === s.id))];
+
+        setSchedules(merged);
+        localStorage.setItem('gifty_schedules', JSON.stringify(merged));
+        alert(`🎉 총 ${merged.length}개의 일정이 성공적으로 복원/병합되었습니다!`);
+      } catch (err: unknown) {
+        console.error(err);
+        alert('파일을 불러오는 중 오류가 발생했습니다. gifty 백업(.json) 파일인지 확인해 주세요.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
 
   const openAddModal = () => {
     setEditingId(null);
@@ -288,6 +346,38 @@ export default function ExperienceDiary() {
           </button>
         </div>
 
+        {/* 데이터 안심 백업 & 복원 유틸리티 바 */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white border border-slate-200/80 px-5 py-3.5 rounded-2xl mb-6 shadow-sm">
+          <div className="flex items-center gap-2.5 text-xs text-slate-600">
+            <span className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-sm font-bold">🛡️</span>
+            <div>
+              <p className="font-bold text-slate-800">데이터 유실 방지 안심 보관함</p>
+              <p className="text-[11px] text-slate-500">브라우저 캐시 삭제나 폰/PC 기기 변경에 대비해 내 컴퓨터/스마트폰에 백업해두세요.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+            <button
+              onClick={handleExportBackup}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-all active:scale-95 shadow-sm"
+            >
+              <Download size={14} /> 데이터 백업 📥
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold transition-all active:scale-95 shadow-sm"
+            >
+              <Upload size={14} /> 데이터 복원 📤
+            </button>
+            <input 
+              ref={fileInputRef}
+              type="file" 
+              accept=".json"
+              onChange={handleImportBackup}
+              className="hidden"
+            />
+          </div>
+        </div>
+
         <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-slate-100 min-h-[400px]">
           
           {/* 1. Schedule Tab */}
@@ -329,7 +419,7 @@ export default function ExperienceDiary() {
                         onClick={() => setSelectedDate(isSelected ? '' : dateStr)}
                         className={`aspect-square flex flex-col items-center justify-center rounded-xl text-sm font-medium transition-all relative ${
                           isSelected ? 'bg-indigo-600 text-white shadow-md' 
-                          : isToday ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' 
+                          : isToday ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold' 
                           : 'hover:bg-slate-200 text-slate-700'
                         }`}
                       >
@@ -348,18 +438,33 @@ export default function ExperienceDiary() {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-slate-700">
-                    {selectedDate ? `${selectedDate.split('-')[1]}월 ${selectedDate.split('-')[2]}일 일정` : '전체 일정'}
+                    {selectedDate 
+                      ? `${selectedDate.split('-')[1]}월 ${selectedDate.split('-')[2]}일 일정 (${filteredSchedules.length}건)` 
+                      : `전체 일정 (${schedules.length}건)`}
                   </h3>
                   {selectedDate && (
-                    <button onClick={() => setSelectedDate('')} className="text-xs text-indigo-600 font-semibold hover:underline">
+                    <button onClick={() => setSelectedDate('')} className="text-xs text-indigo-600 font-bold hover:underline bg-indigo-50 px-2.5 py-1 rounded-lg">
                       전체 보기
                     </button>
                   )}
                 </div>
 
                 {filteredSchedules.length === 0 ? (
-                  <div className="bg-slate-50 rounded-2xl py-8 text-center text-slate-400 text-sm border border-slate-100">
-                    해당 날짜에 일정이 없습니다.
+                  <div className="bg-slate-50 rounded-2xl py-12 text-center text-slate-400 text-sm border border-slate-100 flex flex-col items-center justify-center gap-2">
+                    <p className="font-bold text-slate-500">
+                      {selectedDate 
+                        ? `${selectedDate}에 등록된 일정이 없습니다.` 
+                        : '아직 등록된 체험단 일정이 없습니다.'}
+                    </p>
+                    {selectedDate ? (
+                      <button onClick={() => setSelectedDate('')} className="text-xs text-indigo-600 underline font-semibold mt-1">
+                        전체 일정 보러가기
+                      </button>
+                    ) : (
+                      <button onClick={openAddModal} className="text-xs text-white bg-indigo-600 px-4 py-2 rounded-xl font-bold mt-2 shadow-sm">
+                        + 첫 체험단 일정 추가하기
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="grid gap-3">
