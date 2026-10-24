@@ -99,8 +99,8 @@ export default function Home() {
             <a href="/" className="hover:text-indigo-600 transition-colors">홈</a>
             <a href="/community" className="text-indigo-600 font-extrabold hover:text-indigo-700 transition-colors flex items-center gap-1">커뮤니티 💬</a>
             <a href="/experience-diary" className="hover:text-indigo-600 transition-colors text-blue-600">체험단 다이어리 📓</a>
-            <a href="/remove-bg" className="hover:text-indigo-600 transition-colors text-purple-600">누끼따기(AI) ✂️</a>
             <a href="/sticker" className="hover:text-pink-700 transition-colors text-pink-600 font-extrabold">블로그 스티커 🎨</a>
+            <a href="/remove-bg" className="hover:text-indigo-600 transition-colors text-purple-600">누끼따기(AI) ✂️</a>
           </div>
           <button 
             className="md:hidden text-slate-500 hover:text-slate-800"
@@ -116,8 +116,8 @@ export default function Home() {
             <a href="/" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl hover:bg-slate-50">홈</a>
             <a href="/community" className="text-indigo-600 hover:bg-indigo-50 p-3 rounded-xl">커뮤니티 💬</a>
             <a href="/experience-diary" className="text-blue-600 hover:bg-blue-50 p-3 rounded-xl">체험단 다이어리 📓</a>
-            <a href="/remove-bg" className="text-purple-600 hover:bg-purple-50 p-3 rounded-xl">누끼따기(AI) ✂️</a>
             <a href="/sticker" className="text-pink-600 hover:bg-pink-50 p-3 rounded-xl">블로그 스티커 🎨</a>
+            <a href="/remove-bg" className="text-purple-600 hover:bg-purple-50 p-3 rounded-xl">누끼따기(AI) ✂️</a>
           </div>
         )}
       </nav>
@@ -131,11 +131,11 @@ export default function Home() {
           <a href="/experience-diary" className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-50/80 text-blue-700 font-extrabold text-[13px] rounded-full border border-blue-200/50 shadow-sm active:scale-95 transition-transform">
             📓 체험단 다이어리
           </a>
-          <a href="/remove-bg" className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-50/80 text-purple-700 font-extrabold text-[13px] rounded-full border border-purple-200/50 shadow-sm active:scale-95 transition-transform">
-            ✂️ 누끼따기(AI)
-          </a>
           <a href="/sticker" className="inline-flex items-center gap-1.5 px-4 py-2 bg-pink-50/80 text-pink-700 font-extrabold text-[13px] rounded-full border border-pink-200/50 shadow-sm active:scale-95 transition-transform">
             🎨 블로그 스티커
+          </a>
+          <a href="/remove-bg" className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-50/80 text-purple-700 font-extrabold text-[13px] rounded-full border border-purple-200/50 shadow-sm active:scale-95 transition-transform">
+            ✂️ 누끼따기(AI)
           </a>
         </div>
       </div>
