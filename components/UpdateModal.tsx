@@ -70,7 +70,7 @@ export default function UpdateModal() {
               <div className="flex items-center justify-between gap-1.5">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <h3 className="font-extrabold text-slate-800 text-sm group-hover:text-amber-700 transition-colors">
-                    리뷰노트·당첨 카톡 1초 자동등록
+                    체험단 당첨 카톡 1초 자동등록 오픈!
                   </h3>
                   <span className="text-[10px] font-black px-1.5 py-0.5 bg-red-500 text-white rounded-full">
                     HOT
@@ -79,7 +79,7 @@ export default function UpdateModal() {
                 <ArrowRight size={14} className="text-amber-600 shrink-0 group-hover:translate-x-0.5 transition-transform" />
               </div>
               <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                타자 칠 필요 없이 카카오톡 당첨 알림톡이나 리뷰노트 내역을 복사·붙여넣기만 하면 업체명, 마감일, 식사권 금액, 포인트가 1초 만에 자동 입력됩니다!
+                <strong>리뷰노트 · 강남맛집 · 디너의여왕 · 레뷰 · 포포몬</strong> 당첨 카톡이나 내역을 복사·붙여넣기만 하면 업체명, 마감일, 식사권 금액, 포인트까지 1초 만에 자동 입력됩니다!
               </p>
             </div>
           </Link>

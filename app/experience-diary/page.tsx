@@ -10,13 +10,14 @@ import {
   parseCampaignsFromText,
   parseSingleCampaignBlock,
   getQuickImportBookmarklet,
+  getSampleCampaignText,
   ParsedCampaign,
 } from '@/lib/campaignParser';
 
 interface Schedule {
   id: string;
   title: string;
-  platform?: string;      // 체험단 플랫폼/출처 (예: 레뷰, 리뷰노트, 강남맛집 등)
+  platform?: string;      // 체험단 플랫폼/출처 (예: 레뷰, 리뷰노트, 강남맛집, 포포몬 등)
   visitDate: string;
   deadlineDate: string;
   benefitAmount?: number; // 제공받은 혜택 (식사권/제품 등)
@@ -24,7 +25,7 @@ interface Schedule {
   extraExpense?: number;  // 추가 지출 (내돈내산)
 }
 
-const POPULAR_PLATFORMS = ['레뷰', '리뷰노트', '강남맛집', '디너의여왕', '미블', '포블로그', '인스타협찬', '기타'];
+const POPULAR_PLATFORMS = ['리뷰노트', '강남맛집', '디너의여왕', '레뷰', '포포몬', '미블', '포블로그', '서울오빠', '인스타협찬', '기타'];
 
 export default function ExperienceDiary() {
   const { settings, isLoaded } = useSiteSettings();
@@ -126,18 +127,9 @@ export default function ExperienceDiary() {
     if (parsed.cashAmount > 0) setNewCash(String(parsed.cashAmount));
   };
 
-  // 리뷰노트 알림톡 샘플 예시 채우기
-  const handleFillSampleReviewNote = () => {
-    const sample = `[리뷰노트] 캠페인 선정 안내
-축하합니다! 신청하신 캠페인에 선정되셨습니다.
-
-■ 캠페인명 : [성수/맛집] 성수동 화덕피자 & 파스타 2인 식사권
-■ 제공내역 : 50,000원 자유 이용권 + 리뷰 포인트 10,000P
-■ 방문예약일 : 2026.10.28
-■ 리뷰 마감일 : 2026.11.05 까지
-
-※ 기한 내 리뷰 미등록 시 페널티가 부과될 수 있습니다.`;
-    handleAutoImportTextChange(sample);
+  // 플랫폼별 알림톡 샘플 예시 채우기
+  const handleFillSample = (plat = 'all') => {
+    handleAutoImportTextChange(getSampleCampaignText(plat));
   };
 
   // 분석된 캠페인 목록을 내 일정에 원클릭 일괄 등록
@@ -922,7 +914,7 @@ export default function ExperienceDiary() {
                     onClick={() => setIsAutoImportModalOpen(true)}
                     className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs sm:text-sm font-extrabold px-3.5 py-2 rounded-xl shadow-sm transition active:scale-95"
                   >
-                    <Zap size={15} /> 리뷰노트·카톡 1초 자동등록
+                    <Zap size={15} /> 당첨 카톡·내역 1초 자동등록
                   </button>
                   <button 
                     onClick={openAddModal}
@@ -1354,6 +1346,26 @@ export default function ExperienceDiary() {
                     <p className="text-xs text-slate-500 mt-1">최근 가장 핫한 신흥 체험단</p>
                   </div>
                 </a>
+
+                <a href="https://popomon.com/" target="_blank" rel="noreferrer" className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all group">
+                  <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 text-xs font-bold group-hover:bg-purple-50 group-hover:text-purple-500">
+                    포포몬
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800 group-hover:text-purple-600">포포몬 (POPOMON)</h3>
+                    <p className="text-xs text-slate-500 mt-1">맛집·핫플·제품 알짜 캠페인 체험단</p>
+                  </div>
+                </a>
+
+                <a href="https://mrblog.net/" target="_blank" rel="noreferrer" className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all group">
+                  <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 text-xs font-bold group-hover:bg-rose-50 group-hover:text-rose-500">
+                    미블
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800 group-hover:text-rose-600">미블 (미스터블로그)</h3>
+                    <p className="text-xs text-slate-500 mt-1">전국 지역 맛집·뷰티·배송형 체험단</p>
+                  </div>
+                </a>
               </div>
             </div>
           )}
@@ -1397,7 +1409,7 @@ export default function ExperienceDiary() {
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-extrabold text-amber-900 flex items-center gap-1">
                       <Zap size={14} className="text-amber-600" />
-                      리뷰노트·레뷰 당첨 카톡 복사하셨나요?
+                      리뷰노트·강남맛집·디너·레뷰·포포몬 당첨톡 복사하셨나요?
                     </span>
                     <button
                       type="button"
@@ -1405,7 +1417,7 @@ export default function ExperienceDiary() {
                         setIsModalOpen(false);
                         setIsAutoImportModalOpen(true);
                       }}
-                      className="text-[11px] font-bold text-amber-700 underline hover:text-amber-900"
+                      className="text-[11px] font-bold text-amber-700 underline hover:text-amber-900 shrink-0"
                     >
                       여러 건 일괄등록 &rarr;
                     </button>
@@ -1755,20 +1767,20 @@ export default function ExperienceDiary() {
         </div>
       )}
 
-      {/* ⚡ 리뷰노트·체험단 당첨 1초 자동등록 모달 */}
+      {/* ⚡ 전 플랫폼 체험단 당첨 1초 자동등록 모달 */}
       {isAutoImportModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl w-full max-w-2xl p-6 md:p-8 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto">
             <div className="flex justify-between items-start gap-4 mb-5">
               <div>
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-extrabold mb-1">
-                  <Zap size={12} /> 타자 치지 말고 1초 컷!
+                  <Zap size={12} /> 리뷰노트 · 강남맛집 · 디너의여왕 · 레뷰 · 포포몬 완벽 지원!
                 </span>
                 <h3 className="text-xl md:text-2xl font-extrabold text-slate-900">
-                  리뷰노트 · 체험단 당첨 자동 등록기
+                  체험단 당첨 카톡·내역 1초 자동 등록기
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  카카오톡 당첨 알림톡이나 리뷰노트·레뷰 마이페이지 내역을 복사해 붙여넣으면 캠페인명·마감일·제공금액·포인트를 자동으로 추출합니다.
+                  어느 체험단 사이트든 카카오톡 당첨 알림톡·문자·마이페이지 내역을 복사해 붙여넣으면 플랫폼·캠페인명·마감일·제공혜택·포인트를 자동으로 추출합니다.
                 </p>
               </div>
               <button
@@ -1795,13 +1807,6 @@ export default function ExperienceDiary() {
                     >
                       <ClipboardPaste size={13} /> 클립보드 붙여넣기
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleFillSampleReviewNote}
-                      className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 text-xs font-bold transition"
-                    >
-                      예시 넣어보기
-                    </button>
                     {autoImportText && (
                       <button
                         type="button"
@@ -1814,11 +1819,33 @@ export default function ExperienceDiary() {
                   </div>
                 </div>
 
+                {/* 지원 플랫폼별 원클릭 예시 테스트 버튼 */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-slate-400 mr-1">플랫폼별 예시 테스트:</span>
+                  {['리뷰노트', '강남맛집', '디너의여왕', '레뷰', '포포몬'].map((plat) => (
+                    <button
+                      key={plat}
+                      type="button"
+                      onClick={() => handleFillSample(plat)}
+                      className="px-2.5 py-1 rounded-lg bg-white hover:bg-amber-50 text-slate-600 hover:text-amber-800 border border-slate-200 hover:border-amber-300 text-[11px] font-bold transition"
+                    >
+                      {plat} 예시
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => handleFillSample('all')}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[11px] font-extrabold transition"
+                  >
+                    ✨ 3건 동시 등록 예시
+                  </button>
+                </div>
+
                 <textarea
                   rows={5}
                   value={autoImportText}
                   onChange={(e) => handleAutoImportTextChange(e.target.value)}
-                  placeholder={`여기에 카카오톡 당첨 알림톡이나 리뷰노트 선정 내역을 붙여넣기(Ctrl+V) 해주세요!\n\n예시:\n[리뷰노트] 캠페인 선정 안내\n■ 캠페인명 : [강남] 성수동 화덕피자 2인 식사권\n■ 제공내역 : 50,000원 이용권 + 10,000P\n■ 리뷰 마감일 : 2026.11.05`}
+                  placeholder={`여기에 카카오톡 당첨 알림톡이나 각 체험단 사이트(리뷰노트, 강남맛집, 디너의여왕, 레뷰, 포포몬, 미블 등) 선정 내역을 붙여넣기(Ctrl+V) 해주세요!\n\n예시:\n[강남맛집] 리뷰어 선정 안내\n▶ 매장명 : [강남] 숙성 한우 오마카세\n▶ 제공내역 : 80,000원 식사권\n▶ 리뷰마감일 : 2026.11.07`}
                   className="w-full p-3.5 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400 leading-relaxed"
                 />
               </div>
@@ -1939,10 +1966,10 @@ export default function ExperienceDiary() {
               <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="space-y-1">
                   <p className="text-xs font-extrabold text-slate-800">
-                    💻 PC에서 리뷰노트 화면을 보고 계신가요? (1클릭 전송 버튼)
+                    💻 PC에서 체험단 사이트 화면을 보고 계신가요? (전 사이트 1클릭 전송 버튼)
                   </p>
                   <p className="text-[11px] text-slate-500 leading-relaxed">
-                    오른쪽 <strong>[⚡ 리뷰노트→Gifty 자동전송]</strong> 버튼을 마우스로 끌어다 브라우저 상단 <strong>즐겨찾기(북마크) 바</strong>에 놓으세요. 리뷰노트 당첨 화면에서 누르면 우리 사이트로 즉시 넘어옵니다!
+                    오른쪽 <strong>[⚡ 체험단→Gifty 자동전송]</strong> 버튼을 마우스로 끌어다 브라우저 상단 <strong>즐겨찾기(북마크) 바</strong>에 놓으세요. 리뷰노트·강남맛집·디너의여왕·레뷰·포포몬 당첨 화면에서 누르면 플랫폼까지 자동 인식해 넘어옵니다!
                   </p>
                 </div>
                 <a
@@ -1953,12 +1980,12 @@ export default function ExperienceDiary() {
                   }}
                   onClick={(e) => {
                     e.preventDefault();
-                    alert('이 버튼을 클릭하지 마시고, 마우스로 끌어다(드래그) 브라우저 상단 즐겨찾기 바에 놓아주세요!\n이후 리뷰노트 당첨 페이지에서 그 즐겨찾기를 누르면 자동 전송됩니다.');
+                    alert('이 버튼을 클릭하지 마시고, 마우스로 끌어다(드래그) 브라우저 상단 즐겨찾기 바에 놓아주세요!\n이후 리뷰노트·강남맛집·디너의여왕·레뷰·포포몬 당첨 페이지에서 그 즐겨찾기를 누르면 자동 전송됩니다.');
                   }}
                   className="shrink-0 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-extrabold text-xs shadow-sm cursor-grab active:cursor-grabbing select-none"
                   title="즐겨찾기 바로 드래그하세요"
                 >
-                  ⚡ 리뷰노트→Gifty 자동전송
+                  ⚡ 체험단→Gifty 자동전송
                 </a>
               </div>
             </div>
