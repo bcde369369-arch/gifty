@@ -26,6 +26,62 @@ interface Schedule {
   benefitAmount?: number; // 제공받은 혜택 (식사권/제품 등)
   cashAmount?: number;    // 원고료/지원금 (현금 수익)
   extraExpense?: number;  // 추가 지출 (내돈내산)
+  isCompleted?: boolean;  // 리뷰 작성 완료 여부
+}
+
+/** 달력 칸에 들어갈 짧은 업체명 라벨 추출 (예: "[성수/맛집] 성수동 화덕피자" -> "성수동 화덕피자") */
+function getShortCampaignLabel(title: string): string {
+  const withoutBracket = title.replace(/^\[[^\]]+\]\s*/, '').trim();
+  const base = withoutBracket.length >= 2 ? withoutBracket : title.trim();
+  return base.length > 7 ? `${base.slice(0, 7)}..` : base;
+}
+
+/** 마감일 기준 D-Day 계산 및 배지 스타일 반환 */
+function getDDayInfo(deadlineDate: string, isCompleted?: boolean) {
+  if (isCompleted) {
+    return {
+      label: '리뷰완료',
+      style: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+      daysLeft: 999,
+    };
+  }
+  const todayStr = toDateInputString(new Date());
+  const todayTime = new Date(`${todayStr}T00:00:00`).getTime();
+  const targetTime = new Date(`${deadlineDate}T00:00:00`).getTime();
+  if (isNaN(targetTime)) {
+    return {
+      label: '일정확인',
+      style: 'bg-slate-100 text-slate-600 border border-slate-200',
+      daysLeft: 99,
+    };
+  }
+  const daysLeft = Math.round((targetTime - todayTime) / 86400000);
+  if (daysLeft === 0) {
+    return {
+      label: '오늘마감!',
+      style: 'bg-rose-600 text-white shadow-sm animate-pulse',
+      daysLeft: 0,
+    };
+  }
+  if (daysLeft > 0 && daysLeft <= 3) {
+    return {
+      label: `D-${daysLeft} 마감임박`,
+      style: 'bg-rose-100 text-rose-700 border border-rose-200',
+      daysLeft,
+    };
+  }
+  if (daysLeft > 3) {
+    return {
+      label: `D-${daysLeft}`,
+      style: 'bg-slate-100 text-slate-600 border border-slate-200',
+      daysLeft,
+    };
+  }
+  return {
+    label: `마감지남(D+${Math.abs(daysLeft)})`,
+    style: 'bg-amber-100 text-amber-800 border border-amber-300',
+    daysLeft,
+  };
 }
 
 const POPULAR_PLATFORMS = ['리뷰노트', '강남맛집', '디너의여왕', '레뷰', '포포몬', '미블', '포블로그', '서울오빠', '인스타협찬', '기타'];
@@ -53,6 +109,7 @@ export default function ExperienceDiary() {
   const [currentMonth, setCurrentMonth] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedPlatformFilter, setSelectedPlatformFilter] = useState<string | null>(null);
+  const [calendarFilter, setCalendarFilter] = useState<'all' | 'uncompleted' | 'deadline'>('all');
 
   // ⚡ 리뷰노트/카톡 당첨 1초 자동등록 모달 상태
   const [isAutoImportModalOpen, setIsAutoImportModalOpen] = useState(false);
@@ -316,6 +373,15 @@ export default function ExperienceDiary() {
     localStorage.setItem('gifty_schedules', JSON.stringify(updated));
   };
 
+  // 리뷰 작성 완료 / 미완료 원클릭 토글
+  const handleToggleComplete = (id: string) => {
+    const updated = schedules.map((s) =>
+      s.id === id ? { ...s, isCompleted: !s.isCompleted } : s
+    );
+    setSchedules(updated);
+    localStorage.setItem('gifty_schedules', JSON.stringify(updated));
+  };
+
   // 캘린더 로직
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
@@ -337,9 +403,35 @@ export default function ExperienceDiary() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
-  const filteredSchedules = selectedDate 
-    ? schedules.filter(s => s.visitDate === selectedDate || s.deadlineDate === selectedDate)
-    : schedules;
+  // 달력 및 목록 필터 적용
+  const baseCalendarSchedules = schedules.filter((s) => {
+    if (calendarFilter === 'uncompleted') return !s.isCompleted;
+    return true;
+  });
+
+  const filteredSchedules = (
+    selectedDate
+      ? baseCalendarSchedules.filter((s) =>
+          calendarFilter === 'deadline'
+            ? s.deadlineDate === selectedDate
+            : s.visitDate === selectedDate || s.deadlineDate === selectedDate
+        )
+      : baseCalendarSchedules
+  ).sort((a, b) => {
+    if (Boolean(a.isCompleted) !== Boolean(b.isCompleted)) {
+      return a.isCompleted ? 1 : -1;
+    }
+    return a.deadlineDate.localeCompare(b.deadlineDate);
+  });
+
+  // 3일 이내 마감 임박 미완료 캠페인 브리핑 목록
+  const urgentSchedules = schedules
+    .filter((s) => {
+      if (s.isCompleted) return false;
+      const info = getDDayInfo(s.deadlineDate, false);
+      return info.daysLeft >= 0 && info.daysLeft <= 3;
+    })
+    .sort((a, b) => a.deadlineDate.localeCompare(b.deadlineDate));
 
   // 금액 계산 (전체 일정 기준 - 상단 요약용)
   const totalBenefit = schedules.reduce((acc, cur) => acc + (cur.benefitAmount || 0), 0);
@@ -929,40 +1021,260 @@ export default function ExperienceDiary() {
                 </div>
               </div>
 
+              {/* 🚨 마감 임박 D-Day 브리핑 바 */}
+              {urgentSchedules.length > 0 && (
+                <div className="bg-rose-50/90 border border-rose-200 rounded-2xl p-3.5 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[11px] font-black shrink-0 animate-pulse">
+                      🚨 마감 임박 {urgentSchedules.length}건
+                    </span>
+                    <span className="text-xs font-extrabold text-rose-900">
+                      3일 이내에 리뷰를 올려야 하는 체험단이 있어요!
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {urgentSchedules.slice(0, 4).map((urg) => {
+                      const dInfo = getDDayInfo(urg.deadlineDate, urg.isCompleted);
+                      return (
+                        <button
+                          key={urg.id}
+                          type="button"
+                          onClick={() => setSelectedDate(urg.deadlineDate)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white hover:bg-rose-100 text-rose-800 border border-rose-200 text-[11px] font-extrabold shadow-sm transition"
+                        >
+                          <span className="text-rose-600">{dInfo.label.split(' ')[0]}</span>
+                          <span>{getShortCampaignLabel(urg.title)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Calendar */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-8 select-none">
-                <div className="flex justify-between items-center mb-4 px-2">
-                  <button onClick={prevMonth} className="p-2 hover:bg-slate-200 rounded-lg text-slate-500"><ChevronLeft size={20}/></button>
-                  <h3 className="font-bold text-lg text-slate-800">{year}년 {month + 1}월</h3>
-                  <button onClick={nextMonth} className="p-2 hover:bg-slate-200 rounded-lg text-slate-500"><ChevronRight size={20}/></button>
+              <div className="bg-slate-50 p-3 sm:p-5 rounded-2xl border border-slate-100 mb-8 select-none">
+                {/* 달력 상단: 월 이동 + 보기 필터 & 범례 */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 px-1">
+                  <div className="flex items-center justify-between sm:justify-start gap-2">
+                    <button onClick={prevMonth} className="p-2 hover:bg-slate-200 rounded-xl text-slate-600 transition">
+                      <ChevronLeft size={20} />
+                    </button>
+                    <h3 className="font-extrabold text-lg sm:text-xl text-slate-800 min-w-[110px] text-center">
+                      {year}년 {month + 1}월
+                    </h3>
+                    <button onClick={nextMonth} className="p-2 hover:bg-slate-200 rounded-xl text-slate-600 transition">
+                      <ChevronRight size={20} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const now = new Date();
+                        setCurrentMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+                        setSelectedDate(formatDateString(now));
+                      }}
+                      className="ml-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:border-indigo-300 text-xs font-bold text-slate-600 hover:text-indigo-600 shadow-sm"
+                    >
+                      오늘
+                    </button>
+                  </div>
+
+                  {/* 보기 필터 & 색상 범례 */}
+                  <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2">
+                    <div className="hidden lg:flex items-center gap-2.5 text-[11px] font-bold text-slate-500 mr-1">
+                      <span className="flex items-center gap-1">
+                        <span className="w-2.5 h-2.5 rounded-sm bg-indigo-500 inline-block" /> 방문/시작
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-2.5 h-2.5 rounded-sm bg-rose-500 inline-block" /> 마감일
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" /> 완료됨
+                      </span>
+                    </div>
+
+                    <div className="inline-flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm text-[11px] font-extrabold">
+                      <button
+                        type="button"
+                        onClick={() => setCalendarFilter('all')}
+                        className={`px-2.5 py-1 rounded-lg transition ${
+                          calendarFilter === 'all' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        전체
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCalendarFilter('uncompleted')}
+                        className={`px-2.5 py-1 rounded-lg transition ${
+                          calendarFilter === 'uncompleted' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        미완료만
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCalendarFilter('deadline')}
+                        className={`px-2.5 py-1 rounded-lg transition ${
+                          calendarFilter === 'deadline' ? 'bg-rose-600 text-white' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        마감일만
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-400 mb-2">
-                  <div className="text-red-400">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div className="text-blue-400">토</div>
+
+                {/* 모바일용 색상 범례 */}
+                <div className="flex lg:hidden items-center justify-end gap-3 text-[11px] font-bold text-slate-500 mb-2 px-1">
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-sm bg-indigo-500 inline-block" /> 📍방문/시작
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-sm bg-rose-500 inline-block" /> ⏰마감일
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" /> ✔완료
+                  </span>
                 </div>
-                <div className="grid grid-cols-7 gap-1">
+
+                {/* 요일 헤더 */}
+                <div className="grid grid-cols-7 gap-1 sm:gap-1.5 text-center text-xs font-extrabold text-slate-400 mb-1.5">
+                  <div className="text-red-400">일</div>
+                  <div>월</div>
+                  <div>화</div>
+                  <div>수</div>
+                  <div>목</div>
+                  <div>금</div>
+                  <div className="text-blue-400">토</div>
+                </div>
+
+                {/* 달력 그리드 (칸 안에 업체명 미니 배지 직접 표시) */}
+                <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
                   {days.map((d, i) => {
-                    if (!d) return <div key={i} className="aspect-square"></div>;
+                    if (!d) {
+                      return (
+                        <div
+                          key={i}
+                          className="min-h-[68px] sm:min-h-[88px] rounded-xl bg-slate-100/40 border border-transparent"
+                        />
+                      );
+                    }
                     const dateStr = formatDateString(d);
                     const isSelected = selectedDate === dateStr;
                     const isToday = formatDateString(new Date()) === dateStr;
-                    
-                    const hasVisit = schedules.some(s => s.visitDate === dateStr);
-                    const hasDeadline = schedules.some(s => s.deadlineDate === dateStr);
+                    const dayOfWeek = d.getDay();
+
+                    // 해당 날짜에 걸린 방문/시작 일정과 마감 일정 추출
+                    const dayEvents: {
+                      id: string;
+                      type: 'visit' | 'deadline';
+                      title: string;
+                      platform?: string;
+                      isCompleted?: boolean;
+                    }[] = [];
+
+                    baseCalendarSchedules.forEach((s) => {
+                      if (calendarFilter !== 'deadline' && s.visitDate === dateStr) {
+                        dayEvents.push({
+                          id: `${s.id}_v`,
+                          type: 'visit',
+                          title: s.title,
+                          platform: s.platform,
+                          isCompleted: s.isCompleted,
+                        });
+                      }
+                      if (s.deadlineDate === dateStr) {
+                        dayEvents.push({
+                          id: `${s.id}_d`,
+                          type: 'deadline',
+                          title: s.title,
+                          platform: s.platform,
+                          isCompleted: s.isCompleted,
+                        });
+                      }
+                    });
+
+                    const visibleEvents = dayEvents.slice(0, 2);
+                    const hiddenCount = dayEvents.length - visibleEvents.length;
 
                     return (
-                      <button 
-                        key={i} 
+                      <button
+                        key={i}
+                        type="button"
                         onClick={() => setSelectedDate(isSelected ? '' : dateStr)}
-                        className={`aspect-square flex flex-col items-center justify-center rounded-xl text-sm font-medium transition-all relative ${
-                          isSelected ? 'bg-indigo-600 text-white shadow-md' 
-                          : isToday ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold' 
-                          : 'hover:bg-slate-200 text-slate-700'
+                        className={`min-h-[68px] sm:min-h-[88px] p-1 sm:p-1.5 flex flex-col items-stretch justify-start rounded-xl transition-all text-left border ${
+                          isSelected
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-200'
+                            : isToday
+                            ? 'bg-indigo-50/70 border-indigo-300 hover:border-indigo-400'
+                            : dayEvents.length > 0
+                            ? 'bg-white border-slate-200/90 hover:border-indigo-300 shadow-sm'
+                            : 'bg-white/60 border-slate-100 hover:bg-white hover:border-slate-200'
                         }`}
                       >
-                        {d.getDate()}
-                        <div className="flex gap-1 mt-1">
-                          {hasVisit && <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-indigo-400'}`}></div>}
-                          {hasDeadline && <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-pink-400'}`}></div>}
+                        {/* 날짜 숫자 + 초과 건수 배지 */}
+                        <div className="flex items-center justify-between w-full mb-1">
+                          <span
+                            className={`text-xs font-extrabold leading-none px-1 py-0.5 rounded-md ${
+                              isSelected
+                                ? 'text-white'
+                                : isToday
+                                ? 'bg-indigo-600 text-white'
+                                : dayOfWeek === 0
+                                ? 'text-red-500'
+                                : dayOfWeek === 6
+                                ? 'text-blue-500'
+                                : 'text-slate-700'
+                            }`}
+                          >
+                            {d.getDate()}
+                          </span>
+                          {hiddenCount > 0 && (
+                            <span
+                              className={`text-[9px] font-black px-1 rounded ${
+                                isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                              }`}
+                            >
+                              +{hiddenCount}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* 미니 일정 배지 리스트 (최대 2개 노출) */}
+                        <div className="flex flex-col gap-0.5 w-full overflow-hidden">
+                          {visibleEvents.map((ev) => {
+                            const shortName = getShortCampaignLabel(ev.title);
+                            let badgeClass = '';
+                            let iconPrefix = '';
+
+                            if (ev.isCompleted) {
+                              iconPrefix = '✔';
+                              badgeClass = isSelected
+                                ? 'bg-emerald-400/30 text-white'
+                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200/70 line-through opacity-80';
+                            } else if (ev.type === 'deadline') {
+                              iconPrefix = '⏰';
+                              badgeClass = isSelected
+                                ? 'bg-rose-400/40 text-white'
+                                : 'bg-rose-50 text-rose-700 border border-rose-200/80';
+                            } else {
+                              iconPrefix = '📍';
+                              badgeClass = isSelected
+                                ? 'bg-white/20 text-white'
+                                : 'bg-indigo-50 text-indigo-700 border border-indigo-200/80';
+                            }
+
+                            return (
+                              <div
+                                key={ev.id}
+                                className={`w-full px-1 py-0.5 rounded text-[9px] sm:text-[10px] font-extrabold truncate leading-tight ${badgeClass}`}
+                                title={`${ev.type === 'deadline' ? '[마감]' : '[방문/시작]'} ${ev.title}`}
+                              >
+                                <span className="mr-0.5">{iconPrefix}</span>
+                                {shortName}
+                              </div>
+                            );
+                          })}
                         </div>
                       </button>
                     );
@@ -976,11 +1288,11 @@ export default function ExperienceDiary() {
                   <h3 className="font-bold text-slate-700">
                     {selectedDate 
                       ? `${selectedDate.split('-')[1]}월 ${selectedDate.split('-')[2]}일 일정 (${filteredSchedules.length}건)` 
-                      : `전체 일정 (${schedules.length}건)`}
+                      : `전체 일정 (${filteredSchedules.length}건)`}
                   </h3>
                   {selectedDate && (
                     <button onClick={() => setSelectedDate('')} className="text-xs text-indigo-600 font-bold hover:underline bg-indigo-50 px-2.5 py-1 rounded-lg">
-                      전체 보기
+                      전체 일정 보기
                     </button>
                   )}
                 </div>
@@ -1014,40 +1326,85 @@ export default function ExperienceDiary() {
                 ) : (
                   <div className="grid gap-3">
                     {filteredSchedules.map((schedule) => {
-                      const isDeadlineToday = schedule.deadlineDate === selectedDate;
+                      const dDayInfo = getDDayInfo(schedule.deadlineDate, schedule.isCompleted);
                       return (
-                        <div key={schedule.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-sm transition-all group">
-                          <div>
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              {isDeadlineToday && <span className="bg-pink-100 text-pink-600 text-[10px] font-extrabold px-2 py-0.5 rounded-full">마감일</span>}
-                              {schedule.platform && (
-                                <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-extrabold px-2 py-0.5 rounded-md">
-                                  {schedule.platform}
+                        <div
+                          key={schedule.id}
+                          className={`flex flex-col md:flex-row md:items-center justify-between p-4 rounded-2xl border transition-all group ${
+                            schedule.isCompleted
+                              ? 'border-slate-100 bg-slate-50/70 opacity-75'
+                              : 'border-slate-200/80 bg-white hover:border-indigo-200 hover:shadow-sm'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            {/* ✅ 원클릭 리뷰 완료 체크 버튼 */}
+                            <button
+                              type="button"
+                              onClick={() => handleToggleComplete(schedule.id)}
+                              className={`mt-0.5 px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold border shrink-0 transition active:scale-95 ${
+                                schedule.isCompleted
+                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                                  : 'bg-white hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 border-slate-200 hover:border-emerald-300'
+                              }`}
+                              title="클릭하여 리뷰 작성 완료 상태 변경"
+                            >
+                              {schedule.isCompleted ? '✔ 완료됨' : '⬜ 완료체크'}
+                            </button>
+
+                            <div>
+                              <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${dDayInfo.style}`}>
+                                  {dDayInfo.label}
                                 </span>
-                              )}
-                              <h3 className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{schedule.title}</h3>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium mt-2">
-                              {schedule.visitDate && (
-                                <span className={`flex items-center gap-1 ${schedule.visitDate === selectedDate ? 'text-indigo-600 font-bold' : ''}`}>
-                                  <CalendarIcon size={12} /> 방문: {schedule.visitDate}
+                                {schedule.platform && (
+                                  <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-extrabold px-2 py-0.5 rounded-md">
+                                    {schedule.platform}
+                                  </span>
+                                )}
+                                <h3
+                                  className={`font-bold transition-colors ${
+                                    schedule.isCompleted
+                                      ? 'line-through text-slate-400'
+                                      : 'text-slate-800 group-hover:text-indigo-600'
+                                  }`}
+                                >
+                                  {schedule.title}
+                                </h3>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium mt-1.5">
+                                {schedule.visitDate && (
+                                  <span className={`flex items-center gap-1 ${schedule.visitDate === selectedDate ? 'text-indigo-600 font-extrabold' : ''}`}>
+                                    📍 방문/시작: {schedule.visitDate}
+                                  </span>
+                                )}
+                                <span className={`flex items-center gap-1 ${schedule.deadlineDate === selectedDate ? 'text-rose-600 font-extrabold' : ''}`}>
+                                  ⏰ 마감: {schedule.deadlineDate}
                                 </span>
-                              )}
-                              <span className={`flex items-center gap-1 ${schedule.deadlineDate === selectedDate ? 'text-pink-600 font-bold' : ''}`}>
-                                <CalendarIcon size={12} /> 마감: {schedule.deadlineDate}
-                              </span>
+                                {(schedule.benefitAmount || 0) > 0 && (
+                                  <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md text-[11px]">
+                                    혜택 {schedule.benefitAmount?.toLocaleString()}원
+                                  </span>
+                                )}
+                                {(schedule.cashAmount || 0) > 0 && (
+                                  <span className="text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded-md text-[11px]">
+                                    원고료 {schedule.cashAmount?.toLocaleString()}원
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
-                          <div className="flex gap-2 mt-3 md:mt-0">
+
+                          <div className="flex justify-end gap-2 mt-3 md:mt-0">
                             <button 
                               onClick={() => handleEdit(schedule)}
-                              className="text-xs font-semibold text-slate-400 hover:text-indigo-600 transition-colors px-3 py-1.5 rounded-lg border border-transparent hover:border-indigo-100 hover:bg-indigo-50"
+                              className="text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors px-3 py-1.5 rounded-lg border border-slate-200 md:border-transparent hover:border-indigo-100 hover:bg-indigo-50"
                             >
                               수정
                             </button>
                             <button 
                               onClick={() => handleDelete(schedule.id)}
-                              className="text-xs font-semibold text-slate-400 hover:text-red-500 transition-colors px-3 py-1.5 rounded-lg border border-transparent hover:border-red-100 hover:bg-red-50"
+                              className="text-xs font-semibold text-slate-500 hover:text-red-500 transition-colors px-3 py-1.5 rounded-lg border border-slate-200 md:border-transparent hover:border-red-100 hover:bg-red-50"
                             >
                               삭제
                             </button>
