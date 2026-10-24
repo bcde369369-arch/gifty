@@ -26,7 +26,12 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
   const [isGeneratingThumbs, setIsGeneratingThumbs] = useState(false);
   const [isLooping, setIsLooping] = useState(true);
   const [isPlayingPreview, setIsPlayingPreview] = useState(false);
-  const [activeHandle, setActiveHandle] = useState<'start' | 'end' | null>(null);
+  const [activeHandle, setActiveHandle] = useState<'start' | 'end' | 'move' | null>(null);
+  const dragStateRef = useRef<{
+    mode: 'start' | 'end' | 'move';
+    grabOffset: number;
+    windowLength: number;
+  } | null>(null);
 
   const [quality, setQuality] = useState<'high' | 'normal' | 'low'>('normal');
   const [textOverlay, setTextOverlay] = useState<string>('');
@@ -147,39 +152,122 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
     return Number((ratio * effectiveDuration).toFixed(1));
   };
 
+  const handleStartTimeChange = (newStart: number) => {
+    const effectiveDuration = duration > 0 ? duration : 15;
+    const maxStart = Math.max(0, Number((effectiveDuration - 0.5).toFixed(1)));
+    const clampedStart = Number(Math.max(0, Math.min(newStart, maxStart)).toFixed(1));
+    const currentWindow = Math.max(1, Math.min(15, endTime - startTime));
+
+    setStartTime(clampedStart);
+
+    // If startTime moves past or too close to endTime, push endTime forward automatically
+    if (clampedStart >= endTime - 0.5) {
+      const pushedEnd = Math.min(
+        effectiveDuration,
+        Math.max(clampedStart + 0.5, Number((clampedStart + currentWindow).toFixed(1)))
+      );
+      setEndTime(Number(pushedEnd.toFixed(1)));
+    } else if (endTime - clampedStart > 15) {
+      setEndTime(Number((clampedStart + 15).toFixed(1)));
+    }
+
+    if (videoRef.current && !videoRef.current.paused) {
+      videoRef.current.pause();
+      setIsPlayingPreview(false);
+    }
+    seekVideoTo(clampedStart);
+  };
+
+  const handleEndTimeChange = (newEnd: number) => {
+    const effectiveDuration = duration > 0 ? duration : 15;
+    const clampedEnd = Number(Math.min(effectiveDuration, Math.max(0.5, newEnd)).toFixed(1));
+
+    if (clampedEnd <= startTime + 0.5) {
+      const pulledStart = Math.max(0, Number((clampedEnd - 0.5).toFixed(1)));
+      setStartTime(pulledStart);
+    } else if (clampedEnd - startTime > 15) {
+      const adjustedStart = Math.max(0, Number((clampedEnd - 15).toFixed(1)));
+      setStartTime(adjustedStart);
+    }
+
+    setEndTime(clampedEnd);
+    if (videoRef.current && !videoRef.current.paused) {
+      videoRef.current.pause();
+      setIsPlayingPreview(false);
+    }
+    seekVideoTo(clampedEnd);
+  };
+
+  const handleWindowMove = (targetStart: number, windowLength: number) => {
+    const effectiveDuration = duration > 0 ? duration : 15;
+    const safeWindow = Math.max(0.5, Math.min(15, windowLength, effectiveDuration));
+    const maxStart = Math.max(0, effectiveDuration - safeWindow);
+    const nextStart = Number(Math.max(0, Math.min(targetStart, maxStart)).toFixed(1));
+    const nextEnd = Number(Math.min(effectiveDuration, nextStart + safeWindow).toFixed(1));
+
+    setStartTime(nextStart);
+    setEndTime(nextEnd);
+
+    if (videoRef.current && !videoRef.current.paused) {
+      videoRef.current.pause();
+      setIsPlayingPreview(false);
+    }
+    seekVideoTo(nextStart);
+  };
+
   const handleTimelinePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (isConverting) return;
     e.currentTarget.setPointerCapture(e.pointerId);
+    const effectiveDuration = duration > 0 ? duration : 15;
     const clickedTime = getTimeFromPointerEvent(e);
+    const edgeThreshold = Math.max(0.4, effectiveDuration * 0.045);
     const distToStart = Math.abs(clickedTime - startTime);
     const distToEnd = Math.abs(clickedTime - endTime);
+    const windowLength = Math.max(0.5, Math.min(15, endTime - startTime));
 
-    if (distToStart <= distToEnd) {
+    if (distToStart <= edgeThreshold && distToStart <= distToEnd) {
+      dragStateRef.current = { mode: 'start', grabOffset: 0, windowLength };
       setActiveHandle('start');
       handleStartTimeChange(clickedTime);
-    } else {
+    } else if (distToEnd <= edgeThreshold) {
+      dragStateRef.current = { mode: 'end', grabOffset: 0, windowLength };
       setActiveHandle('end');
       handleEndTimeChange(clickedTime);
+    } else if (clickedTime > startTime && clickedTime < endTime) {
+      // Dragging inside the selection box moves the entire [startTime ~ endTime] window
+      const grabOffset = clickedTime - startTime;
+      dragStateRef.current = { mode: 'move', grabOffset, windowLength };
+      setActiveHandle('move');
+      seekVideoTo(startTime);
+    } else {
+      // Clicking outside the selection box jumps startTime to clicked position
+      dragStateRef.current = { mode: 'move', grabOffset: 0, windowLength };
+      setActiveHandle('move');
+      handleWindowMove(clickedTime, windowLength);
     }
   };
 
   const handleTimelinePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!activeHandle || isConverting) return;
+    const dragState = dragStateRef.current;
+    if (!dragState || isConverting) return;
     const moveTime = getTimeFromPointerEvent(e);
-    if (activeHandle === 'start') {
+    if (dragState.mode === 'start') {
       handleStartTimeChange(moveTime);
-    } else {
+    } else if (dragState.mode === 'end') {
       handleEndTimeChange(moveTime);
+    } else {
+      handleWindowMove(moveTime - dragState.grabOffset, dragState.windowLength);
     }
   };
 
   const handleTimelinePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (activeHandle) {
+    if (dragStateRef.current || activeHandle) {
       try {
         e.currentTarget.releasePointerCapture(e.pointerId);
       } catch {
         // ignore if not captured
       }
+      dragStateRef.current = null;
       setActiveHandle(null);
     }
   };
@@ -197,34 +285,6 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
         vid.play().catch(() => {});
       }
     }
-  };
-
-  const handleStartTimeChange = (newStart: number) => {
-    const clampedStart = Math.max(0, Math.min(newStart, endTime - 0.5));
-    setStartTime(clampedStart);
-    // Keep max interval within 15 seconds by pulling endTime if needed
-    if (endTime - clampedStart > 15) {
-      setEndTime(clampedStart + 15);
-    }
-    if (videoRef.current && !videoRef.current.paused) {
-      videoRef.current.pause();
-      setIsPlayingPreview(false);
-    }
-    seekVideoTo(clampedStart);
-  };
-
-  const handleEndTimeChange = (newEnd: number) => {
-    const clampedEnd = Math.min(duration, Math.max(newEnd, startTime + 0.5));
-    if (clampedEnd - startTime > 15) {
-      const adjustedStart = Math.max(0, clampedEnd - 15);
-      setStartTime(adjustedStart);
-    }
-    setEndTime(clampedEnd);
-    if (videoRef.current && !videoRef.current.paused) {
-      videoRef.current.pause();
-      setIsPlayingPreview(false);
-    }
-    seekVideoTo(clampedEnd);
   };
 
   const toggleLoopPreview = () => {
@@ -356,13 +416,19 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
           <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-slate-900/90 backdrop-blur-md text-white text-xs font-extrabold px-3.5 py-1.5 rounded-full shadow-lg border border-white/15 flex items-center gap-2 animate-in fade-in duration-150">
             <span
               className={`w-2 h-2 rounded-full ${
-                activeHandle === 'start' ? 'bg-indigo-400' : 'bg-fuchsia-400'
+                activeHandle === 'start'
+                  ? 'bg-indigo-400'
+                  : activeHandle === 'end'
+                  ? 'bg-fuchsia-400'
+                  : 'bg-emerald-400'
               } animate-ping`}
             />
             <span>
               {activeHandle === 'start'
                 ? `시작 장면 맞추는 중: ${startTime.toFixed(1)}초`
-                : `끝 장면 맞추는 중: ${endTime.toFixed(1)}초`}
+                : activeHandle === 'end'
+                ? `끝 장면 맞추는 중: ${endTime.toFixed(1)}초`
+                : `구간 이동 중: ${startTime.toFixed(1)}초 ~ ${endTime.toFixed(1)}초`}
             </span>
           </div>
         )}
@@ -451,11 +517,11 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
                   }}
                 >
                   {/* Left Visual Handle Bar */}
-                  <div className="absolute left-0 inset-y-0 -translate-x-1/2 w-4 bg-indigo-600 rounded-l-md flex items-center justify-center shadow-md ring-1 ring-white/80">
+                  <div className="absolute left-0 inset-y-0 w-3.5 bg-indigo-600 flex items-center justify-center shadow-md ring-1 ring-white/80">
                     <div className="w-0.5 h-6 bg-white/90 rounded-full" />
                   </div>
                   {/* Right Visual Handle Bar */}
-                  <div className="absolute right-0 inset-y-0 translate-x-1/2 w-4 bg-fuchsia-500 rounded-r-md flex items-center justify-center shadow-md ring-1 ring-white/80">
+                  <div className="absolute right-0 inset-y-0 w-3.5 bg-fuchsia-500 flex items-center justify-center shadow-md ring-1 ring-white/80">
                     <div className="w-0.5 h-6 bg-white/90 rounded-full" />
                   </div>
                 </div>
