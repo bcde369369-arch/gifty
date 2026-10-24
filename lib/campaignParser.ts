@@ -18,12 +18,29 @@ export function toDateInputString(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-/** 한국어 금액 문자열(예: "50,000원", "5만원", "3만 5천원", "15,000P")에서 숫자 추출 */
+/** 오늘 기준 N일 뒤 날짜(YYYY-MM-DD) 반환 */
+export function getOffsetDateString(daysOffset: number, baseDateStr?: string): string {
+  const base = baseDateStr ? new Date(`${baseDateStr}T00:00:00`) : new Date();
+  const validBase = isNaN(base.getTime()) ? new Date() : base;
+  const target = new Date(validBase.getTime() + daysOffset * 86400000);
+  return toDateInputString(target);
+}
+
+/** 이번 주 토요일 날짜(YYYY-MM-DD) 반환 */
+export function getThisSaturdayString(): string {
+  const now = new Date();
+  const day = now.getDay(); // 0(일) ~ 6(토)
+  const diff = day === 6 ? 7 : 6 - day;
+  const sat = new Date(now.getTime() + diff * 86400000);
+  return toDateInputString(sat);
+}
+
+/** 한국어 금액 문자열(예: "50,000원", "5만원권", "3만 5천원", "15,000P")에서 숫자 추출 */
 export function parseKoreanMoney(text: string): number {
   if (!text) return 0;
 
-  // 1) "3만 5천", "5만", "10만" 패턴
-  const manCheonMatch = text.match(/(\d+)\s*만\s*(?:(\d+)\s*천)?\s*(?:원|포인트|P|p)?/);
+  // 1) "3만 5천", "5만", "10만원권" 패턴
+  const manCheonMatch = text.match(/(\d+)\s*만\s*(?:(\d+)\s*천)?\s*(?:원|원권|포인트|P|p|상당)?/);
   if (manCheonMatch) {
     const man = parseInt(manCheonMatch[1], 10) * 10000;
     const cheon = manCheonMatch[2] ? parseInt(manCheonMatch[2], 10) * 1000 : 0;
@@ -31,7 +48,7 @@ export function parseKoreanMoney(text: string): number {
   }
 
   // 2) 일반 "50,000원", "10,000P", "30000원" 패턴
-  const commaNumberMatch = text.match(/(\d{1,3}(?:,\d{3})+|\d{4,})\s*(?:원|포인트|P|p|상당)/);
+  const commaNumberMatch = text.match(/(\d{1,3}(?:,\d{3})+|\d{4,})\s*(?:원|원권|포인트|P|p|상당)/);
   if (commaNumberMatch) {
     const num = parseInt(commaNumberMatch[1].replace(/,/g, ''), 10);
     if (!isNaN(num) && num >= 1000 && num <= 10000000) {
@@ -40,7 +57,7 @@ export function parseKoreanMoney(text: string): number {
   }
 
   // 3) "5천원" 패턴
-  const cheonOnlyMatch = text.match(/(\d+)\s*천\s*(?:원|포인트|P|p)/);
+  const cheonOnlyMatch = text.match(/(\d+)\s*천\s*(?:원|원권|포인트|P|p)/);
   if (cheonOnlyMatch) {
     return parseInt(cheonOnlyMatch[1], 10) * 1000;
   }
@@ -141,7 +158,7 @@ export function parseSingleCampaignBlock(rawBlock: string): ParsedCampaign | nul
     }
   }
 
-  // (B) 따옴표/괄호 안 선정 문구: "'[강남] OO식당' 캠페인에 선정되셨습니다" 또는 "[디너의여왕] OO캠페인에 선정"
+  // (B) 따옴표/괄호 안 선정 문구: "'[강남] OO식당' 캠페인에 선정되셨습니다"
   if (!title) {
     const quoteMatch = cleaned.match(
       /['"「『]([^'"」』\n\r]{2,50})['"」』]\s*(?:캠페인|체험단|리뷰어)?(?:에|으로)?\s*(?:선정|당첨)/
@@ -151,7 +168,7 @@ export function parseSingleCampaignBlock(rawBlock: string): ParsedCampaign | nul
     }
   }
 
-  // (C) 대괄호 지역/카테고리형 제목 줄: "[성수/맛집] OO식당" (단, [리뷰노트], [강남맛집], [포포몬] 등 플랫폼 헤더 제외)
+  // (C) 대괄호 지역/카테고리형 제목 줄: "[성수/맛집] OO식당"
   if (!title) {
     for (const line of lines) {
       const strippedBullet = line.replace(/^[■▶▷•*-]\s*/, '').trim();
@@ -183,9 +200,10 @@ export function parseSingleCampaignBlock(rawBlock: string): ParsedCampaign | nul
     }
   }
 
-  // 2. 마감일(deadlineDate) 및 방문일(visitDate) 추출
+  // 2. 시작날짜(visitDate) 및 마감일(deadlineDate) 스마트 추출
   let deadlineDate = '';
   let visitDate = '';
+  let explicitVisitDate = '';
 
   for (const line of lines) {
     const isDeadlineLine = /(?:마감|등록\s*기간|작성\s*기간|제출\s*기한|리뷰\s*기간|콘텐츠\s*등록|기간|까지|D-\d)/i.test(line);
@@ -193,19 +211,41 @@ export function parseSingleCampaignBlock(rawBlock: string): ParsedCampaign | nul
 
     const dates = extractDatesFromLine(line);
     if (dates.length > 0) {
-      if (isVisitLine && !visitDate) {
-        visitDate = dates[0];
+      if (isVisitLine) {
+        explicitVisitDate = dates[0];
+        // "방문 및 리뷰마감일 : 10.25 ~ 11.07" 같이 한 줄에 기간이 있는 경우
+        if (dates.length >= 2 && !deadlineDate) {
+          deadlineDate = dates[dates.length - 1];
+        }
       } else if (isDeadlineLine) {
+        // 기간(예: 10.25 ~ 11.08)이면 앞 날짜는 시작일, 뒤 날짜는 마감일로 자동 지정!
+        if (dates.length >= 2 && !visitDate) {
+          visitDate = dates[0];
+        }
         deadlineDate = dates[dates.length - 1];
-      } else if (!deadlineDate) {
-        deadlineDate = dates[dates.length - 1];
+      } else {
+        if (dates.length >= 2 && !visitDate) {
+          visitDate = dates[0];
+        }
+        if (!deadlineDate) {
+          deadlineDate = dates[dates.length - 1];
+        }
       }
     }
   }
 
+  if (explicitVisitDate) {
+    visitDate = explicitVisitDate;
+  }
+
+  // 시작날짜가 텍스트에 없으면 '오늘 날짜(당첨 등록일)'로 기본 자동 세팅
+  if (!visitDate) {
+    visitDate = toDateInputString(new Date());
+  }
+
+  // 마감일이 없으면 시작날짜 기준 +10일로 자동 세팅
   if (!deadlineDate) {
-    const fallbackDate = new Date(Date.now() + 10 * 86400000);
-    deadlineDate = toDateInputString(fallbackDate);
+    deadlineDate = getOffsetDateString(10, visitDate);
   }
 
   // 3. 제공 혜택(benefitAmount) 및 원고료/포인트(cashAmount) 추출
@@ -218,7 +258,6 @@ export function parseSingleCampaignBlock(rawBlock: string): ParsedCampaign | nul
     const isPenaltyLine = /(?:페널티|위약금|과태료|벌금)/i.test(line);
     if (isPenaltyLine) continue;
 
-    // 한 줄에 "50,000원 이용권 + 10,000P" 처럼 혜택과 포인트가 같이 있는 경우 분리 추출
     if (isBenefitLine && isCashLine && line.includes('+')) {
       const parts = line.split('+');
       for (const part of parts) {
@@ -269,7 +308,6 @@ export function parseCampaignsFromText(rawText: string): ParsedCampaign[] {
   const trimmed = rawText.trim();
   if (!trimmed) return [];
 
-  // 여러 건의 알림톡이나 빈 줄 2개 이상으로 구분된 블록 분리
   const blocks = trimmed
     .split(/(?=\[(?:리뷰노트|레뷰|REVU|강남맛집|디너의여왕|포포몬|POPOMON|미블|포블로그|서울오빠)\])|\n\s*\n\s*\n/)
     .map((b) => b.trim())
@@ -323,12 +361,12 @@ export function getSampleCampaignText(platform = 'all'): string {
       return `[리뷰노트] 캠페인 선정 안내
 ■ 캠페인명 : [성수/맛집] 성수동 화덕피자 2인 식사권
 ■ 제공내역 : 50,000원 이용권 + 10,000P
-■ 리뷰 마감일 : 2026.11.05
+■ 리뷰 등록기간 : 2026.10.25 ~ 2026.11.05
 
 [강남맛집] 리뷰어 선정 안내
 ▶ 매장명 : [강남] 숙성 삼겹살 스페셜 세트
 ▶ 제공내역 : 45,000원 식사권
-▶ 리뷰마감일 : 2026.11.08
+▶ 방문 및 리뷰마감일 : 2026.10.26 ~ 2026.11.08
 
 [포포몬] 체험단 선정 안내
 ■ 캠페인명 : [연남동] 수제 디저트 & 커피 2인 세트

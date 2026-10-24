@@ -11,6 +11,9 @@ import {
   parseSingleCampaignBlock,
   getQuickImportBookmarklet,
   getSampleCampaignText,
+  toDateInputString,
+  getOffsetDateString,
+  getThisSaturdayString,
   ParsedCampaign,
 } from '@/lib/campaignParser';
 
@@ -219,13 +222,14 @@ export default function ExperienceDiary() {
   };
 
   const openAddModal = () => {
+    const defaultStart = selectedDate || toDateInputString(new Date());
     setEditingId(null);
     setNewTitle('');
     setNewPlatform('');
     setCustomPlatform('');
     setIsCustomPlatform(false);
-    setNewVisitDate('');
-    setNewDeadlineDate('');
+    setNewVisitDate(defaultStart);
+    setNewDeadlineDate(getOffsetDateString(10, defaultStart));
     setNewBenefit('');
     setNewCash('');
     setNewExpense('');
@@ -1511,25 +1515,60 @@ export default function ExperienceDiary() {
                       />
                     )}
                   </div>
-                  <div className="flex gap-3">
-                    <div className="flex-1">
-                      <label className="block text-sm font-bold text-slate-700 mb-1">방문/예약일</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">방문/시작일</label>
                       <input 
                         type="date" 
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all text-sm"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all text-sm"
                         value={newVisitDate}
                         onChange={(e) => setNewVisitDate(e.target.value)}
                       />
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setNewVisitDate(toDateInputString(new Date()))}
+                          className="px-2 py-0.5 rounded-md bg-white border border-slate-200 hover:border-indigo-300 text-[11px] font-bold text-slate-600 hover:text-indigo-600"
+                        >
+                          오늘
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNewVisitDate(getOffsetDateString(1))}
+                          className="px-2 py-0.5 rounded-md bg-white border border-slate-200 hover:border-indigo-300 text-[11px] font-bold text-slate-600 hover:text-indigo-600"
+                        >
+                          내일
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNewVisitDate(getThisSaturdayString())}
+                          className="px-2 py-0.5 rounded-md bg-white border border-slate-200 hover:border-indigo-300 text-[11px] font-bold text-slate-600 hover:text-indigo-600"
+                        >
+                          이번주 토
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex-1">
+                    <div>
                       <label className="block text-sm font-bold text-slate-700 mb-1">포스팅 마감일 <span className="text-red-500">*</span></label>
                       <input 
                         type="date" 
                         required
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all text-sm"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all text-sm"
                         value={newDeadlineDate}
                         onChange={(e) => setNewDeadlineDate(e.target.value)}
                       />
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {[7, 10, 14].map((daysOffset) => (
+                          <button
+                            key={daysOffset}
+                            type="button"
+                            onClick={() => setNewDeadlineDate(getOffsetDateString(daysOffset, newVisitDate || undefined))}
+                            className="px-2 py-0.5 rounded-md bg-white border border-slate-200 hover:border-pink-300 text-[11px] font-bold text-slate-600 hover:text-pink-600"
+                          >
+                            +{daysOffset}일
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1537,40 +1576,95 @@ export default function ExperienceDiary() {
 
               {/* 가계부 정보 */}
               <div className="bg-green-50/50 p-4 rounded-2xl border border-green-50">
-                <h4 className="text-xs font-bold text-green-600 mb-3 tracking-wide">가계부 정보 (선택)</h4>
-                <div className="space-y-3">
-                  <div className="flex gap-3">
-                    <div className="flex-1">
-                      <label className="block text-xs font-bold text-slate-700 mb-1">제공 혜택(현물) <span className="text-slate-400 font-normal">원</span></label>
-                      <input 
-                        type="number" 
-                        placeholder="예: 30000"
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all text-sm"
-                        value={newBenefit}
-                        onChange={(e) => setNewBenefit(e.target.value)}
-                      />
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-bold text-green-700 tracking-wide">가계부 정보 (선택 — 버튼으로 1초 입력)</h4>
+                </div>
+                <div className="space-y-3.5">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">제공 혜택(식사권·제품) <span className="text-slate-400 font-normal">원</span></label>
+                    <input 
+                      type="number" 
+                      placeholder="예: 30000"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all text-sm bg-white font-bold text-slate-800"
+                      value={newBenefit}
+                      onChange={(e) => setNewBenefit(e.target.value)}
+                    />
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {[
+                        { label: '+1만', val: 10000 },
+                        { label: '+2만', val: 20000 },
+                        { label: '+3만', val: 30000 },
+                        { label: '+5만', val: 50000 },
+                        { label: '+10만', val: 100000 },
+                      ].map((btn) => (
+                        <button
+                          key={btn.label}
+                          type="button"
+                          onClick={() => setNewBenefit(String((Number(newBenefit) || 0) + btn.val))}
+                          className="px-2 py-1 rounded-lg bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-extrabold transition active:scale-95"
+                        >
+                          {btn.label}
+                        </button>
+                      ))}
+                      {newBenefit && (
+                        <button
+                          type="button"
+                          onClick={() => setNewBenefit('')}
+                          className="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-400 border border-slate-200 text-[11px] font-bold"
+                        >
+                          초기화
+                        </button>
+                      )}
                     </div>
-                    <div className="flex-1">
-                      <label className="block text-xs font-bold text-slate-700 mb-1">지원금(원고료) <span className="text-slate-400 font-normal">원</span></label>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">지원금(원고료·포인트) <span className="text-slate-400 font-normal">원</span></label>
                       <input 
                         type="number" 
                         placeholder="예: 10000"
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all text-sm"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all text-sm bg-white font-bold text-slate-800"
                         value={newCash}
                         onChange={(e) => setNewCash(e.target.value)}
                       />
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {[
+                          { label: '+5천', val: 5000 },
+                          { label: '+1만', val: 10000 },
+                          { label: '+3만', val: 30000 },
+                        ].map((btn) => (
+                          <button
+                            key={btn.label}
+                            type="button"
+                            onClick={() => setNewCash(String((Number(newCash) || 0) + btn.val))}
+                            className="px-2 py-0.5 rounded-md bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-extrabold"
+                          >
+                            {btn.label}
+                          </button>
+                        ))}
+                        {newCash && (
+                          <button
+                            type="button"
+                            onClick={() => setNewCash('')}
+                            className="px-2 py-0.5 rounded-md bg-white text-slate-400 border border-slate-200 text-[11px] font-bold"
+                          >
+                            0
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">초과 지출 내돈내산 <span className="text-slate-400 font-normal">원</span></label>
-                    <input 
-                      type="number" 
-                      placeholder="예: 5000"
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-all text-sm"
-                      value={newExpense}
-                      onChange={(e) => setNewExpense(e.target.value)}
-                    />
+                    
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">초과 지출 (내돈내산) <span className="text-slate-400 font-normal">원</span></label>
+                      <input 
+                        type="number" 
+                        placeholder="예: 5000"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-all text-sm bg-white"
+                        value={newExpense}
+                        onChange={(e) => setNewExpense(e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1893,26 +1987,26 @@ export default function ExperienceDiary() {
 
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                           <div>
-                            <span className="block text-[10px] font-bold text-slate-400 mb-0.5">마감일 *</span>
-                            <input
-                              type="date"
-                              value={item.deadlineDate}
-                              onChange={(e) => {
-                                const next = [...parsedPreviewList];
-                                next[idx] = { ...next[idx], deadlineDate: e.target.value };
-                                setParsedPreviewList(next);
-                              }}
-                              className="w-full px-2 py-1 rounded-lg border border-slate-200 font-semibold text-slate-700"
-                            />
-                          </div>
-                          <div>
-                            <span className="block text-[10px] font-bold text-slate-400 mb-0.5">방문예약일</span>
+                            <span className="block text-[10px] font-bold text-indigo-600 mb-0.5">방문/시작일 (자동)</span>
                             <input
                               type="date"
                               value={item.visitDate}
                               onChange={(e) => {
                                 const next = [...parsedPreviewList];
                                 next[idx] = { ...next[idx], visitDate: e.target.value };
+                                setParsedPreviewList(next);
+                              }}
+                              className="w-full px-2 py-1 rounded-lg border border-slate-200 font-semibold text-slate-700"
+                            />
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-pink-600 mb-0.5">포스팅 마감일 *</span>
+                            <input
+                              type="date"
+                              value={item.deadlineDate}
+                              onChange={(e) => {
+                                const next = [...parsedPreviewList];
+                                next[idx] = { ...next[idx], deadlineDate: e.target.value };
                                 setParsedPreviewList(next);
                               }}
                               className="w-full px-2 py-1 rounded-lg border border-slate-200 font-semibold text-slate-700"
@@ -1945,6 +2039,74 @@ export default function ExperienceDiary() {
                               }}
                               className="w-full px-2 py-1 rounded-lg border border-slate-200 font-bold text-blue-700"
                             />
+                          </div>
+                        </div>
+
+                        {/* 원클릭 금액 & 날짜 빠른 조정 버튼 바 */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100 text-[11px]">
+                          <div className="flex flex-wrap items-center gap-1">
+                            <span className="text-slate-400 font-bold mr-0.5">💰 혜택 빠른입력:</span>
+                            {[
+                              { label: '+1만', val: 10000 },
+                              { label: '+3만', val: 30000 },
+                              { label: '+5만', val: 50000 },
+                              { label: '+10만', val: 100000 },
+                            ].map((btn) => (
+                              <button
+                                key={btn.label}
+                                type="button"
+                                onClick={() => {
+                                  const next = [...parsedPreviewList];
+                                  next[idx] = {
+                                    ...next[idx],
+                                    benefitAmount: (next[idx].benefitAmount || 0) + btn.val,
+                                  };
+                                  setParsedPreviewList(next);
+                                }}
+                                className="px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-extrabold transition active:scale-95"
+                              >
+                                {btn.label}
+                              </button>
+                            ))}
+                            {item.benefitAmount > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = [...parsedPreviewList];
+                                  next[idx] = { ...next[idx], benefitAmount: 0 };
+                                  setParsedPreviewList(next);
+                                }}
+                                className="px-1.5 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold"
+                              >
+                                0원
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <span className="text-slate-400 font-bold mr-0.5">📅 시작일:</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = [...parsedPreviewList];
+                                next[idx] = { ...next[idx], visitDate: toDateInputString(new Date()) };
+                                setParsedPreviewList(next);
+                              }}
+                              className="px-1.5 py-0.5 rounded-md bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 font-bold"
+                            >
+                              오늘
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = [...parsedPreviewList];
+                                next[idx] = { ...next[idx], visitDate: getThisSaturdayString() };
+                                setParsedPreviewList(next);
+                              }}
+                              className="px-1.5 py-0.5 rounded-md bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 font-bold"
+                            >
+                              이번주 토
+                            </button>
                           </div>
                         </div>
                       </div>
