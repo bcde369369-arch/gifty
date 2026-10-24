@@ -100,7 +100,7 @@ export default function Home() {
             <a href="/community" className="text-indigo-600 font-extrabold hover:text-indigo-700 transition-colors flex items-center gap-1">커뮤니티 💬</a>
             <a href="/experience-diary" className="hover:text-indigo-600 transition-colors text-blue-600">체험단 다이어리 📓</a>
             <a href="/remove-bg" className="hover:text-indigo-600 transition-colors text-purple-600">누끼따기(AI) ✂️</a>
-            <a href="/guide" className="hover:text-indigo-600 transition-colors text-slate-600">움짤 꿀팁 📚</a>
+            <a href="/sticker" className="hover:text-pink-700 transition-colors text-pink-600 font-extrabold">블로그 스티커 🎨</a>
           </div>
           <button 
             className="md:hidden text-slate-500 hover:text-slate-800"
@@ -117,7 +117,7 @@ export default function Home() {
             <a href="/community" className="text-indigo-600 hover:bg-indigo-50 p-3 rounded-xl">커뮤니티 💬</a>
             <a href="/experience-diary" className="text-blue-600 hover:bg-blue-50 p-3 rounded-xl">체험단 다이어리 📓</a>
             <a href="/remove-bg" className="text-purple-600 hover:bg-purple-50 p-3 rounded-xl">누끼따기(AI) ✂️</a>
-            <a href="/guide" className="text-slate-600 hover:bg-slate-50 p-3 rounded-xl">움짤 꿀팁 📚</a>
+            <a href="/sticker" className="text-pink-600 hover:bg-pink-50 p-3 rounded-xl">블로그 스티커 🎨</a>
           </div>
         )}
       </nav>
@@ -134,8 +134,8 @@ export default function Home() {
           <a href="/remove-bg" className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-50/80 text-purple-700 font-extrabold text-[13px] rounded-full border border-purple-200/50 shadow-sm active:scale-95 transition-transform">
             ✂️ 누끼따기(AI)
           </a>
-          <a href="/guide" className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-50/80 text-emerald-700 font-extrabold text-[13px] rounded-full border border-emerald-200/50 shadow-sm active:scale-95 transition-transform">
-            📚 블로그 꿀팁
+          <a href="/sticker" className="inline-flex items-center gap-1.5 px-4 py-2 bg-pink-50/80 text-pink-700 font-extrabold text-[13px] rounded-full border border-pink-200/50 shadow-sm active:scale-95 transition-transform">
+            🎨 블로그 스티커
           </a>
         </div>
       </div>
@@ -286,7 +286,8 @@ export default function Home() {
           <div className="flex justify-center items-center gap-2 mb-6 opacity-50">
             <Sparkles size={16} /> <span className="font-bold tracking-widest text-slate-200">GIFTY</span>
           </div>
-          <div className="flex justify-center gap-6 mb-6 text-sm font-medium">
+          <div className="flex flex-wrap justify-center gap-6 mb-6 text-sm font-medium">
+            <a href="/guide" className="hover:text-white transition-colors">움짤·블로그 꿀팁 가이드</a>
             <a href="/legal" className="hover:text-white transition-colors">이용약관 및 개인정보처리방침</a>
             <a href="mailto:contact@gifty.run" className="hover:text-white transition-colors">문의하기</a>
             <a href="/admin" className="text-slate-700 hover:text-white transition-colors">관리자</a>

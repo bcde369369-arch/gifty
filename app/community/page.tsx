@@ -219,7 +219,7 @@ export default function CommunityPage() {
             </Link>
             <Link href="/experience-diary" className="hover:text-indigo-600 transition-colors text-blue-600">체험단 다이어리 📓</Link>
             <Link href="/remove-bg" className="hover:text-indigo-600 transition-colors text-purple-600">누끼따기(AI) ✂️</Link>
-            <Link href="/guide" className="hover:text-indigo-600 transition-colors text-slate-600">움짤 꿀팁 📚</Link>
+            <Link href="/sticker" className="hover:text-pink-700 transition-colors text-pink-600 font-extrabold">블로그 스티커 🎨</Link>
           </div>
           <button 
             className="md:hidden text-slate-500 hover:text-slate-800"
@@ -236,7 +236,7 @@ export default function CommunityPage() {
             <Link href="/community" className="text-indigo-600 bg-indigo-50 p-3 rounded-xl">커뮤니티 💬</Link>
             <Link href="/experience-diary" className="text-blue-600 hover:bg-blue-50 p-3 rounded-xl">체험단 다이어리 📓</Link>
             <Link href="/remove-bg" className="text-purple-600 hover:bg-purple-50 p-3 rounded-xl">누끼따기(AI) ✂️</Link>
-            <Link href="/guide" className="text-slate-600 hover:bg-slate-50 p-3 rounded-xl">움짤 꿀팁 📚</Link>
+            <Link href="/sticker" className="text-pink-600 hover:bg-pink-50 p-3 rounded-xl">블로그 스티커 🎨</Link>
           </div>
         )}
       </nav>
