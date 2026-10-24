@@ -1,11 +1,17 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Sparkles, Calendar as CalendarIcon, Calculator, Link as LinkIcon, ArrowLeft, Plus, X, ChevronLeft, ChevronRight, Menu, Download, Upload, Share2, Copy, Image as ImageIcon, EyeOff, Eye, MessageSquareHeart } from 'lucide-react';
+import { Sparkles, Calendar as CalendarIcon, Calculator, Link as LinkIcon, ArrowLeft, Plus, X, ChevronLeft, ChevronRight, Menu, Download, Upload, Share2, Copy, Image as ImageIcon, EyeOff, Eye, MessageSquareHeart, Zap, ClipboardPaste, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import CoupangBanner from '@/components/CoupangBanner';
 import { useSiteSettings } from '@/lib/settings';
+import {
+  parseCampaignsFromText,
+  parseSingleCampaignBlock,
+  getQuickImportBookmarklet,
+  ParsedCampaign,
+} from '@/lib/campaignParser';
 
 interface Schedule {
   id: string;
@@ -44,6 +50,12 @@ export default function ExperienceDiary() {
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedPlatformFilter, setSelectedPlatformFilter] = useState<string | null>(null);
 
+  // ⚡ 리뷰노트/카톡 당첨 1초 자동등록 모달 상태
+  const [isAutoImportModalOpen, setIsAutoImportModalOpen] = useState(false);
+  const [autoImportText, setAutoImportText] = useState('');
+  const [parsedPreviewList, setParsedPreviewList] = useState<ParsedCampaign[]>([]);
+  const [quickPasteFeedback, setQuickPasteFeedback] = useState('');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -53,7 +65,109 @@ export default function ExperienceDiary() {
     }
     // 기본 선택을 빈 값('')으로 두어 접속 시 전체 일정이 바로 보이도록 설정
     setSelectedDate('');
+
+    // URL 파라미터(?autoImport=...)로 전달된 당첨 내역이 있으면 즉시 자동분석 모달 오픈
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const importedText = params.get('autoImport');
+      if (importedText && importedText.trim()) {
+        setAutoImportText(importedText);
+        setParsedPreviewList(parseCampaignsFromText(importedText));
+        setIsAutoImportModalOpen(true);
+        window.history.replaceState({}, '', '/experience-diary');
+      }
+    }
   }, []);
+
+  // 자동등록 텍스트 변경 시 실시간 분석
+  const handleAutoImportTextChange = (text: string) => {
+    setAutoImportText(text);
+    setParsedPreviewList(parseCampaignsFromText(text));
+  };
+
+  // 클립보드에서 바로 읽어와 자동 분석
+  const handlePasteFromClipboard = async (applyDirectlyToForm = false) => {
+    try {
+      const clipText = await navigator.clipboard.readText();
+      if (!clipText || !clipText.trim()) {
+        alert('클립보드에 복사된 텍스트가 없습니다.\n리뷰노트 당첨 카톡이나 마이페이지 내역을 먼저 복사해 주세요!');
+        return;
+      }
+      if (applyDirectlyToForm) {
+        const parsed = parseSingleCampaignBlock(clipText);
+        if (parsed) {
+          applyParsedCampaignToForm(parsed);
+          setQuickPasteFeedback(`✨ '${parsed.title}' 정보가 자동으로 채워졌습니다!`);
+          setTimeout(() => setQuickPasteFeedback(''), 4000);
+        }
+      } else {
+        handleAutoImportTextChange(clipText);
+      }
+    } catch {
+      alert('브라우저 권한 설정으로 인해 아래 입력창에 직접 붙여넣기(Ctrl+V 또는 길게 눌러 붙여넣기) 해주세요!');
+    }
+  };
+
+  // 파싱된 단일 캠페인 데이터를 등록 모달 폼에 채우기
+  const applyParsedCampaignToForm = (parsed: ParsedCampaign) => {
+    setNewTitle(parsed.title);
+    if (parsed.platform && !POPULAR_PLATFORMS.includes(parsed.platform)) {
+      setNewPlatform('');
+      setCustomPlatform(parsed.platform);
+      setIsCustomPlatform(true);
+    } else {
+      setNewPlatform(parsed.platform || '리뷰노트');
+      setCustomPlatform('');
+      setIsCustomPlatform(false);
+    }
+    if (parsed.visitDate) setNewVisitDate(parsed.visitDate);
+    if (parsed.deadlineDate) setNewDeadlineDate(parsed.deadlineDate);
+    if (parsed.benefitAmount > 0) setNewBenefit(String(parsed.benefitAmount));
+    if (parsed.cashAmount > 0) setNewCash(String(parsed.cashAmount));
+  };
+
+  // 리뷰노트 알림톡 샘플 예시 채우기
+  const handleFillSampleReviewNote = () => {
+    const sample = `[리뷰노트] 캠페인 선정 안내
+축하합니다! 신청하신 캠페인에 선정되셨습니다.
+
+■ 캠페인명 : [성수/맛집] 성수동 화덕피자 & 파스타 2인 식사권
+■ 제공내역 : 50,000원 자유 이용권 + 리뷰 포인트 10,000P
+■ 방문예약일 : 2026.10.28
+■ 리뷰 마감일 : 2026.11.05 까지
+
+※ 기한 내 리뷰 미등록 시 페널티가 부과될 수 있습니다.`;
+    handleAutoImportTextChange(sample);
+  };
+
+  // 분석된 캠페인 목록을 내 일정에 원클릭 일괄 등록
+  const handleConfirmAutoImport = () => {
+    if (parsedPreviewList.length === 0) {
+      alert('먼저 당첨 카톡 메시지나 리뷰노트 당첨 내역을 붙여넣어 주세요!');
+      return;
+    }
+
+    const nowTs = Date.now();
+    const newItems: Schedule[] = parsedPreviewList.map((item, idx) => ({
+      id: `${nowTs}_${idx}`,
+      title: item.title,
+      platform: item.platform || '리뷰노트',
+      visitDate: item.visitDate || '',
+      deadlineDate: item.deadlineDate,
+      benefitAmount: item.benefitAmount || 0,
+      cashAmount: item.cashAmount || 0,
+      extraExpense: 0,
+    }));
+
+    const updated = [...newItems, ...schedules];
+    setSchedules(updated);
+    localStorage.setItem('gifty_schedules', JSON.stringify(updated));
+
+    setAutoImportText('');
+    setParsedPreviewList([]);
+    setIsAutoImportModalOpen(false);
+    alert(`🎉 총 ${newItems.length}건의 체험단 당첨 내역이 다이어리와 가계부에 자동 등록되었습니다!`);
+  };
 
   // 1. 데이터 백업 (JSON 파일 다운로드)
   const handleExportBackup = () => {
@@ -800,14 +914,23 @@ export default function ExperienceDiary() {
           {/* 1. Schedule Tab */}
           {activeTab === 'schedule' && (
             <div className="animate-in fade-in duration-300">
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex flex-wrap justify-between items-center gap-2 mb-6">
                 <h2 className="text-xl font-bold text-slate-800">📅 내 일정</h2>
-                <button 
-                  onClick={openAddModal}
-                  className="flex items-center gap-1 bg-indigo-600 text-white text-sm font-bold px-4 py-2 rounded-xl hover:bg-indigo-700 transition"
-                >
-                  <Plus size={16} /> 추가
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAutoImportModalOpen(true)}
+                    className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs sm:text-sm font-extrabold px-3.5 py-2 rounded-xl shadow-sm transition active:scale-95"
+                  >
+                    <Zap size={15} /> 리뷰노트·카톡 1초 자동등록
+                  </button>
+                  <button 
+                    onClick={openAddModal}
+                    className="flex items-center gap-1 bg-indigo-600 text-white text-xs sm:text-sm font-bold px-3.5 py-2 rounded-xl hover:bg-indigo-700 transition active:scale-95"
+                  >
+                    <Plus size={16} /> 직접 추가
+                  </button>
+                </div>
               </div>
 
               {/* Calendar */}
@@ -878,9 +1001,18 @@ export default function ExperienceDiary() {
                         전체 일정 보러가기
                       </button>
                     ) : (
-                      <button onClick={openAddModal} className="text-xs text-white bg-indigo-600 px-4 py-2 rounded-xl font-bold mt-2 shadow-sm">
-                        + 첫 체험단 일정 추가하기
-                      </button>
+                      <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsAutoImportModalOpen(true)}
+                          className="text-xs text-white bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 rounded-xl font-extrabold shadow-sm flex items-center gap-1"
+                        >
+                          <Zap size={14} /> 리뷰노트·당첨톡 1초 자동등록
+                        </button>
+                        <button onClick={openAddModal} className="text-xs text-white bg-indigo-600 px-4 py-2 rounded-xl font-bold shadow-sm">
+                          + 직접 일정 추가하기
+                        </button>
+                      </div>
                     )}
                   </div>
                 ) : (
@@ -1259,6 +1391,42 @@ export default function ExperienceDiary() {
             </div>
             
             <form onSubmit={handleSaveSchedule} className="flex flex-col gap-4">
+              {/* ⚡ 당첨 카톡/내역 1초 자동완성 바 (신규 등록 시) */}
+              {!editingId && (
+                <div className="bg-amber-50/90 border border-amber-200 p-3.5 rounded-2xl flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-extrabold text-amber-900 flex items-center gap-1">
+                      <Zap size={14} className="text-amber-600" />
+                      리뷰노트·레뷰 당첨 카톡 복사하셨나요?
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsModalOpen(false);
+                        setIsAutoImportModalOpen(true);
+                      }}
+                      className="text-[11px] font-bold text-amber-700 underline hover:text-amber-900"
+                    >
+                      여러 건 일괄등록 &rarr;
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handlePasteFromClipboard(true)}
+                      className="flex-1 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95"
+                    >
+                      <ClipboardPaste size={14} /> 복사한 당첨톡으로 빈칸 1초 자동채우기
+                    </button>
+                  </div>
+                  {quickPasteFeedback && (
+                    <p className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                      <CheckCircle2 size={12} /> {quickPasteFeedback}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* 기본 정보 */}
               <div className="bg-slate-50 p-4 rounded-2xl">
                 <h4 className="text-xs font-bold text-indigo-500 mb-3 tracking-wide">기본 정보</h4>
@@ -1581,6 +1749,217 @@ export default function ExperienceDiary() {
                     💬 Gifty 블로거 커뮤니티에 1초 자랑하기
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ⚡ 리뷰노트·체험단 당첨 1초 자동등록 모달 */}
+      {isAutoImportModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl w-full max-w-2xl p-6 md:p-8 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto">
+            <div className="flex justify-between items-start gap-4 mb-5">
+              <div>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-extrabold mb-1">
+                  <Zap size={12} /> 타자 치지 말고 1초 컷!
+                </span>
+                <h3 className="text-xl md:text-2xl font-extrabold text-slate-900">
+                  리뷰노트 · 체험단 당첨 자동 등록기
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                  카카오톡 당첨 알림톡이나 리뷰노트·레뷰 마이페이지 내역을 복사해 붙여넣으면 캠페인명·마감일·제공금액·포인트를 자동으로 추출합니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAutoImportModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              {/* 1. 클립보드 붙여넣기 & 텍스트 입력 영역 */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="text-xs font-extrabold text-slate-700">
+                    1️⃣ 당첨 카톡 메시지 또는 마이페이지 텍스트 붙여넣기
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handlePasteFromClipboard(false)}
+                      className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold flex items-center gap-1 shadow-sm transition active:scale-95"
+                    >
+                      <ClipboardPaste size={13} /> 클립보드 붙여넣기
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleFillSampleReviewNote}
+                      className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 text-xs font-bold transition"
+                    >
+                      예시 넣어보기
+                    </button>
+                    {autoImportText && (
+                      <button
+                        type="button"
+                        onClick={() => handleAutoImportTextChange('')}
+                        className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-rose-50 text-rose-600 border border-slate-200 text-xs font-bold transition"
+                      >
+                        비우기
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <textarea
+                  rows={5}
+                  value={autoImportText}
+                  onChange={(e) => handleAutoImportTextChange(e.target.value)}
+                  placeholder={`여기에 카카오톡 당첨 알림톡이나 리뷰노트 선정 내역을 붙여넣기(Ctrl+V) 해주세요!\n\n예시:\n[리뷰노트] 캠페인 선정 안내\n■ 캠페인명 : [강남] 성수동 화덕피자 2인 식사권\n■ 제공내역 : 50,000원 이용권 + 10,000P\n■ 리뷰 마감일 : 2026.11.05`}
+                  className="w-full p-3.5 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400 leading-relaxed"
+                />
+              </div>
+
+              {/* 2. 실시간 자동 추출 미리보기 & 수정 */}
+              {parsedPreviewList.length > 0 && (
+                <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs sm:text-sm font-extrabold text-indigo-900 flex items-center gap-1.5">
+                      <CheckCircle2 size={16} className="text-indigo-600" />
+                      자동 분석 결과 ({parsedPreviewList.length}건 감지됨 — 클릭하여 바로 수정 가능)
+                    </h4>
+                  </div>
+
+                  <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                    {parsedPreviewList.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="bg-white border border-indigo-100 rounded-xl p-3.5 shadow-sm space-y-2.5"
+                      >
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <input
+                            type="text"
+                            value={item.platform}
+                            onChange={(e) => {
+                              const next = [...parsedPreviewList];
+                              next[idx] = { ...next[idx], platform: e.target.value };
+                              setParsedPreviewList(next);
+                            }}
+                            className="w-full sm:w-28 px-2.5 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50/50 text-indigo-700 font-extrabold text-xs"
+                            placeholder="플랫폼"
+                          />
+                          <input
+                            type="text"
+                            value={item.title}
+                            onChange={(e) => {
+                              const next = [...parsedPreviewList];
+                              next[idx] = { ...next[idx], title: e.target.value };
+                              setParsedPreviewList(next);
+                            }}
+                            className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 font-bold text-xs sm:text-sm text-slate-800"
+                            placeholder="캠페인 제목"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                          <div>
+                            <span className="block text-[10px] font-bold text-slate-400 mb-0.5">마감일 *</span>
+                            <input
+                              type="date"
+                              value={item.deadlineDate}
+                              onChange={(e) => {
+                                const next = [...parsedPreviewList];
+                                next[idx] = { ...next[idx], deadlineDate: e.target.value };
+                                setParsedPreviewList(next);
+                              }}
+                              className="w-full px-2 py-1 rounded-lg border border-slate-200 font-semibold text-slate-700"
+                            />
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-slate-400 mb-0.5">방문예약일</span>
+                            <input
+                              type="date"
+                              value={item.visitDate}
+                              onChange={(e) => {
+                                const next = [...parsedPreviewList];
+                                next[idx] = { ...next[idx], visitDate: e.target.value };
+                                setParsedPreviewList(next);
+                              }}
+                              className="w-full px-2 py-1 rounded-lg border border-slate-200 font-semibold text-slate-700"
+                            />
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-emerald-600 mb-0.5">제공 혜택(원)</span>
+                            <input
+                              type="number"
+                              value={item.benefitAmount || ''}
+                              placeholder="0"
+                              onChange={(e) => {
+                                const next = [...parsedPreviewList];
+                                next[idx] = { ...next[idx], benefitAmount: Number(e.target.value) || 0 };
+                                setParsedPreviewList(next);
+                              }}
+                              className="w-full px-2 py-1 rounded-lg border border-slate-200 font-bold text-emerald-700"
+                            />
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-blue-600 mb-0.5">포인트/원고료(원)</span>
+                            <input
+                              type="number"
+                              value={item.cashAmount || ''}
+                              placeholder="0"
+                              onChange={(e) => {
+                                const next = [...parsedPreviewList];
+                                next[idx] = { ...next[idx], cashAmount: Number(e.target.value) || 0 };
+                                setParsedPreviewList(next);
+                              }}
+                              className="w-full px-2 py-1 rounded-lg border border-slate-200 font-bold text-blue-700"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleConfirmAutoImport}
+                    className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold text-sm shadow-md flex items-center justify-center gap-2 transition active:scale-95"
+                  >
+                    <Zap size={16} />
+                    🎉 총 {parsedPreviewList.length}건 다이어리 & 가계부에 즉시 등록하기
+                  </button>
+                </div>
+              )}
+
+              {/* 3. PC 크롬 사용자를 위한 1클릭 북마클릿 안내 */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="text-xs font-extrabold text-slate-800">
+                    💻 PC에서 리뷰노트 화면을 보고 계신가요? (1클릭 전송 버튼)
+                  </p>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    오른쪽 <strong>[⚡ 리뷰노트→Gifty 자동전송]</strong> 버튼을 마우스로 끌어다 브라우저 상단 <strong>즐겨찾기(북마크) 바</strong>에 놓으세요. 리뷰노트 당첨 화면에서 누르면 우리 사이트로 즉시 넘어옵니다!
+                  </p>
+                </div>
+                <a
+                  ref={(el) => {
+                    if (el && typeof window !== 'undefined') {
+                      el.setAttribute('href', getQuickImportBookmarklet(window.location.origin));
+                    }
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    alert('이 버튼을 클릭하지 마시고, 마우스로 끌어다(드래그) 브라우저 상단 즐겨찾기 바에 놓아주세요!\n이후 리뷰노트 당첨 페이지에서 그 즐겨찾기를 누르면 자동 전송됩니다.');
+                  }}
+                  className="shrink-0 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-extrabold text-xs shadow-sm cursor-grab active:cursor-grabbing select-none"
+                  title="즐겨찾기 바로 드래그하세요"
+                >
+                  ⚡ 리뷰노트→Gifty 자동전송
+                </a>
               </div>
             </div>
           </div>
