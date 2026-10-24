@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Calendar as CalendarIcon, Calculator, Link as LinkIcon, ArrowLeft, Plus, X, ChevronLeft, ChevronRight, Menu, Download, Upload } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Sparkles, Calendar as CalendarIcon, Calculator, Link as LinkIcon, ArrowLeft, Plus, X, ChevronLeft, ChevronRight, Menu, Download, Upload, Share2, Copy, Image as ImageIcon, EyeOff, Eye, MessageSquareHeart } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import CoupangBanner from '@/components/CoupangBanner';
 import { useSiteSettings } from '@/lib/settings';
 
@@ -263,6 +264,422 @@ export default function ExperienceDiary() {
     ? monthlySchedules.filter(s => (s.platform?.trim() || '미지정') === selectedPlatformFilter)
     : monthlySchedules;
 
+  // SNS 정산 공유 모달 상태
+  const router = useRouter();
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [shareNickname, setShareNickname] = useState('');
+  const [shareTheme, setShareTheme] = useState<'indigo' | 'receipt' | 'dark'>('indigo');
+  const [hideAmounts, setHideAmounts] = useState(false);
+  const [shareCardUrl, setShareCardUrl] = useState<string>('');
+  const shareCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const formatMoney = useCallback(
+    (amount: number, prefix = '') => {
+      if (hideAmounts) return `${prefix}***,***원`;
+      return `${prefix}${amount.toLocaleString()}원`;
+    },
+    [hideAmounts]
+  );
+
+  // 정산 요약 텍스트 생성 (카톡 / 스레드 / 인스타 캡션용)
+  const getShareTextSummary = useCallback(() => {
+    const ownerPrefix = shareNickname.trim() ? `${shareNickname.trim()}님의 ` : '';
+    const topPlatforms =
+      sortedPlatformStats.length > 0
+        ? sortedPlatformStats
+            .slice(0, 4)
+            .map(([name, cnt]) => `${name}(${cnt}건)`)
+            .join(', ')
+        : '기록 없음';
+
+    const lines = [
+      `📊 [${ownerPrefix}${year}년 ${month + 1}월 체험단 정산 결산]`,
+      ``,
+      `🎯 총 완주 캠페인: ${monthlyCount}건${!hideAmounts && monthlyCount > 0 ? ` (건당 평균 ${avgPerCase.toLocaleString()}원)` : ''}`,
+      `🎁 방어한 식비·제품 혜택: ${formatMoney(monthlyBenefit, '+')}`,
+      `💸 받은 원고료·지원금: ${formatMoney(monthlyCash, '+')}`,
+      ...(monthlyExpense > 0 ? [`💳 내돈내산 추가 지출: ${formatMoney(monthlyExpense, '-')}`] : []),
+      `🏷️ 진행 플랫폼: ${topPlatforms}`,
+      `✨ 이번 달 순이득: ${
+        hideAmounts
+          ? `총 ${monthlyCount}건 완주 성공! 🔥`
+          : monthlyNetProfit >= 0
+          ? `+${monthlyNetProfit.toLocaleString()}원`
+          : `-${Math.abs(monthlyNetProfit).toLocaleString()}원`
+      }`,
+      ``,
+      `📓 블로거 무료 체험단 가계부 & 움짤 제작 👉 https://gifty.run/experience-diary`,
+    ];
+    return lines.join('\n');
+  }, [
+    shareNickname,
+    sortedPlatformStats,
+    year,
+    month,
+    monthlyCount,
+    hideAmounts,
+    avgPerCase,
+    formatMoney,
+    monthlyBenefit,
+    monthlyCash,
+    monthlyExpense,
+    monthlyNetProfit,
+  ]);
+
+  // Canvas로 정산 리포트 카드 이미지(1080x1350) 생성
+  useEffect(() => {
+    if (!isShareModalOpen) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 1080;
+    canvas.height = 1350;
+    shareCanvasRef.current = canvas;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const drawRoundRect = (x: number, y: number, w: number, h: number, r: number) => {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    };
+
+    // 1. 배경 그리기
+    if (shareTheme === 'indigo') {
+      const bgGrad = ctx.createLinearGradient(0, 0, 1080, 1350);
+      bgGrad.addColorStop(0, '#312e81');
+      bgGrad.addColorStop(0.5, '#4f46e5');
+      bgGrad.addColorStop(1, '#9333ea');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, 1080, 1350);
+
+      // 장식 빛망울
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.beginPath();
+      ctx.arc(920, 180, 260, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(160, 1180, 300, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (shareTheme === 'receipt') {
+      ctx.fillStyle = '#f1f5f9';
+      ctx.fillRect(0, 0, 1080, 1350);
+    } else {
+      const darkGrad = ctx.createLinearGradient(0, 0, 1080, 1350);
+      darkGrad.addColorStop(0, '#090d16');
+      darkGrad.addColorStop(1, '#1e1b4b');
+      ctx.fillStyle = darkGrad;
+      ctx.fillRect(0, 0, 1080, 1350);
+    }
+
+    // 2. 메인 카드 프레임
+    const cardX = 70;
+    const cardY = 80;
+    const cardW = 940;
+    const cardH = 1190;
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.22)';
+    ctx.shadowBlur = 45;
+    ctx.shadowOffsetY = 20;
+    drawRoundRect(cardX, cardY, cardW, cardH, 48);
+    ctx.fillStyle = shareTheme === 'dark' ? '#111827' : '#ffffff';
+    ctx.fill();
+    ctx.restore();
+
+    if (shareTheme === 'dark') {
+      ctx.strokeStyle = 'rgba(99, 102, 241, 0.35)';
+      ctx.lineWidth = 3;
+      drawRoundRect(cardX, cardY, cardW, cardH, 48);
+      ctx.stroke();
+    }
+
+    const textPrimary = shareTheme === 'dark' ? '#f8fafc' : '#0f172a';
+    const textSecondary = shareTheme === 'dark' ? '#94a3b8' : '#64748b';
+
+    // 3. 상단 배지 & 타이틀
+    drawRoundRect(cardX + 60, cardY + 60, 320, 52, 26);
+    ctx.fillStyle = shareTheme === 'dark' ? 'rgba(99, 102, 241, 0.2)' : '#eef2ff';
+    ctx.fill();
+
+    ctx.fillStyle = shareTheme === 'dark' ? '#818cf8' : '#4f46e5';
+    ctx.font = 'bold 24px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('✨ GIFTY MONTHLY REPORT', cardX + 220, cardY + 94);
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = textSecondary;
+    ctx.font = 'bold 30px sans-serif';
+    const nickLabel = shareNickname.trim()
+      ? `${shareNickname.trim()}님의 월간 체험단 리포트`
+      : '블로거 월간 체험단 정산 리포트';
+    ctx.fillText(nickLabel, cardX + 60, cardY + 175);
+
+    ctx.fillStyle = textPrimary;
+    ctx.font = '900 60px sans-serif';
+    ctx.fillText(`${year}년 ${month + 1}월 정산 결산`, cardX + 60, cardY + 250);
+
+    // 4. 메인 하이라이트 박스 (순이득)
+    drawRoundRect(cardX + 60, cardY + 295, cardW - 120, 210, 32);
+    const heroGrad = ctx.createLinearGradient(cardX + 60, cardY + 295, cardX + cardW - 60, cardY + 505);
+    heroGrad.addColorStop(0, '#4f46e5');
+    heroGrad.addColorStop(1, '#7c3aed');
+    ctx.fillStyle = heroGrad;
+    ctx.fill();
+
+    ctx.fillStyle = '#e0e7ff';
+    ctx.font = 'bold 28px sans-serif';
+    ctx.fillText(hideAmounts ? '🎯 이번 달 체험단 완주 기록' : '💰 이번 달 총 순이득 (혜택 + 원고료 - 지출)', cardX + 100, cardY + 358);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 72px sans-serif';
+    const heroValueText = hideAmounts
+      ? `총 ${monthlyCount}건 완주 성공! 🔥`
+      : monthlyNetProfit >= 0
+      ? `+${monthlyNetProfit.toLocaleString()}원`
+      : `-${Math.abs(monthlyNetProfit).toLocaleString()}원`;
+    ctx.fillText(heroValueText, cardX + 100, cardY + 455);
+
+    // 5. 4대 핵심 지표 그리드 (2x2)
+    const boxes = [
+      {
+        label: '🎯 총 체험 건수',
+        value: `${monthlyCount}건`,
+        sub: !hideAmounts && monthlyCount > 0 ? `건당 평균 ${avgPerCase.toLocaleString()}원` : '꾸준한 리뷰 기록',
+        bg: shareTheme === 'dark' ? '#1e293b' : '#f8fafc',
+        color: shareTheme === 'dark' ? '#a5b4fc' : '#4338ca',
+      },
+      {
+        label: '🎁 제공 혜택 (식비/제품)',
+        value: formatMoney(monthlyBenefit, '+'),
+        sub: '방어한 생활비·식비',
+        bg: shareTheme === 'dark' ? '#1e293b' : '#f0fdf4',
+        color: shareTheme === 'dark' ? '#4ade80' : '#15803d',
+      },
+      {
+        label: '💸 현금 지원금 (원고료)',
+        value: formatMoney(monthlyCash, '+'),
+        sub: '현금 수익·페이백',
+        bg: shareTheme === 'dark' ? '#1e293b' : '#eff6ff',
+        color: shareTheme === 'dark' ? '#60a5fa' : '#1d4ed8',
+      },
+      {
+        label: '💳 내돈내산 추가 지출',
+        value: formatMoney(monthlyExpense, '-'),
+        sub: '초과 결제 금액',
+        bg: shareTheme === 'dark' ? '#1e293b' : '#fef2f2',
+        color: shareTheme === 'dark' ? '#f87171' : '#b91c1c',
+      },
+    ];
+
+    const boxW = (cardW - 150) / 2;
+    const boxH = 185;
+    boxes.forEach((b, idx) => {
+      const col = idx % 2;
+      const row = Math.floor(idx / 2);
+      const bx = cardX + 60 + col * (boxW + 30);
+      const by = cardY + 540 + row * (boxH + 25);
+
+      drawRoundRect(bx, by, boxW, boxH, 28);
+      ctx.fillStyle = b.bg;
+      ctx.fill();
+
+      ctx.fillStyle = textSecondary;
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillText(b.label, bx + 32, by + 52);
+
+      ctx.fillStyle = b.color;
+      ctx.font = '900 44px sans-serif';
+      ctx.fillText(b.value, bx + 32, by + 115);
+
+      ctx.fillStyle = textSecondary;
+      ctx.font = '600 20px sans-serif';
+      ctx.fillText(b.sub, bx + 32, by + 155);
+    });
+
+    // 6. 플랫폼별 진행 통계 바
+    const platBoxY = cardY + 965;
+    drawRoundRect(cardX + 60, platBoxY, cardW - 120, 125, 24);
+    ctx.fillStyle = shareTheme === 'dark' ? '#1e293b' : '#f8fafc';
+    ctx.fill();
+
+    ctx.fillStyle = textPrimary;
+    ctx.font = 'bold 24px sans-serif';
+    ctx.fillText('🏷️ 이번 달 주요 플랫폼', cardX + 90, platBoxY + 46);
+
+    const topPlats =
+      sortedPlatformStats.length > 0
+        ? sortedPlatformStats
+            .slice(0, 4)
+            .map(([name, cnt]) => `${name} ${cnt}건 (${Math.round((cnt / Math.max(1, monthlyCount)) * 100)}%)`)
+            .join('   |   ')
+        : '등록된 플랫폼 내역이 없습니다';
+
+    ctx.fillStyle = shareTheme === 'dark' ? '#cbd5e1' : '#475569';
+    ctx.font = 'bold 26px sans-serif';
+    ctx.fillText(topPlats, cardX + 90, platBoxY + 92);
+
+    // 7. 하단 Gifty 브랜딩 워터마크
+    ctx.fillStyle = textSecondary;
+    ctx.font = 'bold 24px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🪄 블로거 필수 움짤 변환기 & 체험단 다이어리  •  gifty.run', 540, cardY + cardH - 35);
+
+    setShareCardUrl(canvas.toDataURL('image/png'));
+  }, [
+    isShareModalOpen,
+    shareNickname,
+    shareTheme,
+    hideAmounts,
+    year,
+    month,
+    monthlyCount,
+    monthlyNetProfit,
+    avgPerCase,
+    monthlyBenefit,
+    monthlyCash,
+    monthlyExpense,
+    sortedPlatformStats,
+    formatMoney,
+  ]);
+
+  // 이미지 다운로드 핸들러
+  const handleDownloadShareCard = () => {
+    if (!shareCardUrl) return;
+    const a = document.createElement('a');
+    a.href = shareCardUrl;
+    a.download = `gifty-report-${year}-${String(month + 1).padStart(2, '0')}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  // 모바일/브라우저 네이티브 SNS 공유 (이미지 + 텍스트)
+  const handleNativeShare = async () => {
+    const summaryText = getShareTextSummary();
+    try {
+      if (shareCanvasRef.current && navigator.share) {
+        const blob = await new Promise<Blob | null>((resolve) =>
+          shareCanvasRef.current?.toBlob((b) => resolve(b), 'image/png')
+        );
+        if (blob) {
+          const file = new File([blob], `gifty-report-${year}-${month + 1}.png`, { type: 'image/png' });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              title: `${year}년 ${month + 1}월 체험단 정산 결산`,
+              text: summaryText,
+              files: [file],
+            });
+            return;
+          }
+        }
+        await navigator.share({
+          title: `${year}년 ${month + 1}월 체험단 정산 결산`,
+          text: summaryText,
+          url: 'https://gifty.run/experience-diary',
+        });
+        return;
+      }
+    } catch (err) {
+      console.warn('Native share cancelled or failed:', err);
+      return;
+    }
+
+    // PC 등 Web Share 미지원 시 이미지 다운로드 + 텍스트 복사 동시 수행
+    handleDownloadShareCard();
+    await navigator.clipboard.writeText(summaryText).catch(() => {});
+    alert('정산 리포트 이미지가 다운로드되었고, SNS 공유 문구가 복사되었습니다!\n인스타그램·스레드·블로그·단톡방에 바로 붙여넣어 보세요 ✨');
+  };
+
+  // 카톡 / 스레드 / 인스타용 텍스트 복사
+  const handleCopyShareText = () => {
+    const text = getShareTextSummary();
+    navigator.clipboard.writeText(text).then(() => {
+      alert('📋 SNS용 정산 요약 문구가 복사되었습니다!\n카카오톡, 스레드(Threads), 인스타그램 등에 바로 붙여넣기(Ctrl+V) 해보세요.');
+    });
+  };
+
+  // 네이버 블로그 에디터용 HTML 디자인 표 복사
+  const handleCopyNaverBlogHtml = () => {
+    const ownerPrefix = shareNickname.trim() ? `${shareNickname.trim()}님의 ` : '';
+    const topPlats =
+      sortedPlatformStats.length > 0
+        ? sortedPlatformStats.map(([name, cnt]) => `${name} ${cnt}건`).join(', ')
+        : '-';
+    const netText = hideAmounts
+      ? `총 ${monthlyCount}건 완주 성공!`
+      : `${monthlyNetProfit >= 0 ? '+' : '-'}${Math.abs(monthlyNetProfit).toLocaleString()}원`;
+
+    const htmlString = `
+<div style="max-width:560px;margin:24px auto;padding:24px;border:2px solid #e0e7ff;border-radius:20px;background-color:#f8fafc;font-family:sans-serif;">
+  <p style="margin:0 0 6px 0;font-size:12px;font-weight:bold;color:#4f46e5;">✨ GIFTY MONTHLY REPORT</p>
+  <h3 style="margin:0 0 16px 0;font-size:20px;font-weight:800;color:#0f172a;">📊 ${ownerPrefix}${year}년 ${month + 1}월 체험단 정산 결산</h3>
+  <table style="width:100%;border-collapse:collapse;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
+    <tbody>
+      <tr>
+        <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;color:#64748b;font-size:14px;font-weight:bold;">🎯 총 완주 건수</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;color:#1e293b;font-size:15px;font-weight:800;text-align:right;">${monthlyCount}건</td>
+      </tr>
+      <tr>
+        <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;color:#64748b;font-size:14px;font-weight:bold;">🎁 제공 혜택 (식비/협찬)</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;color:#15803d;font-size:15px;font-weight:800;text-align:right;">${formatMoney(monthlyBenefit, '+')}</td>
+      </tr>
+      <tr>
+        <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;color:#64748b;font-size:14px;font-weight:bold;">💸 지원금 (원고료/페이백)</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;color:#1d4ed8;font-size:15px;font-weight:800;text-align:right;">${formatMoney(monthlyCash, '+')}</td>
+      </tr>
+      <tr>
+        <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;color:#64748b;font-size:14px;font-weight:bold;">🏷️ 진행 플랫폼</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;color:#334155;font-size:14px;font-weight:bold;text-align:right;">${topPlats}</td>
+      </tr>
+      <tr style="background-color:#eef2ff;">
+        <td style="padding:14px 16px;color:#312e81;font-size:15px;font-weight:800;">💰 이번 달 순이득</td>
+        <td style="padding:14px 16px;color:#4f46e5;font-size:18px;font-weight:900;text-align:right;">${netText}</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="margin:14px 0 0 0;text-align:center;font-size:12px;color:#64748b;">
+    이 정산표는 블로거 필수 도구 <a href="https://gifty.run/experience-diary" target="_blank" style="color:#4f46e5;font-weight:bold;text-decoration:underline;">Gifty 체험단 다이어리</a>에서 자동 계산되었습니다.
+  </p>
+</div>`;
+
+    try {
+      const htmlBlob = new Blob([htmlString], { type: 'text/html' });
+      const textBlob = new Blob([getShareTextSummary()], { type: 'text/plain' });
+      const item = new ClipboardItem({ 'text/html': htmlBlob, 'text/plain': textBlob });
+      navigator.clipboard.write([item]).then(() => {
+        alert('💚 네이버 블로그용 정산 요약표(HTML)가 복사되었습니다!\n블로그 글쓰기 에디터에 그대로 붙여넣기(Ctrl+V) 하시면 표가 예쁘게 들어갑니다.');
+      });
+    } catch {
+      handleCopyShareText();
+    }
+  };
+
+  // Gifty 커뮤니티에 1초 자랑하기 (자동 초안 전달)
+  const handleShareToCommunity = () => {
+    const topPlats =
+      sortedPlatformStats.length > 0
+        ? sortedPlatformStats.map(([name, cnt]) => `- ${name}: ${cnt}건`).join('\n')
+        : '- 플랫폼 미지정';
+
+    const draft = {
+      category: 'settlement',
+      author: shareNickname.trim() || '',
+      title: `🎉 ${year}년 ${month + 1}월 체험단 ${monthlyCount}건 완주! ${
+        hideAmounts ? '월간 결산 후기' : `순이득 +${monthlyNetProfit.toLocaleString()}원 정산 후기`
+      }`,
+      content: `안녕하세요! Gifty 체험단 가계부로 정리한 ${year}년 ${month + 1}월 정산 결산 공유합니다 :)\n\n📊 [${month + 1}월 정산 요약]\n- 총 완주 건수: ${monthlyCount}건\n- 제공받은 혜택(식사/제품): ${formatMoney(monthlyBenefit, '+')}\n- 현금 원고료/지원금: ${formatMoney(monthlyCash, '+')}\n- 내돈내산 추가 지출: ${formatMoney(monthlyExpense, '-')}\n- ✨ 이번 달 순이득: ${
+        hideAmounts ? '비공개' : `+${monthlyNetProfit.toLocaleString()}원`
+      }\n\n🏷️ [플랫폼별 진행 내역]\n${topPlats}\n\n다들 이번 달 체험단 정산 어떠셨나요? 모두 파이팅하세요! 🔥`,
+    };
+
+    sessionStorage.setItem('gifty_community_draft', JSON.stringify(draft));
+    router.push('/community');
+  };
+
   return (
     <main className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-indigo-200 pb-20">
       <nav className="w-full bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-200">
@@ -519,14 +936,23 @@ export default function ExperienceDiary() {
           {/* 2. Ledger Tab */}
           {activeTab === 'ledger' && (
             <div className="animate-in fade-in duration-300">
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex flex-wrap justify-between items-center gap-2 mb-6">
                 <h2 className="text-xl font-bold text-slate-800">💰 쏠쏠한 체험단 가계부</h2>
-                <button 
-                  onClick={openAddModal}
-                  className="bg-indigo-600 text-white text-sm font-bold px-4 py-2 rounded-xl hover:bg-indigo-700 transition"
-                >
-                  + 내역 추가
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsShareModalOpen(true)}
+                    className="flex items-center gap-1.5 bg-gradient-to-r from-fuchsia-600 to-indigo-600 text-white text-xs sm:text-sm font-extrabold px-3.5 py-2 rounded-xl hover:opacity-95 transition shadow-sm active:scale-95"
+                  >
+                    <Share2 size={15} />
+                    <span>SNS 정산 공유 ✨</span>
+                  </button>
+                  <button 
+                    onClick={openAddModal}
+                    className="bg-indigo-600 text-white text-xs sm:text-sm font-bold px-3.5 py-2 rounded-xl hover:bg-indigo-700 transition"
+                  >
+                    + 내역 추가
+                  </button>
+                </div>
               </div>
               
               {/* 월 선택 필터 */}
@@ -584,22 +1010,30 @@ export default function ExperienceDiary() {
                 </div>
               </div>
 
-              {/* 커뮤니티 자랑하기 배너 */}
+              {/* SNS 리포트 카드 & 커뮤니티 자랑하기 배너 */}
               {monthlyCount > 0 && (
-                <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
+                <div className="mb-6 p-4 md:p-5 rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-fuchsia-600 text-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md">
                   <div className="flex items-center gap-3 text-center sm:text-left">
                     <span className="text-2xl">🎉</span>
                     <div>
-                      <p className="font-extrabold text-sm">이번 달 {monthlyCount}건 완주! 정산 내역을 자랑해보세요</p>
-                      <p className="text-xs text-indigo-100 opacity-90">블로거 커뮤니티에서 응원과 꿀팁을 함께 나눌 수 있어요.</p>
+                      <p className="font-extrabold text-sm md:text-base">이번 달 {monthlyCount}건 완주! 정산 리포트 카드로 SNS에 공유해보세요</p>
+                      <p className="text-xs text-indigo-100 opacity-90">인스타 스토리·스레드·네이버 블로그용 정산 카드 이미지와 요약 표를 1초 만에 만들어 드려요.</p>
                     </div>
                   </div>
-                  <Link
-                    href="/community"
-                    className="px-4 py-2 bg-white text-indigo-700 font-black rounded-xl text-xs hover:bg-indigo-50 transition-colors shadow-sm whitespace-nowrap active:scale-95"
-                  >
-                    커뮤니티에 자랑하기 📢
-                  </Link>
+                  <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-center">
+                    <button
+                      onClick={() => setIsShareModalOpen(true)}
+                      className="flex-1 sm:flex-initial px-4 py-2.5 bg-white text-indigo-700 font-black rounded-xl text-xs hover:bg-indigo-50 transition-colors shadow-sm whitespace-nowrap active:scale-95 flex items-center justify-center gap-1.5"
+                    >
+                      <Share2 size={14} /> SNS 정산 카드 만들기
+                    </button>
+                    <button
+                      onClick={handleShareToCommunity}
+                      className="flex-1 sm:flex-initial px-3.5 py-2.5 bg-indigo-950/40 text-white border border-white/25 font-bold rounded-xl text-xs hover:bg-indigo-950/60 transition-colors whitespace-nowrap active:scale-95"
+                    >
+                      커뮤니티 자랑 📢
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -977,6 +1411,178 @@ export default function ExperienceDiary() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 월간 정산 SNS 공유 모달 */}
+      {isShareModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl w-full max-w-2xl p-6 md:p-8 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-5">
+              <div>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[11px] font-extrabold mb-1">
+                  <Sparkles size={12} /> SNS · 블로그 정산 리포트
+                </span>
+                <h3 className="text-xl md:text-2xl font-extrabold text-slate-900">
+                  {year}년 {month + 1}월 정산 공유하기
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsShareModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+              {/* 왼쪽: 실시간 리포트 카드 이미지 미리보기 */}
+              <div className="flex flex-col items-center bg-slate-100 p-4 rounded-2xl border border-slate-200/80">
+                {shareCardUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={shareCardUrl}
+                    alt="월간 정산 리포트 카드"
+                    className="w-full max-w-[280px] rounded-xl shadow-md border border-slate-200/60"
+                  />
+                ) : (
+                  <div className="w-full max-w-[280px] aspect-[4/5] bg-slate-200 animate-pulse rounded-xl flex items-center justify-center text-xs text-slate-500 font-bold">
+                    카드 생성 중...
+                  </div>
+                )}
+                <p className="text-[11px] text-slate-500 font-medium mt-2.5 text-center">
+                  💡 인스타 스토리·피드·블로그 썸네일에 최적화된 고화질(1080×1350) 이미지입니다.
+                </p>
+              </div>
+
+              {/* 오른쪽: 커스텀 옵션 & 공유/복사 버튼 */}
+              <div className="flex flex-col gap-4">
+                {/* 1. 카드 꾸미기 옵션 */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/70 space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      블로그명 / 닉네임 넣기 <span className="text-slate-400 font-normal">(선택)</span>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={16}
+                      placeholder="예: 맛동산블로거"
+                      value={shareNickname}
+                      onChange={(e) => setShareNickname(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">카드 배경 테마</label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setShareTheme('indigo')}
+                        className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
+                          shareTheme === 'indigo'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        💎 퍼플
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShareTheme('receipt')}
+                        className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
+                          shareTheme === 'receipt'
+                            ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        🧾 화이트
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShareTheme('dark')}
+                        className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
+                          shareTheme === 'dark'
+                            ? 'bg-slate-950 text-indigo-300 border-slate-900 shadow-sm'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        🌙 다크
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 프라이버시(금액 가리기) 토글 */}
+                  <button
+                    type="button"
+                    onClick={() => setHideAmounts(!hideAmounts)}
+                    className={`w-full py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-between transition-colors ${
+                      hideAmounts
+                        ? 'bg-amber-50 border-amber-300 text-amber-800'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      {hideAmounts ? <EyeOff size={14} /> : <Eye size={14} />}
+                      상세 금액 가리기 (건수만 공개)
+                    </span>
+                    <span className="text-[11px] font-extrabold">
+                      {hideAmounts ? '켜짐 🔒' : '꺼짐'}
+                    </span>
+                  </button>
+                </div>
+
+                {/* 2. 공유 및 복사 액션 버튼들 */}
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={handleNativeShare}
+                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-fuchsia-600 hover:from-indigo-700 hover:to-fuchsia-700 text-white font-extrabold text-sm shadow-md flex items-center justify-center gap-2 active:scale-95 transition-all"
+                  >
+                    <Share2 size={16} />
+                    SNS로 바로 보내기 (인스타·카톡·스레드)
+                  </button>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={handleDownloadShareCard}
+                      className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                    >
+                      <ImageIcon size={14} />
+                      카드 이미지 저장
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCopyShareText}
+                      className="py-2.5 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                    >
+                      <Copy size={14} />
+                      요약 텍스트 복사
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleCopyNaverBlogHtml}
+                    className="w-full py-2.5 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-extrabold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                  >
+                    <Copy size={14} />
+                    💚 네이버 블로그 포스팅용 요약표(HTML) 복사
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleShareToCommunity}
+                    className="w-full py-2.5 px-4 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 font-extrabold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                  >
+                    <MessageSquareHeart size={14} />
+                    💬 Gifty 블로거 커뮤니티에 1초 자랑하기
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

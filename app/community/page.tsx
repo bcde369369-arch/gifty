@@ -52,6 +52,21 @@ export default function CommunityPage() {
   useEffect(() => {
     const loaded = getPosts();
     setPosts(loaded);
+
+    const draftStr = sessionStorage.getItem('gifty_community_draft');
+    if (draftStr) {
+      sessionStorage.removeItem('gifty_community_draft');
+      try {
+        const draft = JSON.parse(draftStr);
+        if (draft.category) setNewCategory(draft.category);
+        if (draft.title) setNewTitle(draft.title);
+        if (draft.author) setNewAuthor(draft.author);
+        if (draft.content) setNewContent(draft.content);
+        setIsWriteModalOpen(true);
+      } catch (e) {
+        console.warn('Failed to parse community draft', e);
+      }
+    }
   }, []);
 
   // 글 작성 핸들러
