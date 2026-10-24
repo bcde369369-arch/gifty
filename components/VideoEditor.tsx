@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { convertToGif } from '@/lib/ffmpeg';
-import { Loader2, Download, RotateCcw, Sparkles, Copy } from 'lucide-react';
+import { Loader2, Download, RotateCcw, Sparkles, Copy, Play, Pause, Repeat, Film } from 'lucide-react';
 import { useSiteSettings } from '@/lib/settings';
 import CoupangBanner from '@/components/CoupangBanner';
 
@@ -14,11 +14,20 @@ interface VideoEditorProps {
 export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
   const { settings, isLoaded } = useSiteSettings();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
   const [videoUrl, setVideoUrl] = useState<string>('');
   const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
   const [startTime, setStartTime] = useState(0);
   const [endTime, setEndTime] = useState(15);
   
+  // Filmstrip & preview states
+  const [thumbnails, setThumbnails] = useState<string[]>([]);
+  const [isGeneratingThumbs, setIsGeneratingThumbs] = useState(false);
+  const [isLooping, setIsLooping] = useState(true);
+  const [isPlayingPreview, setIsPlayingPreview] = useState(false);
+  const [activeHandle, setActiveHandle] = useState<'start' | 'end' | null>(null);
+
   const [quality, setQuality] = useState<'high' | 'normal' | 'low'>('normal');
   const [textOverlay, setTextOverlay] = useState<string>('');
   const [playbackSpeed, setPlaybackSpeed] = useState<string>('1.0');
@@ -37,11 +46,217 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
     return () => URL.revokeObjectURL(url);
   }, [videoFile]);
 
+  // Extract 8 filmstrip thumbnail images using an offscreen video + canvas
+  useEffect(() => {
+    if (!videoUrl) return;
+    let isCancelled = false;
+    setThumbnails([]);
+    setIsGeneratingThumbs(true);
+
+    const tempVideo = document.createElement('video');
+    tempVideo.src = videoUrl;
+    tempVideo.muted = true;
+    tempVideo.playsInline = true;
+    tempVideo.preload = 'auto';
+
+    const extractFrames = async () => {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          tempVideo.onloadeddata = () => resolve();
+          tempVideo.onerror = () => reject(new Error('Failed to load video for thumbnails'));
+        });
+
+        const totalDuration = tempVideo.duration;
+        if (!totalDuration || !isFinite(totalDuration)) {
+          setIsGeneratingThumbs(false);
+          return;
+        }
+
+        setDuration((prev) => (prev > 0 ? prev : totalDuration));
+        setEndTime((prev) => (prev > 0 && prev <= totalDuration ? prev : Math.min(totalDuration, 15)));
+
+        const count = 8;
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 160;
+        canvas.height = 90;
+
+        const frames: string[] = [];
+
+        for (let i = 0; i < count; i++) {
+          if (isCancelled) break;
+          const targetTime = Math.min((totalDuration / count) * (i + 0.5), Math.max(0, totalDuration - 0.1));
+          tempVideo.currentTime = targetTime;
+
+          await new Promise<void>((resolve) => {
+            const onSeeked = () => {
+              tempVideo.removeEventListener('seeked', onSeeked);
+              resolve();
+            };
+            tempVideo.addEventListener('seeked', onSeeked);
+          });
+
+          if (isCancelled) break;
+          if (ctx) {
+            ctx.drawImage(tempVideo, 0, 0, canvas.width, canvas.height);
+            frames.push(canvas.toDataURL('image/jpeg', 0.6));
+            setThumbnails([...frames]);
+          }
+        }
+      } catch (e) {
+        console.warn('Thumbnail extraction skipped:', e);
+      } finally {
+        if (!isCancelled) {
+          setIsGeneratingThumbs(false);
+        }
+        tempVideo.removeAttribute('src');
+        tempVideo.load();
+      }
+    };
+
+    extractFrames();
+
+    return () => {
+      isCancelled = true;
+      tempVideo.removeAttribute('src');
+      tempVideo.load();
+    };
+  }, [videoUrl]);
+
+  const seekVideoTo = useCallback((time: number) => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = time;
+      setCurrentTime(time);
+    }
+  }, []);
+
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
-      setDuration(videoRef.current.duration);
-      setEndTime(Math.min(videoRef.current.duration, 15));
+      const vidDuration = videoRef.current.duration;
+      if (vidDuration && isFinite(vidDuration) && vidDuration > 0) {
+        setDuration(vidDuration);
+        setEndTime((prev) => (prev > 0 && prev <= vidDuration ? prev : Math.min(vidDuration, 15)));
+      }
     }
+  };
+
+  const getTimeFromPointerEvent = (e: React.PointerEvent<HTMLDivElement>): number => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const effectiveDuration = duration > 0 ? duration : 15;
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    return Number((ratio * effectiveDuration).toFixed(1));
+  };
+
+  const handleTimelinePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isConverting) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const clickedTime = getTimeFromPointerEvent(e);
+    const distToStart = Math.abs(clickedTime - startTime);
+    const distToEnd = Math.abs(clickedTime - endTime);
+
+    if (distToStart <= distToEnd) {
+      setActiveHandle('start');
+      handleStartTimeChange(clickedTime);
+    } else {
+      setActiveHandle('end');
+      handleEndTimeChange(clickedTime);
+    }
+  };
+
+  const handleTimelinePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!activeHandle || isConverting) return;
+    const moveTime = getTimeFromPointerEvent(e);
+    if (activeHandle === 'start') {
+      handleStartTimeChange(moveTime);
+    } else {
+      handleEndTimeChange(moveTime);
+    }
+  };
+
+  const handleTimelinePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (activeHandle) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        // ignore if not captured
+      }
+      setActiveHandle(null);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    const vid = videoRef.current;
+    if (!vid) return;
+    const now = vid.currentTime;
+    setCurrentTime(now);
+
+    // Loop within [startTime, endTime] when loop preview is enabled
+    if (isLooping && !vid.paused && activeHandle === null) {
+      if (now >= endTime || now < startTime - 0.15) {
+        vid.currentTime = startTime;
+        vid.play().catch(() => {});
+      }
+    }
+  };
+
+  const handleStartTimeChange = (newStart: number) => {
+    const clampedStart = Math.max(0, Math.min(newStart, endTime - 0.5));
+    setStartTime(clampedStart);
+    // Keep max interval within 15 seconds by pulling endTime if needed
+    if (endTime - clampedStart > 15) {
+      setEndTime(clampedStart + 15);
+    }
+    if (videoRef.current && !videoRef.current.paused) {
+      videoRef.current.pause();
+      setIsPlayingPreview(false);
+    }
+    seekVideoTo(clampedStart);
+  };
+
+  const handleEndTimeChange = (newEnd: number) => {
+    const clampedEnd = Math.min(duration, Math.max(newEnd, startTime + 0.5));
+    if (clampedEnd - startTime > 15) {
+      const adjustedStart = Math.max(0, clampedEnd - 15);
+      setStartTime(adjustedStart);
+    }
+    setEndTime(clampedEnd);
+    if (videoRef.current && !videoRef.current.paused) {
+      videoRef.current.pause();
+      setIsPlayingPreview(false);
+    }
+    seekVideoTo(clampedEnd);
+  };
+
+  const toggleLoopPreview = () => {
+    const vid = videoRef.current;
+    if (!vid) return;
+
+    if (vid.paused) {
+      setIsLooping(true);
+      if (vid.currentTime < startTime || vid.currentTime >= endTime) {
+        vid.currentTime = startTime;
+      }
+      vid.play().then(() => {
+        setIsPlayingPreview(true);
+      }).catch(() => {});
+    } else {
+      vid.pause();
+      setIsPlayingPreview(false);
+    }
+  };
+
+  // Sync playback speed & filter preview on the live video element
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = parseFloat(playbackSpeed) || 1.0;
+    }
+  }, [playbackSpeed]);
+
+  const getPreviewFilterStyle = () => {
+    if (videoFilter === 'grayscale') return 'grayscale(100%)';
+    if (videoFilter === 'sepia') return 'sepia(100%)';
+    if (videoFilter === 'bright') return 'brightness(1.06) contrast(1.1) saturate(1.2)';
+    return 'none';
   };
 
   const handleConvert = async () => {
@@ -105,52 +320,320 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
         </button>
       </div>
 
-      <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden mb-6 shadow-inner ring-1 ring-slate-900/10">
+      <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden mb-4 shadow-inner ring-1 ring-slate-900/10 group">
         <video
           ref={videoRef}
           src={videoUrl}
-          className="w-full h-full object-contain"
+          style={{ filter: getPreviewFilterStyle() }}
+          className="w-full h-full object-contain transition-[filter] duration-200"
           controls
+          playsInline
           onLoadedMetadata={handleLoadedMetadata}
+          onLoadedData={handleLoadedMetadata}
+          onDurationChange={handleLoadedMetadata}
+          onTimeUpdate={handleTimeUpdate}
+          onPlay={() => setIsPlayingPreview(true)}
+          onPause={() => setIsPlayingPreview(false)}
         />
+
+        {/* Live Subtitle Overlay Preview */}
+        {textOverlay.trim() && (
+          <div className="pointer-events-none absolute bottom-10 inset-x-4 text-center z-10">
+            <span
+              className="inline-block text-white font-extrabold text-lg md:text-xl px-2 py-0.5 tracking-wide"
+              style={{
+                textShadow:
+                  '-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 0px 2px 6px rgba(0,0,0,0.7)',
+              }}
+            >
+              {textOverlay}
+            </span>
+          </div>
+        )}
+
+        {/* Active Handle Dragging Indicator Badge */}
+        {activeHandle && (
+          <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-slate-900/90 backdrop-blur-md text-white text-xs font-extrabold px-3.5 py-1.5 rounded-full shadow-lg border border-white/15 flex items-center gap-2 animate-in fade-in duration-150">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                activeHandle === 'start' ? 'bg-indigo-400' : 'bg-fuchsia-400'
+              } animate-ping`}
+            />
+            <span>
+              {activeHandle === 'start'
+                ? `시작 장면 맞추는 중: ${startTime.toFixed(1)}초`
+                : `끝 장면 맞추는 중: ${endTime.toFixed(1)}초`}
+            </span>
+          </div>
+        )}
       </div>
 
       {!gifUrl && (
         <div className="space-y-6 flex-1 flex flex-col justify-between">
-          <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
-            <div className="flex justify-between text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              <span>시작: {startTime.toFixed(1)}초</span>
-              <span className="text-indigo-600">선택 구간: {(endTime - startTime).toFixed(1)}초</span>
-              <span>끝: {endTime.toFixed(1)}초</span>
+          {/* Visual Filmstrip Timeline & Range Selector */}
+          <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+            {/* Top Status Row */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                <Film size={14} className="text-indigo-600" />
+                <span>장면 보며 구간 자르기</span>
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-100/80 text-indigo-700 text-xs font-extrabold">
+                <span>선택 구간: {(endTime - startTime).toFixed(1)}초</span>
+                <span className="text-indigo-400 font-normal">
+                  (최대 15초 · 출력 약 {((endTime - startTime) / (parseFloat(playbackSpeed) || 1)).toFixed(1)}초)
+                </span>
+              </div>
             </div>
-            <div className="relative pt-2 pb-2">
-              <div className="absolute top-1/2 left-0 right-0 h-1.5 bg-slate-200 rounded-full -translate-y-1/2"></div>
-              <input
-                type="range"
-                min={0}
-                max={duration}
-                step={0.1}
-                value={startTime}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  if (val < endTime) setStartTime(val);
-                }}
-                className="absolute top-1/2 -translate-y-1/2 w-full appearance-none bg-transparent pointer-events-auto cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-indigo-600 [&::-webkit-slider-thumb]:ring-2 [&::-webkit-slider-thumb]:ring-white [&::-webkit-slider-thumb]:shadow-md z-20"
-              />
-              <input
-                type="range"
-                min={0}
-                max={duration}
-                step={0.1}
-                value={endTime}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  if (val > startTime && (val - startTime) <= 15) setEndTime(val);
-                }}
-                className="absolute top-1/2 -translate-y-1/2 w-full appearance-none bg-transparent pointer-events-auto cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-fuchsia-500 [&::-webkit-slider-thumb]:ring-2 [&::-webkit-slider-thumb]:ring-white [&::-webkit-slider-thumb]:shadow-md z-30"
-              />
+
+            {/* Filmstrip Container */}
+            <div
+              ref={timelineRef}
+              onPointerDown={handleTimelinePointerDown}
+              onPointerMove={handleTimelinePointerMove}
+              onPointerUp={handleTimelinePointerUp}
+              onPointerCancel={handleTimelinePointerUp}
+              style={{ touchAction: 'none' }}
+              className="relative h-16 w-full rounded-xl overflow-hidden bg-slate-900 select-none ring-1 ring-slate-900/15 shadow-inner cursor-ew-resize"
+            >
+              {/* Extracted Frame Thumbnails */}
+              <div className="pointer-events-none absolute inset-0 grid grid-cols-8 w-full h-full">
+                {Array.from({ length: 8 }).map((_, idx) => {
+                  const thumb = thumbnails[idx];
+                  return (
+                    <div
+                      key={idx}
+                      className="relative w-full h-full border-r border-white/10 last:border-r-0 overflow-hidden bg-slate-800"
+                    >
+                      {thumb ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={thumb}
+                          alt={`frame-${idx}`}
+                          className="w-full h-full object-cover pointer-events-none"
+                          draggable={false}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-slate-800 animate-pulse">
+                          <span className="text-[10px] text-slate-500 font-semibold">
+                            {isGeneratingThumbs ? '...' : ''}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Unselected Left Dim Overlay */}
+              {duration > 0 && (
+                <div
+                  className="pointer-events-none absolute inset-y-0 left-0 bg-slate-950/70 backdrop-blur-[1px] z-10"
+                  style={{ width: `${Math.min(100, Math.max(0, (startTime / duration) * 100))}%` }}
+                />
+              )}
+
+              {/* Unselected Right Dim Overlay */}
+              {duration > 0 && (
+                <div
+                  className="pointer-events-none absolute inset-y-0 right-0 bg-slate-950/70 backdrop-blur-[1px] z-10"
+                  style={{ width: `${Math.min(100, Math.max(0, 100 - (endTime / duration) * 100))}%` }}
+                />
+              )}
+
+              {/* Active Selection Window Frame & Visual Handle Bars */}
+              {duration > 0 && (
+                <div
+                  className="pointer-events-none absolute inset-y-0 z-20 border-y-[3px] border-indigo-500 shadow-[0_0_0_1px_rgba(255,255,255,0.3)]"
+                  style={{
+                    left: `${Math.min(100, Math.max(0, (startTime / duration) * 100))}%`,
+                    width: `${Math.min(100, Math.max(0, ((endTime - startTime) / duration) * 100))}%`,
+                  }}
+                >
+                  {/* Left Visual Handle Bar */}
+                  <div className="absolute left-0 inset-y-0 -translate-x-1/2 w-4 bg-indigo-600 rounded-l-md flex items-center justify-center shadow-md ring-1 ring-white/80">
+                    <div className="w-0.5 h-6 bg-white/90 rounded-full" />
+                  </div>
+                  {/* Right Visual Handle Bar */}
+                  <div className="absolute right-0 inset-y-0 translate-x-1/2 w-4 bg-fuchsia-500 rounded-r-md flex items-center justify-center shadow-md ring-1 ring-white/80">
+                    <div className="w-0.5 h-6 bg-white/90 rounded-full" />
+                  </div>
+                </div>
+              )}
+
+              {/* Current Playhead Position Line */}
+              {duration > 0 && (
+                <div
+                  className="pointer-events-none absolute inset-y-0 z-20 w-0.5 bg-amber-300 shadow-[0_0_6px_rgba(0,0,0,0.9)]"
+                  style={{
+                    left: `${Math.min(100, Math.max(0, (currentTime / duration) * 100))}%`,
+                  }}
+                >
+                  <div className="w-2 h-2 rounded-full bg-amber-300 -translate-x-[3px] -translate-y-0.5 shadow" />
+                </div>
+              )}
             </div>
-            <p className="text-xs text-center text-slate-400 mt-1">* 15초 이상은 선택되지 않습니다.</p>
+
+            {/* Fine-tuning Controls + Dedicated Sliders for Start & End */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              {/* Start Time Fine Control */}
+              <div className="bg-white p-3 rounded-xl border border-slate-200/80 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-indigo-600 flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" />
+                    시작점: {startTime.toFixed(1)}초
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleStartTimeChange(currentTime)}
+                    className="text-[11px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-md transition-colors"
+                    title="현재 재생 중인 화면을 시작점으로 지정"
+                  >
+                    현재 화면으로
+                  </button>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={duration || 15}
+                  step={0.1}
+                  value={startTime}
+                  onMouseDown={() => setActiveHandle('start')}
+                  onTouchStart={() => setActiveHandle('start')}
+                  onMouseUp={() => setActiveHandle(null)}
+                  onTouchEnd={() => setActiveHandle(null)}
+                  onChange={(e) => handleStartTimeChange(parseFloat(e.target.value))}
+                  className="w-full h-2 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                />
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleStartTimeChange(startTime - 0.5)}
+                    className="flex-1 py-1 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
+                  >
+                    -0.5초
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleStartTimeChange(startTime - 0.1)}
+                    className="flex-1 py-1 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
+                  >
+                    -0.1초
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleStartTimeChange(startTime + 0.1)}
+                    className="flex-1 py-1 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
+                  >
+                    +0.1초
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleStartTimeChange(startTime + 0.5)}
+                    className="flex-1 py-1 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
+                  >
+                    +0.5초
+                  </button>
+                </div>
+              </div>
+
+              {/* End Time Fine Control */}
+              <div className="bg-white p-3 rounded-xl border border-slate-200/80 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-fuchsia-600 flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-fuchsia-500" />
+                    끝점: {endTime.toFixed(1)}초
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleEndTimeChange(currentTime)}
+                    className="text-[11px] font-bold text-fuchsia-600 bg-fuchsia-50 hover:bg-fuchsia-100 px-2 py-0.5 rounded-md transition-colors"
+                    title="현재 재생 중인 화면을 끝점으로 지정"
+                  >
+                    현재 화면으로
+                  </button>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={duration || 15}
+                  step={0.1}
+                  value={endTime}
+                  onMouseDown={() => setActiveHandle('end')}
+                  onTouchStart={() => setActiveHandle('end')}
+                  onMouseUp={() => setActiveHandle(null)}
+                  onTouchEnd={() => setActiveHandle(null)}
+                  onChange={(e) => handleEndTimeChange(parseFloat(e.target.value))}
+                  className="w-full h-2 bg-fuchsia-100 rounded-lg appearance-none cursor-pointer accent-fuchsia-600"
+                />
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleEndTimeChange(endTime - 0.5)}
+                    className="flex-1 py-1 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
+                  >
+                    -0.5초
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleEndTimeChange(endTime - 0.1)}
+                    className="flex-1 py-1 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
+                  >
+                    -0.1초
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleEndTimeChange(endTime + 0.1)}
+                    className="flex-1 py-1 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
+                  >
+                    +0.1초
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleEndTimeChange(endTime + 0.5)}
+                    className="flex-1 py-1 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
+                  >
+                    +0.5초
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Loop Preview Action Bar */}
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={toggleLoopPreview}
+                className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all shadow-sm ${
+                  isPlayingPreview
+                    ? 'bg-slate-800 text-white hover:bg-slate-900'
+                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                }`}
+              >
+                {isPlayingPreview ? (
+                  <>
+                    <Pause size={14} /> 구간 미리보기 일시정지
+                  </>
+                ) : (
+                  <>
+                    <Play size={14} /> 선택 구간만 반복 미리보기 ({startTime.toFixed(1)}s ~ {endTime.toFixed(1)}s)
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsLooping(!isLooping)}
+                className={`py-2.5 px-3 rounded-xl text-xs font-bold border flex items-center gap-1 transition-colors ${
+                  isLooping
+                    ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-100'
+                }`}
+                title="선택 구간 무한 반복 재생 켜기/끄기"
+              >
+                <Repeat size={14} />
+                <span>{isLooping ? '반복 ON' : '반복 OFF'}</span>
+              </button>
+            </div>
           </div>
 
           {/* New Feature: Speed Control */}
