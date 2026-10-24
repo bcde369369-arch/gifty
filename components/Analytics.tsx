@@ -1,7 +1,15 @@
+'use client';
+
+import { useEffect } from 'react';
 import Script from 'next/script';
+import { trackSiteVisit } from '@/lib/visitorStats';
 
 export default function Analytics() {
   const GA_TRACKING_ID = process.env.NEXT_PUBLIC_GA_ID || 'G-71MNQE4KRJ'; // 실제 측정 ID로 교체 완료
+
+  useEffect(() => {
+    trackSiteVisit();
+  }, []);
 
   return (
     <>

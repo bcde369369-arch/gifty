@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSiteSettings } from '@/lib/settings';
-import { Save, LogOut, LayoutDashboard, Link as LinkIcon, Type, Sparkles } from 'lucide-react';
+import { getAdminVisitorStats, VisitorStatsSummary } from '@/lib/visitorStats';
+import { Save, LogOut, LayoutDashboard, Link as LinkIcon, Type, Sparkles, Users, Eye, TrendingUp, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminDashboard() {
@@ -14,12 +15,25 @@ export default function AdminDashboard() {
   const [formData, setFormData] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Visitor stats state
+  const [visitorStats, setVisitorStats] = useState<VisitorStatsSummary | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+
+  const loadVisitorStats = useCallback(async () => {
+    setIsLoadingStats(true);
+    const data = await getAdminVisitorStats();
+    setVisitorStats(data);
+    setIsLoadingStats(false);
+  }, []);
+
   useEffect(() => {
     const isAuth = localStorage.getItem('gifty_admin_auth');
     if (!isAuth) {
       router.push('/admin/login');
+      return;
     }
-  }, [router]);
+    loadVisitorStats();
+  }, [router, loadVisitorStats]);
 
   useEffect(() => {
     if (isLoaded) setFormData(settings);
@@ -74,24 +88,177 @@ export default function AdminDashboard() {
 
         <div className="space-y-8">
           {/* Visitor Stats Section */}
-          <section className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 text-indigo-700 font-bold text-lg mb-2">
-                <LayoutDashboard size={20} /> 실시간 방문자 통계
+          <section className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div>
+                <div className="flex items-center gap-2 text-indigo-700 font-bold text-lg mb-1">
+                  <LayoutDashboard size={20} /> 실시간 방문자 통계 (일방문자 · 누적 방문자)
+                </div>
+                <p className="text-xs sm:text-sm text-slate-500">
+                  한국 시간(KST) 자정 기준으로 집계되는 일방문자(UV) 및 누적 방문자 현황입니다.
+                  {visitorStats?.updatedAt && (
+                    <span className="ml-2 text-xs text-slate-400">
+                      (업데이트: {visitorStats.updatedAt})
+                    </span>
+                  )}
+                </p>
               </div>
-              <p className="text-sm text-slate-500">오늘 방문한 사람 / 지금까지 총 방문한 사람 숫자입니다.</p>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={loadVisitorStats}
+                  disabled={isLoadingStats}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-3.5 rounded-xl transition-colors text-xs flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <RefreshCw size={14} className={isLoadingStats ? 'animate-spin' : ''} />
+                  새로고침
+                </button>
+                <a
+                  href="https://analytics.google.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-3.5 rounded-xl shadow-sm transition-colors text-xs flex items-center gap-1.5"
+                >
+                  구글 애널리틱스 &rarr;
+                </a>
+              </div>
             </div>
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col items-end gap-2">
-              <span className="text-xs text-slate-500">더 정확하고 상세한 통계는 구글에서 확인하세요!</span>
-              <a 
-                href="https://analytics.google.com/" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm transition-colors text-sm flex items-center gap-2"
-              >
-                구글 애널리틱스 바로가기 &rarr;
-              </a>
+
+            {/* 4대 핵심 방문자 지표 카드 */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+              {/* 1. 오늘 일방문자 */}
+              <div className="bg-indigo-50/80 border border-indigo-100 p-4 md:p-5 rounded-2xl flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-extrabold text-indigo-700">🟢 오늘 일방문자</span>
+                  <Users size={16} className="text-indigo-500" />
+                </div>
+                {isLoadingStats ? (
+                  <div className="h-8 w-20 bg-indigo-200/60 animate-pulse rounded-lg my-1" />
+                ) : (
+                  <div className="text-2xl md:text-3xl font-black text-indigo-950">
+                    {(visitorStats?.todayVisitors ?? 0).toLocaleString()}
+                    <span className="text-sm font-bold text-indigo-600 ml-1">명</span>
+                  </div>
+                )}
+                <p className="text-[11px] font-semibold text-indigo-600/80 mt-2">
+                  어제 방문자: {(visitorStats?.yesterdayVisitors ?? 0).toLocaleString()}명
+                </p>
+              </div>
+
+              {/* 2. 누적 총 방문자 */}
+              <div className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white p-4 md:p-5 rounded-2xl shadow-md flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-extrabold text-indigo-100">🔥 누적 총 방문자</span>
+                  <TrendingUp size={16} className="text-indigo-200" />
+                </div>
+                {isLoadingStats ? (
+                  <div className="h-8 w-24 bg-white/20 animate-pulse rounded-lg my-1" />
+                ) : (
+                  <div className="text-2xl md:text-3xl font-black text-white">
+                    {(visitorStats?.totalVisitors ?? 0).toLocaleString()}
+                    <span className="text-sm font-bold text-indigo-100 ml-1">명</span>
+                  </div>
+                )}
+                <p className="text-[11px] font-medium text-indigo-100/90 mt-2">
+                  순수 누적 방문자(UV) 합계
+                </p>
+              </div>
+
+              {/* 3. 오늘 페이지뷰 */}
+              <div className="bg-slate-50 border border-slate-200/80 p-4 md:p-5 rounded-2xl flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-extrabold text-slate-600">👀 오늘 페이지뷰</span>
+                  <Eye size={16} className="text-slate-400" />
+                </div>
+                {isLoadingStats ? (
+                  <div className="h-8 w-20 bg-slate-200 animate-pulse rounded-lg my-1" />
+                ) : (
+                  <div className="text-2xl md:text-3xl font-black text-slate-800">
+                    {(visitorStats?.todayPageviews ?? 0).toLocaleString()}
+                    <span className="text-sm font-bold text-slate-500 ml-1">회</span>
+                  </div>
+                )}
+                <p className="text-[11px] font-medium text-slate-400 mt-2">
+                  오늘 총 접속 세션 수
+                </p>
+              </div>
+
+              {/* 4. 누적 총 페이지뷰 */}
+              <div className="bg-slate-50 border border-slate-200/80 p-4 md:p-5 rounded-2xl flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-extrabold text-slate-600">📈 누적 페이지뷰</span>
+                  <Sparkles size={16} className="text-slate-400" />
+                </div>
+                {isLoadingStats ? (
+                  <div className="h-8 w-24 bg-slate-200 animate-pulse rounded-lg my-1" />
+                ) : (
+                  <div className="text-2xl md:text-3xl font-black text-slate-800">
+                    {(visitorStats?.totalPageviews ?? 0).toLocaleString()}
+                    <span className="text-sm font-bold text-slate-500 ml-1">회</span>
+                  </div>
+                )}
+                <p className="text-[11px] font-medium text-slate-400 mt-2">
+                  지금까지 총 열람 수(PV)
+                </p>
+              </div>
             </div>
+
+            {/* 최근 7일 일별 방문자 추이 차트 */}
+            {visitorStats && visitorStats.last7Days.length > 0 && (
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-xs font-extrabold text-slate-700">
+                    📊 최근 7일간 일별 방문자 추이
+                  </h4>
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    단위: 명 (일방문자 UV)
+                  </span>
+                </div>
+                <div className="grid grid-cols-7 gap-2 items-end h-32 pt-4">
+                  {(() => {
+                    const maxVal = Math.max(
+                      1,
+                      ...visitorStats.last7Days.map((item) => item.visitors)
+                    );
+                    return visitorStats.last7Days.map((day, idx) => {
+                      const heightPercent = Math.max(10, Math.round((day.visitors / maxVal) * 100));
+                      const isToday = idx === visitorStats.last7Days.length - 1;
+                      return (
+                        <div
+                          key={day.date}
+                          className="flex flex-col items-center justify-end h-full gap-1.5"
+                        >
+                          <span
+                            className={`text-[11px] font-extrabold ${
+                              isToday ? 'text-indigo-600' : 'text-slate-600'
+                            }`}
+                          >
+                            {day.visitors.toLocaleString()}
+                          </span>
+                          <div className="w-full max-w-[36px] bg-slate-200/70 rounded-t-lg h-20 flex items-end overflow-hidden">
+                            <div
+                              className={`w-full rounded-t-lg transition-all duration-500 ${
+                                isToday
+                                  ? 'bg-gradient-to-t from-indigo-600 to-fuchsia-500'
+                                  : 'bg-indigo-300'
+                              }`}
+                              style={{ height: `${heightPercent}%` }}
+                            />
+                          </div>
+                          <span
+                            className={`text-[10px] font-bold ${
+                              isToday ? 'text-indigo-700 font-extrabold' : 'text-slate-400'
+                            }`}
+                          >
+                            {day.label}
+                          </span>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Main Hero Section Settings */}
