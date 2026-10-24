@@ -4,7 +4,20 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSiteSettings } from '@/lib/settings';
 import { getAdminVisitorStats, VisitorStatsSummary } from '@/lib/visitorStats';
-import { Save, LogOut, LayoutDashboard, Link as LinkIcon, Type, Sparkles, Users, Eye, TrendingUp, RefreshCw } from 'lucide-react';
+import {
+  Save,
+  LogOut,
+  LayoutDashboard,
+  Link as LinkIcon,
+  Type,
+  Sparkles,
+  Users,
+  Eye,
+  TrendingUp,
+  RefreshCw,
+  MousePointerClick,
+  ExternalLink,
+} from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminDashboard() {
@@ -18,6 +31,7 @@ export default function AdminDashboard() {
   // Visitor stats state
   const [visitorStats, setVisitorStats] = useState<VisitorStatsSummary | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [pageRankMode, setPageRankMode] = useState<'today' | 'total'>('today');
 
   const loadVisitorStats = useCallback(async () => {
     setIsLoadingStats(true);
@@ -54,6 +68,21 @@ export default function AdminDashboard() {
   };
 
   if (!isLoaded) return <div className="p-8">로딩 중...</div>;
+
+  const sortedPageStats = visitorStats?.pageStats
+    ? [...visitorStats.pageStats].sort((a, b) => {
+        if (pageRankMode === 'today') {
+          if (b.todayViews !== a.todayViews) return b.todayViews - a.todayViews;
+          return b.totalViews - a.totalViews;
+        }
+        if (b.totalViews !== a.totalViews) return b.totalViews - a.totalViews;
+        return b.todayViews - a.todayViews;
+      })
+    : [];
+
+  const topPage = sortedPageStats[0];
+  const hasAnyPageViews =
+    sortedPageStats.some((p) => (pageRankMode === 'today' ? p.todayViews > 0 : p.totalViews > 0));
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
@@ -92,10 +121,10 @@ export default function AdminDashboard() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
               <div>
                 <div className="flex items-center gap-2 text-indigo-700 font-bold text-lg mb-1">
-                  <LayoutDashboard size={20} /> 실시간 방문자 통계 (일방문자 · 누적 방문자)
+                  <LayoutDashboard size={20} /> 실시간 방문자 및 인기 페이지 통계
                 </div>
                 <p className="text-xs sm:text-sm text-slate-500">
-                  한국 시간(KST) 자정 기준으로 집계되는 일방문자(UV) 및 누적 방문자 현황입니다.
+                  한국 시간(KST) 자정 기준으로 집계되는 일방문자(UV), 누적 방문자, 카테고리별 클릭 순위입니다.
                   {visitorStats?.updatedAt && (
                     <span className="ml-2 text-xs text-slate-400">
                       (업데이트: {visitorStats.updatedAt})
@@ -164,11 +193,19 @@ export default function AdminDashboard() {
                 </p>
               </div>
 
-              {/* 3. 오늘 페이지뷰 */}
-              <div className="bg-slate-50 border border-slate-200/80 p-4 md:p-5 rounded-2xl flex flex-col justify-between">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-extrabold text-slate-600">👀 오늘 페이지뷰</span>
-                  <Eye size={16} className="text-slate-400" />
+              {/* 3. 오늘 페이지뷰 (클릭 시 오늘 순위 탭 활성화) */}
+              <button
+                type="button"
+                onClick={() => setPageRankMode('today')}
+                className={`text-left p-4 md:p-5 rounded-2xl flex flex-col justify-between transition-all ${
+                  pageRankMode === 'today'
+                    ? 'bg-pink-50/80 border-2 border-pink-400 shadow-sm'
+                    : 'bg-slate-50 border border-slate-200/80 hover:border-pink-200'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2 w-full">
+                  <span className="text-xs font-extrabold text-slate-700">👀 오늘 페이지뷰</span>
+                  <Eye size={16} className={pageRankMode === 'today' ? 'text-pink-500' : 'text-slate-400'} />
                 </div>
                 {isLoadingStats ? (
                   <div className="h-8 w-20 bg-slate-200 animate-pulse rounded-lg my-1" />
@@ -178,16 +215,24 @@ export default function AdminDashboard() {
                     <span className="text-sm font-bold text-slate-500 ml-1">회</span>
                   </div>
                 )}
-                <p className="text-[11px] font-medium text-slate-400 mt-2">
-                  오늘 총 접속 세션 수
+                <p className="text-[11px] font-bold text-pink-600 mt-2 flex items-center gap-1">
+                  오늘 클릭 순위 보기 ▾
                 </p>
-              </div>
+              </button>
 
-              {/* 4. 누적 총 페이지뷰 */}
-              <div className="bg-slate-50 border border-slate-200/80 p-4 md:p-5 rounded-2xl flex flex-col justify-between">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-extrabold text-slate-600">📈 누적 페이지뷰</span>
-                  <Sparkles size={16} className="text-slate-400" />
+              {/* 4. 누적 총 페이지뷰 (클릭 시 누적 순위 탭 활성화) */}
+              <button
+                type="button"
+                onClick={() => setPageRankMode('total')}
+                className={`text-left p-4 md:p-5 rounded-2xl flex flex-col justify-between transition-all ${
+                  pageRankMode === 'total'
+                    ? 'bg-indigo-50/80 border-2 border-indigo-400 shadow-sm'
+                    : 'bg-slate-50 border border-slate-200/80 hover:border-indigo-200'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2 w-full">
+                  <span className="text-xs font-extrabold text-slate-700">📈 누적 페이지뷰</span>
+                  <Sparkles size={16} className={pageRankMode === 'total' ? 'text-indigo-500' : 'text-slate-400'} />
                 </div>
                 {isLoadingStats ? (
                   <div className="h-8 w-24 bg-slate-200 animate-pulse rounded-lg my-1" />
@@ -197,9 +242,148 @@ export default function AdminDashboard() {
                     <span className="text-sm font-bold text-slate-500 ml-1">회</span>
                   </div>
                 )}
-                <p className="text-[11px] font-medium text-slate-400 mt-2">
-                  지금까지 총 열람 수(PV)
+                <p className="text-[11px] font-bold text-indigo-600 mt-2 flex items-center gap-1">
+                  누적 클릭 순위 보기 ▾
                 </p>
+              </button>
+            </div>
+
+            {/* 🔥 카테고리별 인기 페이지 클릭 순위 보드 */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+                    <MousePointerClick size={16} className="text-pink-600" />
+                    어떤 페이지를 가장 많이 클릭했을까요? (인기 카테고리 TOP 6)
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    방문자가 각 메뉴를 클릭해 열람한 횟수와 전체 대비 점유율(%)입니다.
+                  </p>
+                </div>
+
+                {/* 오늘 vs 누적 전환 탭 */}
+                <div className="inline-flex bg-white p-1 rounded-xl border border-slate-200 self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setPageRankMode('today')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all ${
+                      pageRankMode === 'today'
+                        ? 'bg-pink-600 text-white shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    오늘 클릭 순위
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPageRankMode('total')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all ${
+                      pageRankMode === 'total'
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    누적 클릭 순위
+                  </button>
+                </div>
+              </div>
+
+              {/* 1위 요약 배너 */}
+              {!isLoadingStats && topPage && hasAnyPageViews && (
+                <div className="bg-white border border-pink-100 rounded-xl px-4 py-3 flex items-center justify-between gap-2 shadow-sm">
+                  <div className="text-xs sm:text-sm font-bold text-slate-700">
+                    🏆 {pageRankMode === 'today' ? '오늘' : '지금까지'} 가장 인기 있는 메뉴는{' '}
+                    <span className="text-pink-600 font-extrabold">
+                      {topPage.emoji} {topPage.name}
+                    </span>{' '}
+                    입니다!
+                  </div>
+                  <span className="text-xs font-extrabold px-2.5 py-1 rounded-full bg-pink-50 text-pink-700 shrink-0">
+                    점유율 {pageRankMode === 'today' ? topPage.todayPercent : topPage.totalPercent}%
+                  </span>
+                </div>
+              )}
+
+              {/* 카테고리별 순위 리스트 */}
+              <div className="space-y-2.5">
+                {isLoadingStats ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="h-14 bg-slate-200/70 animate-pulse rounded-xl" />
+                  ))
+                ) : (
+                  sortedPageStats.map((item, idx) => {
+                    const rank = idx + 1;
+                    const rankBadge =
+                      rank === 1 ? '🥇 1위' : rank === 2 ? '🥈 2위' : rank === 3 ? '🥉 3위' : `${rank}위`;
+                    const activeViews = pageRankMode === 'today' ? item.todayViews : item.totalViews;
+                    const activePercent = pageRankMode === 'today' ? item.todayPercent : item.totalPercent;
+                    const barWidth = activeViews > 0 ? Math.max(6, activePercent) : 0;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="bg-white border border-slate-200/70 rounded-xl p-3.5 hover:border-indigo-200 transition-colors"
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className={`text-xs font-extrabold px-2 py-0.5 rounded-md shrink-0 ${
+                                rank === 1
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : rank === 2
+                                  ? 'bg-slate-200 text-slate-700'
+                                  : rank === 3
+                                  ? 'bg-orange-100 text-orange-800'
+                                  : 'bg-slate-100 text-slate-500'
+                              }`}
+                            >
+                              {rankBadge}
+                            </span>
+                            <span className="text-base shrink-0">{item.emoji}</span>
+                            <span className="text-sm font-extrabold text-slate-800 truncate">
+                              {item.name}
+                            </span>
+                            <Link
+                              href={item.path}
+                              target="_blank"
+                              className="text-[11px] text-slate-400 hover:text-indigo-600 font-mono hidden sm:inline-flex items-center gap-0.5"
+                            >
+                              ({item.path}) <ExternalLink size={10} />
+                            </Link>
+                          </div>
+
+                          <div className="flex items-center gap-3 shrink-0 text-right">
+                            <div>
+                              <span
+                                className={`text-sm font-black ${
+                                  pageRankMode === 'today' ? 'text-pink-600' : 'text-indigo-600'
+                                }`}
+                              >
+                                {activeViews.toLocaleString()}회
+                              </span>
+                              <span className="text-xs font-bold text-slate-400 ml-1">
+                                ({activePercent}%)
+                              </span>
+                            </div>
+                            <div className="text-[11px] font-semibold text-slate-400 border-l border-slate-200 pl-2.5 hidden sm:block min-w-[78px]">
+                              {pageRankMode === 'today'
+                                ? `누적 ${item.totalViews.toLocaleString()}회`
+                                : `오늘 ${item.todayViews.toLocaleString()}회`}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 점유율 프로그레스 바 */}
+                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full bg-gradient-to-r ${item.color} transition-all duration-500`}
+                            style={{ width: `${barWidth}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
 
