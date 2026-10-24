@@ -72,9 +72,11 @@ export default function Home() {
 
       {/* Top Announcement Banner */}
       {showBanner && (
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 text-sm font-semibold flex items-center justify-center gap-2 relative">
+        <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white px-4 py-2 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 relative">
           <span className="animate-pulse">✨</span>
-          <span>[신규 오픈] 블로거 소통을 위한 <strong>커뮤니티</strong>와 <strong>체험단 다이어리</strong>가 추가되었어요!</span>
+          <span>
+            [신규 업데이트] <strong>⚡ 리뷰노트·당첨톡 1초 자동등록</strong> &amp; <strong>🎨 네이버 블로그 스티커 제작소</strong>가 오픈되었어요!
+          </span>
           <button 
             onClick={() => setShowBanner(false)}
             className="absolute right-4 p-1 hover:bg-white/20 rounded-full transition-colors"
