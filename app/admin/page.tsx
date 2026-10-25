@@ -230,7 +230,7 @@ export default function AdminDashboard() {
                     counterapi.dev 회원가입 <ExternalLink size={11} />
                   </a>
                   후 생성된 <strong>Workspace 이름</strong>과 <strong>API Key</strong>를 입력해주세요.
-                  입력 후 아래 &apos;연동 테스트&apos;로 바로 확인하실 수 있습니다.
+                  기본 카운터 1개만 있어도 전체 방문자/페이지뷰가 실시간 연동되며, 카테고리별 순위는 하이브리드 엔진으로 6개 메뉴 모두 자동 집계됩니다.
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

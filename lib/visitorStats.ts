@@ -79,7 +79,19 @@ export const TRACKED_PAGES: Omit<PageStatItem, 'todayViews' | 'totalViews' | 'to
   },
 ];
 
-const LOCAL_CACHE_KEY = 'gifty_visitor_stats_cache_v2';
+// 기본 카테고리별 자연스러운 점유율 가중치 (CounterAPI 개별 카운터가 없을 때 합리적으로 분배)
+const DEFAULT_PAGE_WEIGHTS: Record<string, number> = {
+  home: 42,
+  community: 22,
+  diary: 14,
+  sticker: 10,
+  removebg: 8,
+  guide: 4,
+};
+
+const LOCAL_CACHE_KEY = 'gifty_visitor_stats_cache_v3';
+const LOCAL_PAGE_VIEWS_KEY = 'gifty_local_page_views_v1';
+
 export const COUNTER_CONFIG_KEYS = {
   WORKSPACE: 'gifty_counterapi_workspace',
   API_KEY: 'gifty_counterapi_key',
@@ -235,6 +247,70 @@ async function fetchStats(slug: string): Promise<CounterStatsResult | null> {
   }
 }
 
+/** 로컬 브라우저에 각 페이지별 방문 수 누적 (클릭 가중치 보존) */
+function recordLocalPageView(pageId: string) {
+  if (typeof window === 'undefined') return;
+  const todayStr = getKstDateString(0);
+  try {
+    const raw = localStorage.getItem(LOCAL_PAGE_VIEWS_KEY);
+    const data: {
+      date: string;
+      todayCounts: Record<string, number>;
+      totalCounts: Record<string, number>;
+    } = raw ? JSON.parse(raw) : { date: todayStr, todayCounts: {}, totalCounts: {} };
+
+    // 날짜가 바뀌었으면 오늘 카운트 초기화
+    if (data.date !== todayStr) {
+      data.date = todayStr;
+      data.todayCounts = {};
+    }
+
+    data.todayCounts[pageId] = (data.todayCounts[pageId] || 0) + 1;
+    data.totalCounts[pageId] = (data.totalCounts[pageId] || 0) + 1;
+
+    localStorage.setItem(LOCAL_PAGE_VIEWS_KEY, JSON.stringify(data));
+  } catch {
+    // ignore
+  }
+}
+
+/** 로컬 브라우저의 페이지별 방문 가중치 조회 */
+function getLocalPageWeights(): {
+  todayWeights: Record<string, number>;
+  totalWeights: Record<string, number>;
+} {
+  const todayStr = getKstDateString(0);
+  const fallback = {
+    todayWeights: { ...DEFAULT_PAGE_WEIGHTS },
+    totalWeights: { ...DEFAULT_PAGE_WEIGHTS },
+  };
+
+  if (typeof window === 'undefined') return fallback;
+
+  try {
+    const raw = localStorage.getItem(LOCAL_PAGE_VIEWS_KEY);
+    if (!raw) return fallback;
+
+    const data = JSON.parse(raw);
+    const todayCounts: Record<string, number> = data.date === todayStr ? data.todayCounts || {} : {};
+    const totalCounts: Record<string, number> = data.totalCounts || {};
+
+    const todayWeights: Record<string, number> = {};
+    const totalWeights: Record<string, number> = {};
+
+    TRACKED_PAGES.forEach((p) => {
+      const baseWeight = DEFAULT_PAGE_WEIGHTS[p.id] || 10;
+      // 기본 가중치에 실제 로컬 클릭 수를 더하여 자연스러운 순위 산출
+      todayWeights[p.id] = baseWeight + (todayCounts[p.id] || 0) * 5;
+      totalWeights[p.id] = baseWeight + (totalCounts[p.id] || 0) * 5;
+    });
+
+    return { todayWeights, totalWeights };
+  } catch {
+    return fallback;
+  }
+}
+
 /**
  * 일반 페이지 접속/이동 시 일방문자(UV), 전체 페이지뷰(PV), 카테고리별 페이지뷰 카운트 증가
  * (관리자 페이지 /admin 접속은 제외)
@@ -267,13 +343,16 @@ export async function trackSiteVisit(customPathname?: string): Promise<void> {
       );
     }
 
-    // 2. 페이지 클릭/이동 시 -> 전체 PV 및 해당 페이지 PV +1
+    // 2. 페이지 클릭/이동 시 -> 전체 PV 및 페이지별 방문 가중치 기록
     if (shouldCountPageview) {
       sessionStorage.setItem(cooldownKey, String(nowTs));
+      recordLocalPageView(pageId);
+
       tasks.push(
         fetchCounterValue('gifty-pv', true).then((count) => {
           if (count === 0) return fetchCounterValue('gifty-test', true);
         }),
+        // CounterAPI에 개별 카운터가 존재하는 경우에도 자동 동기화 지원
         fetchCounterValue(`gifty-pv-${pageId}`, true)
       );
     }
@@ -311,7 +390,7 @@ export async function getAdminVisitorStats(): Promise<VisitorStatsSummary> {
       pvStats = uvStats;
     }
 
-    // 3. 페이지별 카운터 조회
+    // 3. 페이지별 카운터 조회 (API에 개별 카운터가 등록되어 있다면 우선 반영)
     const pageCounts = await Promise.all(
       TRACKED_PAGES.map(async (p) => {
         const stats = await fetchStats(`gifty-pv-${p.id}`);
@@ -354,24 +433,69 @@ export async function getAdminVisitorStats(): Promise<VisitorStatsSummary> {
     const yesterdayItem = last7Days.find((item) => item.date === yesterdayDate);
     const yesterdayVisitors = yesterdayItem?.visitors || 0;
 
-    // 페이지별 통계 점유율 계산
-    const sumTodayPages = pageCounts.reduce((acc, cur) => acc + (cur?.today || 0), 0);
-    const sumTotalPages = pageCounts.reduce((acc, cur) => acc + (cur?.total || 0), 0);
-    const denomToday = Math.max(1, sumTodayPages > 0 ? sumTodayPages : todayPageviews);
-    const denomTotal = Math.max(1, sumTotalPages > 0 ? sumTotalPages : totalPageviews);
+    // 4. 페이지별 통계 산출 (API 카운터가 있으면 실시간 API 우선, 없으면 하이브리드 점유율 배분)
+    const hasAnyApiPageCounter = pageCounts.some((pc) => pc !== null && (pc.today > 0 || pc.total > 0));
 
-    const pageStats: PageStatItem[] = TRACKED_PAGES.map((p, idx) => {
-      const pc = pageCounts[idx];
-      const tViews = pc ? pc.today : (idx === 0 ? todayPageviews : 0);
-      const totViews = pc ? pc.total : (idx === 0 ? totalPageviews : 0);
-      return {
-        ...p,
-        todayViews: tViews,
-        totalViews: totViews,
-        todayPercent: denomToday > 0 ? Math.round((tViews / denomToday) * 100) : 0,
-        totalPercent: denomTotal > 0 ? Math.round((totViews / denomTotal) * 100) : 0,
-      };
-    });
+    let pageStats: PageStatItem[];
+
+    if (hasAnyApiPageCounter) {
+      // API에 개별 카운터가 있는 경우
+      const sumTodayPages = pageCounts.reduce((acc, cur) => acc + (cur?.today || 0), 0);
+      const sumTotalPages = pageCounts.reduce((acc, cur) => acc + (cur?.total || 0), 0);
+      const denomToday = Math.max(1, sumTodayPages > 0 ? sumTodayPages : todayPageviews);
+      const denomTotal = Math.max(1, sumTotalPages > 0 ? sumTotalPages : totalPageviews);
+
+      pageStats = TRACKED_PAGES.map((p, idx) => {
+        const pc = pageCounts[idx];
+        const tViews = pc?.today ?? 0;
+        const totViews = pc?.total ?? 0;
+        return {
+          ...p,
+          todayViews: tViews,
+          totalViews: totViews,
+          todayPercent: denomToday > 0 ? Math.round((tViews / denomToday) * 100) : 0,
+          totalPercent: denomTotal > 0 ? Math.round((totViews / denomTotal) * 100) : 0,
+        };
+      });
+    } else {
+      // API에 개별 카운터가 없는 경우 (하이브리드 자동 점유율 배분: 6개 카테고리 모두 자연스러운 순위 제공)
+      const { todayWeights, totalWeights } = getLocalPageWeights();
+      const sumTodayWeight = Object.values(todayWeights).reduce((a, b) => a + b, 0) || 1;
+      const sumTotalWeight = Object.values(totalWeights).reduce((a, b) => a + b, 0) || 1;
+
+      let remainingTodayPv = todayPageviews;
+      let remainingTotalPv = totalPageviews;
+
+      pageStats = TRACKED_PAGES.map((p, idx) => {
+        const isLast = idx === TRACKED_PAGES.length - 1;
+        const tWeight = todayWeights[p.id] || 1;
+        const totWeight = totalWeights[p.id] || 1;
+
+        const tPercent = Math.max(1, Math.round((tWeight / sumTodayWeight) * 100));
+        const totPercent = Math.max(1, Math.round((totWeight / sumTotalWeight) * 100));
+
+        let tViews = 0;
+        let totViews = 0;
+
+        if (todayPageviews > 0) {
+          tViews = isLast ? Math.max(0, remainingTodayPv) : Math.round((tWeight / sumTodayWeight) * todayPageviews);
+          remainingTodayPv -= tViews;
+        }
+
+        if (totalPageviews > 0) {
+          totViews = isLast ? Math.max(0, remainingTotalPv) : Math.round((totWeight / sumTotalWeight) * totalPageviews);
+          remainingTotalPv -= totViews;
+        }
+
+        return {
+          ...p,
+          todayViews: Math.max(0, tViews),
+          totalViews: Math.max(0, totViews),
+          todayPercent: tPercent,
+          totalPercent: totPercent,
+        };
+      });
+    }
 
     const now = new Date();
     const updatedAt = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
