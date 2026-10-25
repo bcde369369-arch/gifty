@@ -3,7 +3,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSiteSettings } from '@/lib/settings';
-import { getAdminVisitorStats, VisitorStatsSummary } from '@/lib/visitorStats';
+import {
+  getAdminVisitorStats,
+  VisitorStatsSummary,
+  getCounterConfig,
+  saveCounterConfig,
+  testCounterApiConnection,
+} from '@/lib/visitorStats';
 import {
   Save,
   LogOut,
@@ -17,6 +23,11 @@ import {
   RefreshCw,
   MousePointerClick,
   ExternalLink,
+  Settings,
+  Key,
+  CheckCircle2,
+  AlertCircle,
+  X,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -32,6 +43,33 @@ export default function AdminDashboard() {
   const [visitorStats, setVisitorStats] = useState<VisitorStatsSummary | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
   const [pageRankMode, setPageRankMode] = useState<'today' | 'total'>('today');
+
+  // CounterAPI v2 configuration state
+  const [showCounterConfig, setShowCounterConfig] = useState(false);
+  const [counterWorkspace, setCounterWorkspace] = useState('');
+  const [counterApiKey, setCounterApiKey] = useState('');
+  const [isTestingCounter, setIsTestingCounter] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  useEffect(() => {
+    const config = getCounterConfig();
+    setCounterWorkspace(config.workspace);
+    setCounterApiKey(config.apiKey);
+  }, []);
+
+  const handleTestCounter = async () => {
+    setIsTestingCounter(true);
+    setTestResult(null);
+    const res = await testCounterApiConnection(counterWorkspace, counterApiKey);
+    setTestResult(res);
+    setIsTestingCounter(false);
+  };
+
+  const handleSaveCounterConfig = () => {
+    saveCounterConfig(counterWorkspace, counterApiKey);
+    alert('CounterAPI 설정이 저장되었습니다! 통계를 새로고침합니다.');
+    loadVisitorStats();
+  };
 
   const loadVisitorStats = useCallback(async () => {
     setIsLoadingStats(true);
@@ -135,6 +173,18 @@ export default function AdminDashboard() {
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
+                  onClick={() => setShowCounterConfig(!showCounterConfig)}
+                  className={`py-2 px-3.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors ${
+                    showCounterConfig
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  <Settings size={14} />
+                  카운터 API 설정
+                </button>
+                <button
+                  type="button"
                   onClick={loadVisitorStats}
                   disabled={isLoadingStats}
                   className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-3.5 rounded-xl transition-colors text-xs flex items-center gap-1.5 disabled:opacity-50"
@@ -152,6 +202,102 @@ export default function AdminDashboard() {
                 </a>
               </div>
             </div>
+
+            {/* CounterAPI v2 설정 패널 (토글 가능) */}
+            {showCounterConfig && (
+              <div className="bg-slate-50 border-2 border-indigo-100 rounded-2xl p-5 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                  <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
+                    <Key size={16} className="text-indigo-600" />
+                    CounterAPI v2 연동 설정
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowCounterConfig(false)}
+                    className="text-slate-400 hover:text-slate-600"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  <a
+                    href="https://counterapi.dev/signup"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-600 underline font-semibold inline-flex items-center gap-0.5"
+                  >
+                    counterapi.dev 회원가입 <ExternalLink size={11} />
+                  </a>
+                  후 생성된 <strong>Workspace 이름</strong>과 <strong>API Key</strong>를 입력해주세요.
+                  입력 후 아래 &apos;연동 테스트&apos;로 바로 확인하실 수 있습니다.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Workspace 이름 (필수)
+                    </label>
+                    <input
+                      type="text"
+                      value={counterWorkspace}
+                      onChange={(e) => setCounterWorkspace(e.target.value)}
+                      placeholder="예: gifty"
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      API Key (선택, 비공개 카운터용)
+                    </label>
+                    <input
+                      type="password"
+                      value={counterApiKey}
+                      onChange={(e) => setCounterApiKey(e.target.value)}
+                      placeholder="YOUR_API_KEY (Bearer 토큰)"
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                    />
+                  </div>
+                </div>
+
+                {testResult && (
+                  <div
+                    className={`p-3 rounded-lg text-xs flex items-center gap-2 ${
+                      testResult.success
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                        : 'bg-rose-50 text-rose-800 border border-rose-200'
+                    }`}
+                  >
+                    {testResult.success ? (
+                      <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                    ) : (
+                      <AlertCircle size={16} className="text-rose-600 shrink-0" />
+                    )}
+                    <span>{testResult.message}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-2">
+                  <button
+                    type="button"
+                    onClick={handleTestCounter}
+                    disabled={isTestingCounter}
+                    className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold py-2 px-3.5 rounded-lg text-xs transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    <RefreshCw size={13} className={isTestingCounter ? 'animate-spin' : ''} />
+                    {isTestingCounter ? '연동 확인 중...' : '연동 테스트'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveCounterConfig}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-xs shadow-sm transition-colors flex items-center gap-1.5"
+                  >
+                    <Save size={13} />
+                    카운터 설정 저장
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* 4대 핵심 방문자 지표 카드 */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
