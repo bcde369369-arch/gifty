@@ -107,7 +107,7 @@ export function saveCounterConfig(workspace: string, apiKey: string): void {
   localStorage.setItem(COUNTER_CONFIG_KEYS.API_KEY, apiKey.trim());
 }
 
-/** CounterAPI v2 연결 테스트 */
+/** CounterAPI v2 연결 테스트 (브라우저 CORS 차단 방지를 위해 Header 대신 Simple GET 또는 Query Param 사용) */
 export async function testCounterApiConnection(
   workspace: string,
   apiKey: string
@@ -119,20 +119,14 @@ export async function testCounterApiConnection(
   }
 
   try {
-    const headers: Record<string, string> = {};
-    if (key) {
-      headers['Authorization'] = `Bearer ${key}`;
-    }
-
+    const query = key ? `?api_key=${encodeURIComponent(key)}` : '';
     // gifty-test 또는 test 카운터로 테스트
-    let res = await fetch(`https://api.counterapi.dev/v2/${ws}/gifty-test/up`, {
+    let res = await fetch(`https://api.counterapi.dev/v2/${ws}/gifty-test/up${query}`, {
       cache: 'no-store',
-      headers,
     });
     if (!res.ok) {
-      res = await fetch(`https://api.counterapi.dev/v2/${ws}/test/up`, {
+      res = await fetch(`https://api.counterapi.dev/v2/${ws}/test/up${query}`, {
         cache: 'no-store',
-        headers,
       });
     }
 
@@ -178,22 +172,18 @@ export function formatDateLabel(dateStr: string): string {
   return `${m}/${d}(${weekDays[dateObj.getDay()]})`;
 }
 
-/** CounterAPI v2 카운트 증가 또는 조회 */
+/** CounterAPI v2 카운트 증가 또는 조회 (CORS preflight 유발 방지) */
 export async function fetchCounterValue(slug: string, increment = false): Promise<number> {
   const { workspace, apiKey } = getCounterConfig();
   if (!workspace) return 0;
 
   try {
+    const query = apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : '';
     const endpoint = increment
-      ? `https://api.counterapi.dev/v2/${workspace}/${slug}/up`
-      : `https://api.counterapi.dev/v2/${workspace}/${slug}`;
+      ? `https://api.counterapi.dev/v2/${workspace}/${slug}/up${query}`
+      : `https://api.counterapi.dev/v2/${workspace}/${slug}${query}`;
 
-    const headers: Record<string, string> = {};
-    if (apiKey) {
-      headers['Authorization'] = `Bearer ${apiKey}`;
-    }
-
-    const res = await fetch(endpoint, { cache: 'no-store', headers });
+    const res = await fetch(endpoint, { cache: 'no-store' });
     if (!res.ok) return 0;
 
     const data = await res.json();
@@ -215,15 +205,15 @@ interface CounterStatsResult {
   weekdays: Record<string, number>;
 }
 
-/** CounterAPI v2 상세 통계(오늘, 주간, 요일별) 조회 */
+/** CounterAPI v2 상세 통계(오늘, 주간, 요일별) 조회 (CORS preflight 유발 방지) */
 async function fetchStats(slug: string): Promise<CounterStatsResult | null> {
   const { workspace, apiKey } = getCounterConfig();
   if (!workspace) return null;
 
   try {
-    const res = await fetch(`https://api.counterapi.dev/v2/${workspace}/${slug}/stats`, {
+    const query = apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : '';
+    const res = await fetch(`https://api.counterapi.dev/v2/${workspace}/${slug}/stats${query}`, {
       cache: 'no-store',
-      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
     });
     if (!res.ok) return null;
     const json = await res.json();
