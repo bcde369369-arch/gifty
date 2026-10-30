@@ -94,7 +94,7 @@ function getDDayInfo(deadlineDate: string, isCompleted?: boolean) {
   };
 }
 
-const POPULAR_PLATFORMS = ['리뷰노트', '강남맛집', '디너의여왕', '레뷰', '포포몬', '미블', '포블로그', '서울오빠', '인스타협찬', '기타'];
+const POPULAR_PLATFORMS = ['리뷰노트', '강남맛집', '디너의여왕', '레뷰', '포포몬', '슈퍼멤버스', '미블', '포블로그', '서울오빠', '인스타협찬', '기타'];
 
 export default function ExperienceDiary() {
   const { settings, isLoaded } = useSiteSettings();
