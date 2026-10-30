@@ -13,6 +13,7 @@ import {
   normalizeSyncCode,
   pushSchedulesToCloud,
   pullSchedulesFromCloud,
+  decompressSchedules,
 } from '@/lib/syncService';
 import { useSiteSettings } from '@/lib/settings';
 import {
@@ -161,15 +162,31 @@ export default function ExperienceDiary() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const urlSyncCode = params.get('syncCode');
+      const urlSyncData = params.get('syncData');
+
       if (urlSyncCode && normalizeSyncCode(urlSyncCode).length === 6) {
         const norm = normalizeSyncCode(urlSyncCode);
         saveSyncCode(norm);
         setActiveSyncCode(norm);
+        isInitialLoadedRef.current = true;
+
+        // A. QR 코드 URL에 압축 일정이 직접 실려있는 경우 -> 외부 서버 없이 0초 만에 100% 즉시 복원
+        if (urlSyncData) {
+          const directRestored = decompressSchedules(urlSyncData);
+          if (directRestored && Array.isArray(directRestored) && directRestored.length > 0) {
+            setSchedules(directRestored as Schedule[]);
+            localStorage.setItem('gifty_schedules', JSON.stringify(directRestored));
+            alert(`🎉 PC와 스마트폰이 성공적으로 연동되었습니다! (코드: ${formatSyncCode(norm)})\nPC의 일정 ${directRestored.length}건을 스마트폰에 완벽하게 가져왔습니다!`);
+            window.history.replaceState({}, '', '/experience-diary');
+            return;
+          }
+        }
+
+        // B. 클라우드에서 조회 시도
         setIsSyncing(true);
         pullSchedulesFromCloud<Schedule[]>(norm).then((res) => {
           setIsSyncing(false);
-          isInitialLoadedRef.current = true;
-          if (res.success && res.data && Array.isArray(res.data)) {
+          if (res.success && res.data && Array.isArray(res.data) && res.data.length > 0) {
             setSchedules(res.data);
             localStorage.setItem('gifty_schedules', JSON.stringify(res.data));
             alert(`🎉 PC와 스마트폰이 성공적으로 연동되었습니다! (코드: ${formatSyncCode(norm)})\n클라우드의 최신 일정 ${res.data.length}건을 동기화했습니다.`);

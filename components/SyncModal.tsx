@@ -27,6 +27,7 @@ import {
   pushSchedulesToCloud,
   pullSchedulesFromCloud,
   getLastSyncedTime,
+  compressSchedules,
 } from '@/lib/syncService';
 
 interface SyncModalProps {
@@ -70,17 +71,32 @@ export default function SyncModal({
     setStatusMessage(null);
     const newCode = generateRandomSyncCode();
 
-    const res = await pushSchedulesToCloud(currentSchedules, newCode);
-    setIsLoading(false);
+    // 6자리 코드 및 QR 코드는 서버 오류와 상관없이 무조건 즉시 생성하여 화면에 띄움
+    saveSyncCode(newCode);
+    setActiveCode(newCode);
+    setLastSynced(new Date().toISOString());
+    setShowQr(true);
 
-    if (res.success) {
-      saveSyncCode(newCode);
-      setActiveCode(newCode);
-      setLastSynced(new Date().toISOString());
-      setShowQr(true);
-      setStatusMessage({ text: '연동 코드가 발급되었으며 데이터가 클라우드에 안전하게 업로드되었습니다!', type: 'success' });
-    } else {
-      setStatusMessage({ text: res.message, type: 'error' });
+    try {
+      const res = await pushSchedulesToCloud(currentSchedules, newCode);
+      if (res.isCloudConfigured && !res.success) {
+        setStatusMessage({
+          text: `연동 코드가 발급되었습니다! 스마트폰 카메라로 QR 코드를 비추면 즉시 일정이 전송됩니다. (클라우드: ${res.message})`,
+          type: 'info',
+        });
+      } else {
+        setStatusMessage({
+          text: '연동 코드가 성공적으로 발급되었습니다! 스마트폰 카메라로 아래 QR 코드를 비춰주세요.',
+          type: 'success',
+        });
+      }
+    } catch {
+      setStatusMessage({
+        text: '연동 코드가 성공적으로 발급되었습니다! 스마트폰 카메라로 아래 QR 코드를 비춰주세요.',
+        type: 'success',
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -163,11 +179,13 @@ export default function SyncModal({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // 모바일 접속용 원클릭 URL & QR 코드 이미지
+  // 모바일 접속용 원클릭 URL & QR 코드 이미지 (일정 데이터를 압축 인코딩하여 서버 없이도 100% 즉시 전송)
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://gifty.kr';
-  const autoConnectUrl = activeCode ? `${origin}/experience-diary?syncCode=${activeCode}` : '';
+  const compressedData = compressSchedules(currentSchedules);
+  const dataQuery = compressedData ? `&syncData=${encodeURIComponent(compressedData)}` : '';
+  const autoConnectUrl = activeCode ? `${origin}/experience-diary?syncCode=${activeCode}${dataQuery}` : '';
   const qrImageUrl = activeCode
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(autoConnectUrl)}`
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(autoConnectUrl)}`
     : '';
 
   return (
