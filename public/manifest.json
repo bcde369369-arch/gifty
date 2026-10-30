@@ -1,1 +1,21 @@
-{"name": "Gifty - ����ó�� ���� ��© ����Ŀ","short_name": "Gifty","theme_color": "#4f46e5","background_color": "#f8fafc","display": "standalone","orientation": "portrait","scope": "/","start_url": "/","icons": [{"src": "/icon.jpg","sizes": "192x192","type": "image/jpeg"},{"src": "/icon.jpg","sizes": "512x512","type": "image/jpeg"}]}
+{
+  "name": "Gifty - 무료 GIF 움짤 변환기 & 체험단 다이어리",
+  "short_name": "Gifty",
+  "description": "동영상 고화질 GIF 변환, AI 누끼따기, 블로그 체험단 다이어리까지 한 번에!",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "/icon.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "/icon.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}

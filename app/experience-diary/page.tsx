@@ -229,6 +229,48 @@ export default function ExperienceDiary() {
         window.history.replaceState({}, '', '/experience-diary');
       }
     }
+
+    // 3) 연동 중일 때 15초 주기 및 창 포커스(화면 돌아올 때) 자동 실시간 동기화
+    const syncInterval = setInterval(() => {
+      const code = getSavedSyncCode();
+      if (code) {
+        pullSchedulesFromCloud<Schedule[]>(code).then((res) => {
+          if (res.success && res.data && Array.isArray(res.data)) {
+            setSchedules((prev) => {
+              if (JSON.stringify(prev) !== JSON.stringify(res.data)) {
+                localStorage.setItem('gifty_schedules', JSON.stringify(res.data));
+                return res.data as Schedule[];
+              }
+              return prev;
+            });
+          }
+        });
+      }
+    }, 15000);
+
+    const handleWindowFocus = () => {
+      const code = getSavedSyncCode();
+      if (code) {
+        pullSchedulesFromCloud<Schedule[]>(code).then((res) => {
+          if (res.success && res.data && Array.isArray(res.data)) {
+            setSchedules((prev) => {
+              if (JSON.stringify(prev) !== JSON.stringify(res.data)) {
+                localStorage.setItem('gifty_schedules', JSON.stringify(res.data));
+                return res.data as Schedule[];
+              }
+              return prev;
+            });
+          }
+        });
+      }
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+
+    return () => {
+      clearInterval(syncInterval);
+      window.removeEventListener('focus', handleWindowFocus);
+    };
   }, []);
 
   // 자동등록 텍스트 변경 시 실시간 분석

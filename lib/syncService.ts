@@ -68,6 +68,8 @@ export function getLastSyncedTime(): string | null {
   return localStorage.getItem(SYNC_STORAGE_KEYS.LAST_SYNCED);
 }
 
+const DEFAULT_FIREBASE_URL = 'https://gifty-96749-default-rtdb.asia-southeast1.firebasedatabase.app';
+
 /** Firebase Realtime DB URL 또는 커스텀 엔드포인트 조회 */
 export function getSyncEndpoint(): string {
   if (typeof window !== 'undefined') {
@@ -76,7 +78,7 @@ export function getSyncEndpoint(): string {
   }
   const envUrl = process.env.NEXT_PUBLIC_FIREBASE_DB_URL;
   if (envUrl && envUrl.trim()) return envUrl.trim().replace(/\/$/, '');
-  return '';
+  return DEFAULT_FIREBASE_URL;
 }
 
 /**

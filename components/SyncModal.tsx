@@ -7,7 +7,6 @@ import {
   Copy,
   Check,
   RefreshCw,
-  ArrowRight,
   ShieldCheck,
   AlertCircle,
   X,
@@ -334,47 +333,60 @@ export default function SyncModal({
               </div>
             </div>
           ) : (
-            /* [상태 B] 아직 연동되지 않은 상태 (새 코드 발급 or 코드 입력) */
-            <div className="space-y-6">
-              {/* 옵션 1: PC나 메인 기기에서 새로 시작할 때 */}
-              <div className="p-5 rounded-2xl border border-indigo-100 bg-indigo-50/50 hover:bg-indigo-50 transition-colors">
+            /* [상태 B] 아직 연동되지 않은 상태 (모바일 편의를 위해 코드 입력을 1순위로 배치) */
+            <div className="space-y-5">
+              {/* 옵션 A: 스마트폰 등에서 PC 코드를 입력하여 연결할 때 (모바일 최우선 배치) */}
+              <div className="p-5 rounded-3xl border-2 border-indigo-100 bg-indigo-50/40 shadow-sm">
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 text-xs font-bold">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 text-xs font-black shadow-sm">
                     1
                   </div>
                   <div className="flex-1">
-                    <h4 className="text-sm font-bold text-slate-800">
-                      새 연동 코드 발급하기 (기존 일정이 있는 기기)
+                    <h4 className="text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
+                      발급받은 6자리 연동 코드 입력하기 📱
                     </h4>
                     <p className="text-xs text-slate-500 mt-1">
-                      현재 등록된 다이어리 일정을 암호화하여 클라우드에 올리고, 모바일에서 접속할 수 있는 6자리 코드를 발급합니다.
+                      PC 화면에 뜬 6자리 코드를 입력하면 저장된 일정을 즉시 불러오고 동기화합니다.
                     </p>
-                    <button
-                      onClick={handleGenerateAndUpload}
-                      disabled={isLoading}
-                      className="mt-4 w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-100"
-                    >
-                      {isLoading ? (
-                        <>
-                          <RefreshCw size={14} className="animate-spin" /> 코드 생성 및 데이터 전송 중...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles size={14} /> 6자리 연동 코드 발급 및 클라우드 업로드
-                        </>
-                      )}
-                    </button>
+
+                    {/* 입력창 + 하단 전폭 큼직한 연결 버튼 (모바일 최적화) */}
+                    <div className="mt-4 space-y-2.5">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={inputCode}
+                        onChange={(e) => setInputCode(e.target.value.replace(/[^0-9]/g, ''))}
+                        placeholder="6자리 코드 입력 (예: 386474)"
+                        className="w-full px-4 py-3.5 rounded-2xl border-2 border-indigo-200 bg-white font-mono text-center text-2xl tracking-widest font-black focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-inner text-slate-800"
+                      />
+                      <button
+                        onClick={handleConnectWithCode}
+                        disabled={isLoading || inputCode.length !== 6}
+                        className="w-full py-3.5 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-black flex items-center justify-center gap-2 transition-all shadow-md shadow-indigo-200 active:scale-95"
+                      >
+                        {isLoading ? (
+                          <>
+                            <RefreshCw size={16} className="animate-spin" /> 연동 확인 중...
+                          </>
+                        ) : (
+                          <>
+                            <Smartphone size={16} /> 🚀 연동하기 & 내 일정 불러오기
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="relative flex py-1 items-center">
+              <div className="relative flex py-0.5 items-center">
                 <div className="flex-grow border-t border-slate-200"></div>
                 <span className="flex-shrink mx-4 text-xs font-semibold text-slate-400">또는</span>
                 <div className="flex-grow border-t border-slate-200"></div>
               </div>
 
-              {/* 옵션 2: 스마트폰 등 다른 기기에서 기존 코드를 입력할 때 */}
+              {/* 옵션 B: PC나 메인 기기에서 처음 시작할 때 새 코드 발급 */}
               <div className="p-5 rounded-2xl border border-slate-200 bg-white">
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-xl bg-slate-800 text-white flex items-center justify-center shrink-0 text-xs font-bold">
@@ -382,36 +394,26 @@ export default function SyncModal({
                   </div>
                   <div className="flex-1">
                     <h4 className="text-sm font-bold text-slate-800">
-                      발급받은 6자리 연동 코드 입력하기
+                      새 연동 코드 발급하기 (PC에서 시작할 때)
                     </h4>
                     <p className="text-xs text-slate-500 mt-1">
-                      PC에서 발급받은 6자리 코드를 입력하면 저장된 일정을 즉시 불러오고 연동합니다.
+                      현재 기기의 다이어리 일정을 클라우드에 올리고, 모바일에서 접속할 수 있는 새 6자리 코드를 생성합니다.
                     </p>
-
-                    <div className="mt-3 flex gap-2">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={6}
-                        value={inputCode}
-                        onChange={(e) => setInputCode(e.target.value.replace(/[^0-9]/g, ''))}
-                        placeholder="예: 748291"
-                        className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 font-mono text-center text-lg tracking-widest font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                      <button
-                        onClick={handleConnectWithCode}
-                        disabled={isLoading || inputCode.length !== 6}
-                        className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 disabled:bg-slate-300 text-white text-xs font-bold transition-all shrink-0"
-                      >
-                        {isLoading ? (
-                          <RefreshCw size={14} className="animate-spin" />
-                        ) : (
-                          <>
-                            연결 <ArrowRight size={14} />
-                          </>
-                        )}
-                      </button>
-                    </div>
+                    <button
+                      onClick={handleGenerateAndUpload}
+                      disabled={isLoading}
+                      className="mt-3.5 w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition-all shadow-sm active:scale-95"
+                    >
+                      {isLoading ? (
+                        <>
+                          <RefreshCw size={14} className="animate-spin" /> 코드 생성 중...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={14} /> 6자리 연동 코드 발급 및 QR 생성
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>
