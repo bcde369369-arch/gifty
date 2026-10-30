@@ -311,12 +311,26 @@ function getLocalPageWeights(): {
   }
 }
 
+/** 관리자 로그인 상태 확인 (관리자 접속 시 통계 카운트 제외용) */
+export function isAdminUser(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return localStorage.getItem('gifty_admin_auth') === 'true';
+  } catch {
+    return false;
+  }
+}
+
 /**
  * 일반 페이지 접속/이동 시 일방문자(UV), 전체 페이지뷰(PV), 카테고리별 페이지뷰 카운트 증가
- * (관리자 페이지 /admin 접속은 제외)
+ * (관리자 페이지 /admin 접속 및 관리자 로그인 상태 브라우저는 카운트 제외)
  */
 export async function trackSiteVisit(customPathname?: string): Promise<void> {
   if (typeof window === 'undefined') return;
+
+  // 관리자로 로그인된 브라우저는 통계 카운트에서 완전 제외
+  if (isAdminUser()) return;
+
   const pathname = customPathname || window.location.pathname;
   const pageId = resolvePageId(pathname);
   if (!pageId) return;

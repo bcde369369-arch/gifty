@@ -48,6 +48,7 @@ export default function AdminDashboard() {
   const [showCounterConfig, setShowCounterConfig] = useState(false);
   const [counterWorkspace, setCounterWorkspace] = useState('');
   const [counterApiKey, setCounterApiKey] = useState('');
+  const [syncEndpoint, setSyncEndpoint] = useState('');
   const [isTestingCounter, setIsTestingCounter] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
@@ -55,6 +56,8 @@ export default function AdminDashboard() {
     const config = getCounterConfig();
     setCounterWorkspace(config.workspace);
     setCounterApiKey(config.apiKey);
+    const savedSyncUrl = localStorage.getItem('gifty_diary_custom_sync_url');
+    if (savedSyncUrl) setSyncEndpoint(savedSyncUrl);
   }, []);
 
   const handleTestCounter = async () => {
@@ -67,7 +70,14 @@ export default function AdminDashboard() {
 
   const handleSaveCounterConfig = () => {
     saveCounterConfig(counterWorkspace, counterApiKey);
-    alert('CounterAPI 설정이 저장되었습니다! 통계를 새로고침합니다.');
+    if (typeof window !== 'undefined') {
+      if (syncEndpoint.trim()) {
+        localStorage.setItem('gifty_diary_custom_sync_url', syncEndpoint.trim());
+      } else {
+        localStorage.removeItem('gifty_diary_custom_sync_url');
+      }
+    }
+    alert('API 및 클라우드 설정이 성공적으로 저장되었습니다!');
     loadVisitorStats();
   };
 
@@ -257,6 +267,21 @@ export default function AdminDashboard() {
                       placeholder="YOUR_API_KEY (Bearer 토큰)"
                       className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                     />
+                  </div>
+                  <div className="md:col-span-2 pt-2 border-t border-slate-200">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      📱 체험단 다이어리 Firebase Realtime DB URL (선택)
+                    </label>
+                    <input
+                      type="text"
+                      value={syncEndpoint}
+                      onChange={(e) => setSyncEndpoint(e.target.value)}
+                      placeholder="예: https://your-project-default-rtdb.firebaseio.com (비워두면 기본 보안 클라우드 사용)"
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      * 비워두셔도 기본 보안 클라우드를 통해 모바일 ↔ PC 간 6자리 연동이 바로 작동합니다.
+                    </p>
                   </div>
                 </div>
 

@@ -1,10 +1,19 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Sparkles, Calendar as CalendarIcon, Calculator, Link as LinkIcon, ArrowLeft, Plus, X, ChevronLeft, ChevronRight, Menu, Download, Upload, Share2, Copy, Image as ImageIcon, EyeOff, Eye, MessageSquareHeart, Zap, ClipboardPaste, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Calendar as CalendarIcon, Calculator, Link as LinkIcon, ArrowLeft, ArrowRight, Laptop, Plus, X, ChevronLeft, ChevronRight, Menu, Download, Upload, Share2, Copy, Image as ImageIcon, EyeOff, Eye, MessageSquareHeart, Zap, ClipboardPaste, CheckCircle2, Smartphone, RefreshCw, QrCode } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import CoupangBanner from '@/components/CoupangBanner';
+import SyncModal from '@/components/SyncModal';
+import {
+  getSavedSyncCode,
+  saveSyncCode,
+  formatSyncCode,
+  normalizeSyncCode,
+  pushSchedulesToCloud,
+  pullSchedulesFromCloud,
+} from '@/lib/syncService';
 import { useSiteSettings } from '@/lib/settings';
 import {
   parseCampaignsFromText,
@@ -117,15 +126,80 @@ export default function ExperienceDiary() {
   const [parsedPreviewList, setParsedPreviewList] = useState<ParsedCampaign[]>([]);
   const [quickPasteFeedback, setQuickPasteFeedback] = useState('');
 
+  // 📱 모바일 ↔ PC 간편 연동 상태
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [activeSyncCode, setActiveSyncCode] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const isInitialLoadedRef = useRef(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 일정(schedules) 변경 시 연동 코드가 있으면 클라우드에 실시간 자동 동기화
   useEffect(() => {
+    if (!isInitialLoadedRef.current) return;
+    const syncCode = getSavedSyncCode();
+    if (syncCode) {
+      pushSchedulesToCloud(schedules, syncCode).catch(() => {});
+    }
+  }, [schedules]);
+
+  useEffect(() => {
+    let localList: Schedule[] = [];
     const saved = localStorage.getItem('gifty_schedules');
     if (saved) {
-      setSchedules(JSON.parse(saved));
+      try {
+        localList = JSON.parse(saved);
+        setSchedules(localList);
+      } catch {
+        // ignore
+      }
     }
     // 기본 선택을 빈 값('')으로 두어 접속 시 전체 일정이 바로 보이도록 설정
     setSelectedDate('');
+
+    // 1) 스마트폰 카메라(QR)나 URL 링크(?syncCode=123456)로 접속한 경우 즉시 자동 연동
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlSyncCode = params.get('syncCode');
+      if (urlSyncCode && normalizeSyncCode(urlSyncCode).length === 6) {
+        const norm = normalizeSyncCode(urlSyncCode);
+        saveSyncCode(norm);
+        setActiveSyncCode(norm);
+        setIsSyncing(true);
+        pullSchedulesFromCloud<Schedule[]>(norm).then((res) => {
+          setIsSyncing(false);
+          isInitialLoadedRef.current = true;
+          if (res.success && res.data && Array.isArray(res.data)) {
+            setSchedules(res.data);
+            localStorage.setItem('gifty_schedules', JSON.stringify(res.data));
+            alert(`🎉 PC와 스마트폰이 성공적으로 연동되었습니다! (코드: ${formatSyncCode(norm)})\n클라우드의 최신 일정 ${res.data.length}건을 동기화했습니다.`);
+          } else {
+            alert(`연동 코드(${formatSyncCode(norm)})가 설정되었습니다. 이제 PC와 모바일이 실시간으로 동기화됩니다.`);
+          }
+        });
+        window.history.replaceState({}, '', '/experience-diary');
+        return;
+      }
+    }
+
+    // 2) 이미 연동 코드가 등록되어 있다면 클라우드의 최신 변경사항을 백그라운드 자동 동기화
+    const savedCode = getSavedSyncCode();
+    if (savedCode) {
+      setActiveSyncCode(savedCode);
+      setIsSyncing(true);
+      pullSchedulesFromCloud<Schedule[]>(savedCode).then((res) => {
+        setIsSyncing(false);
+        isInitialLoadedRef.current = true;
+        if (res.success && res.data && Array.isArray(res.data)) {
+          if (res.data.length > 0 || localList.length === 0) {
+            setSchedules(res.data);
+            localStorage.setItem('gifty_schedules', JSON.stringify(res.data));
+          }
+        }
+      });
+    } else {
+      isInitialLoadedRef.current = true;
+    }
 
     // URL 파라미터(?autoImport=...)로 전달된 당첨 내역이 있으면 즉시 자동분석 모달 오픈
     if (typeof window !== 'undefined') {
@@ -965,27 +1039,54 @@ export default function ExperienceDiary() {
           </button>
         </div>
 
-        {/* 데이터 안심 백업 & 복원 유틸리티 바 */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white border border-slate-200/80 px-5 py-3.5 rounded-2xl mb-6 shadow-sm">
-          <div className="flex items-center gap-2.5 text-xs text-slate-600">
+        {/* 데이터 안심 백업 & 복원 & 모바일 연동 유틸리티 바 */}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-white border border-slate-200/80 px-5 py-3.5 rounded-2xl mb-6 shadow-sm">
+          <div className="flex items-center gap-2.5 text-xs text-slate-600 w-full md:w-auto">
             <span className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-sm font-bold">🛡️</span>
             <div>
-              <p className="font-bold text-slate-800">데이터 유실 방지 안심 보관함</p>
-              <p className="text-[11px] text-slate-500">브라우저 캐시 삭제나 폰/PC 기기 변경에 대비해 내 컴퓨터/스마트폰에 백업해두세요.</p>
+              <div className="flex items-center gap-2">
+                <p className="font-bold text-slate-800">모바일 연동 & 데이터 안심 보관함</p>
+                {activeSyncCode && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    연동중 ({formatSyncCode(activeSyncCode)})
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500">6자리 코드로 스마트폰과 실시간 연동하거나, 백업 파일로 안전하게 보관하세요.</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2 shrink-0 w-full md:w-auto">
+            <button
+              type="button"
+              onClick={() => setIsSyncModalOpen(true)}
+              className={`flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm ${
+                activeSyncCode
+                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
+                  : 'bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white'
+              }`}
+            >
+              <Smartphone size={15} />
+              {activeSyncCode ? (
+                <>
+                  <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
+                  모바일 연동 관리
+                </>
+              ) : (
+                '모바일 ↔ PC 간편 연동 📱'
+              )}
+            </button>
             <button
               onClick={handleExportBackup}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-all active:scale-95 shadow-sm"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold transition-all active:scale-95 shadow-sm"
             >
-              <Download size={14} /> 데이터 백업 📥
+              <Download size={14} /> 백업 📥
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold transition-all active:scale-95 shadow-sm"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold transition-all active:scale-95 shadow-sm"
             >
-              <Upload size={14} /> 데이터 복원 📤
+              <Upload size={14} /> 복원 📤
             </button>
             <input 
               ref={fileInputRef}
@@ -1730,6 +1831,112 @@ export default function ExperienceDiary() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* 📱 모바일 ↔ PC 간편 연동 3단계 가이드 카드 섹션 */}
+        <div className="mt-8 bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden border border-indigo-800/40">
+          {/* 배경 데코레이션 블러 서클 */}
+          <div className="absolute -top-24 -right-24 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative z-10">
+            {/* 섹션 상단 헤더 */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 text-xs font-bold mb-2">
+                  <Sparkles size={13} className="text-amber-300" />
+                  <span>체험단 블로거 필수 기능</span>
+                  <span className="w-1 h-1 rounded-full bg-indigo-300" />
+                  <span className="text-emerald-300">회원가입 없음</span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-extrabold tracking-tight">
+                  스마트폰과 PC를 3초 만에 연결해보세요! 📱💻
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300 mt-1">
+                  PC에서 등록한 당첨 일정, 외출할 땐 스마트폰에서 실시간으로 확인하고 리뷰 완료 체크까지!
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsSyncModalOpen(true)}
+                className="self-start sm:self-center shrink-0 flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-orange-500/20 transition-all active:scale-95"
+              >
+                <Smartphone size={16} />
+                {activeSyncCode ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-emerald-700 animate-pulse" />
+                    연동 상태 확인하기
+                  </>
+                ) : (
+                  '지금 바로 연동하기 📱'
+                )}
+                <ArrowRight size={14} />
+              </button>
+            </div>
+
+            {/* 3단계 가이드 카드 그리드 */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* STEP 1 */}
+              <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-5 hover:bg-white/15 transition-all">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="w-7 h-7 rounded-xl bg-indigo-500 text-white text-xs font-black flex items-center justify-center shadow-sm">
+                    1
+                  </span>
+                  <Laptop size={18} className="text-indigo-300" />
+                </div>
+                <h4 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1.5">
+                  PC에서 [연동하기] 클릭
+                </h4>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  버튼 한 번만 누르면 나만의 <strong>6자리 고유 코드</strong>와 <strong>연동용 QR 코드</strong>가 즉시 생성됩니다.
+                </p>
+              </div>
+
+              {/* STEP 2 */}
+              <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-5 hover:bg-white/15 transition-all">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="w-7 h-7 rounded-xl bg-purple-500 text-white text-xs font-black flex items-center justify-center shadow-sm">
+                    2
+                  </span>
+                  <QrCode size={18} className="text-purple-300" />
+                </div>
+                <h4 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1.5">
+                  스마트폰 카메라로 QR 찰칵!
+                </h4>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  스마트폰 기본 카메라로 비추기만 하면 <strong>코드 입력 없이 1초 만에 자동 연결</strong>됩니다.
+                </p>
+              </div>
+
+              {/* STEP 3 */}
+              <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-5 hover:bg-white/15 transition-all">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="w-7 h-7 rounded-xl bg-emerald-500 text-white text-xs font-black flex items-center justify-center shadow-sm">
+                    3
+                  </span>
+                  <RefreshCw size={18} className="text-emerald-300" />
+                </div>
+                <h4 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1.5">
+                  실시간 자동 동기화 완료
+                </h4>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  PC든 스마트폰이든 한쪽에서 수정하면 <strong>양방향으로 자동 저장</strong>되어 언제나 최신 일정이 유지됩니다.
+                </p>
+              </div>
+            </div>
+
+            {/* 하단 안심 메시지 */}
+            <div className="mt-5 pt-4 border-t border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] text-slate-300">
+              <span className="flex items-center gap-1.5">
+                <span className="text-emerald-400 font-bold">🔒 강력한 개인정보 보호:</span>
+                모든 일정은 6자리 코드로 기기 내에서 자체 암호화되어 안전하게 전송됩니다.
+              </span>
+              <span className="text-slate-400">
+                기기를 변경하거나 캐시를 지워도 6자리 코드만 있으면 언제든 복구할 수 있어요!
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* 쿠팡 파트너스 광고 배너 영역 */}
@@ -2511,6 +2718,23 @@ export default function ExperienceDiary() {
           </div>
         </div>
       )}
+
+      {/* 📱 모바일 ↔ PC 간편 연동 모달 */}
+      <SyncModal
+        isOpen={isSyncModalOpen}
+        onClose={() => {
+          setIsSyncModalOpen(false);
+          setActiveSyncCode(getSavedSyncCode());
+        }}
+        currentSchedules={schedules}
+        onSchedulesSynced={(newSchedules) => {
+          if (Array.isArray(newSchedules)) {
+            setSchedules(newSchedules as Schedule[]);
+            localStorage.setItem('gifty_schedules', JSON.stringify(newSchedules));
+            setActiveSyncCode(getSavedSyncCode());
+          }
+        }}
+      />
     </main>
   );
 }

@@ -32,7 +32,7 @@ export default function CommunityPreview() {
                 </span>
               </div>
               <p className="text-slate-500 text-xs md:text-sm mt-0.5">
-                체험단 정산 후기, 움짤 자랑, 블로그 팁을 나누고 Gifty에 자유롭게 의견을 남겨보세요!
+                체험단 정산 후기, 블로그 팁을 나누고 Gifty에 자유롭게 의견을 남겨보세요!
               </p>
             </div>
           </div>

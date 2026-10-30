@@ -255,7 +255,7 @@ export default function CommunityPage() {
                 Gifty 커뮤니티 💬
               </h1>
               <p className="text-indigo-200 text-sm md:text-base max-w-xl leading-relaxed">
-                체험단 정산 인증, 블로그 지수 상승 꿀팁, 나만의 멋진 움짤 공유부터 Gifty 기능 건의까지 자유롭게 소통해보세요!
+                체험단 정산 인증, 블로그 지수 상승 꿀팁부터 Gifty 기능 건의까지 자유롭게 소통해보세요!
               </p>
             </div>
             <button
@@ -498,7 +498,7 @@ export default function CommunityPage() {
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">카테고리 선택</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {(['settlement', 'meme', 'tips', 'feedback', 'free'] as Post['category'][]).map(cat => (
+                  {(['settlement', 'tips', 'feedback', 'free'] as Post['category'][]).map(cat => (
                     <button
                       key={cat}
                       type="button"

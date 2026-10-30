@@ -8,7 +8,7 @@ export interface Comment {
 
 export interface Post {
   id: string;
-  category: 'settlement' | 'meme' | 'tips' | 'feedback' | 'free';
+  category: 'settlement' | 'tips' | 'feedback' | 'free' | 'meme';
   title: string;
   content: string;
   author: string;
@@ -22,16 +22,14 @@ export interface Post {
 
 export const CATEGORIES = [
   { id: 'all', label: '🔥 전체글' },
-  { id: 'settlement', label: '💰 체험단 정산&자랑' },
-  { id: 'meme', label: '🪄 움짤 자랑' },
+  { id: 'settlement', label: '💰 체험단 정산' },
   { id: 'tips', label: '💡 블로그 꿀팁 & Q&A' },
   { id: 'feedback', label: '✍️ Gifty에 바란다' },
   { id: 'free', label: '☕ 자유수다' },
 ] as const;
 
 export const CATEGORY_LABELS: Record<string, string> = {
-  settlement: '💰 정산&자랑',
-  meme: '🪄 움짤 자랑',
+  settlement: '💰 체험단 정산',
   tips: '💡 블로그 팁',
   feedback: '✍️ 기능 건의',
   free: '☕ 자유수다',
@@ -68,19 +66,6 @@ export const INITIAL_POSTS: Post[] = [
     badge: '추천'
   },
   {
-    id: 'post-3',
-    category: 'meme',
-    title: '우리 집 고양이 츄르 먹방 움짤 만들었어요 ㅋㅋㅋ',
-    content: `집사 3년차인데 키프티에서 1.5배속하고 뽀샤시 필터 먹여서 만드니까 진짜 귀엽게 나왔네요 ㅠㅠ\n블로그 일상 글에 올렸더니 댓글 폭발했습니다 ㅋㅋ 무설치라 너무 편해요!`,
-    author: '냥냥펀치',
-    views: 298,
-    likes: 29,
-    comments: [
-      { id: 'c-4', author: '댕댕이맘', content: '어머 너무 귀여워요 ㅠㅠ 필터 기능도 있었군요!', createdAt: '2026-10-16 18:22' }
-    ],
-    createdAt: '2026-10-16 16:10'
-  },
-  {
     id: 'post-4',
     category: 'feedback',
     title: '운영자님! 체험단 다이어리에 플랫폼별 집계 추가해주셔서 너무 감사해요',
@@ -109,21 +94,38 @@ export const INITIAL_POSTS: Post[] = [
   }
 ];
 
-const STORAGE_KEY = 'gifty_community_posts_v1';
+const STORAGE_KEY = 'gifty_community_posts_v2';
 
 export function getPosts(): Post[] {
   if (typeof window === 'undefined') return INITIAL_POSTS;
+  
+  let loadedPosts: Post[] = [];
   const saved = localStorage.getItem(STORAGE_KEY);
-  if (!saved) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_POSTS));
-    return INITIAL_POSTS;
+  if (saved) {
+    try {
+      loadedPosts = JSON.parse(saved);
+    } catch {
+      loadedPosts = INITIAL_POSTS;
+    }
+  } else {
+    const legacy = localStorage.getItem('gifty_community_posts_v1');
+    if (legacy) {
+      try {
+        loadedPosts = JSON.parse(legacy);
+      } catch {
+        loadedPosts = INITIAL_POSTS;
+      }
+    } else {
+      loadedPosts = INITIAL_POSTS;
+    }
   }
-  try {
-    return JSON.parse(saved);
-  } catch (e) {
-    console.error('Failed to parse community posts', e);
-    return INITIAL_POSTS;
+
+  // meme(움짤자랑) 카테고리 및 관련 글 완전 배제 필터링
+  const filtered = loadedPosts.filter((p: Post) => p.category !== 'meme');
+  if (filtered.length !== loadedPosts.length || !saved) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
   }
+  return filtered;
 }
 
 export function savePosts(posts: Post[]) {
