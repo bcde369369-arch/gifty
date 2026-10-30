@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Smartphone,
-  Laptop,
   QrCode,
   Copy,
   Check,
