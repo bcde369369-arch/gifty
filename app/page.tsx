@@ -202,14 +202,9 @@ export default function Home() {
             )}
           </div>
 
-          {/* Google AdSense Banner */}
-          <div className="mt-3.5 w-full max-w-4xl mx-auto">
-            <AdSenseBanner className="rounded-2xl overflow-hidden my-1" />
-          </div>
-
-          {/* Global Coupang Partners Banner */}
+          {/* Global Coupang Partners Banner (업로드 상자 바로 밑에 밀착 배치) */}
           {isLoaded && (
-            <div className="mt-3 flex flex-col justify-center items-center">
+            <div className="mt-3.5 flex flex-col justify-center items-center">
               {/* PC Banner */}
               {settings.coupangBannerHtml && (
                 <div className="hidden md:flex max-w-4xl mx-auto overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm p-2">
