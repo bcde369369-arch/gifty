@@ -39,7 +39,7 @@ export default function AdSenseBanner({
   }, []);
 
   return (
-    <div className={`w-full overflow-hidden my-6 flex justify-center items-center text-center ${className}`}>
+    <div className={`w-full overflow-hidden flex justify-center items-center text-center ${className}`}>
       <ins
         ref={adRef}
         className="adsbygoogle"

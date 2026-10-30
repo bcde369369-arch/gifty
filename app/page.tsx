@@ -194,7 +194,7 @@ export default function Home() {
           {/* Decorative Background Glow */}
           <div className="absolute inset-0 bg-gradient-to-tr from-indigo-200 to-fuchsia-200 blur-3xl opacity-50 rounded-full transform -translate-x-10 translate-y-10 -z-10"></div>
           
-          <div className="bg-white/80 backdrop-blur-xl border border-slate-200/60 p-6 md:p-8 rounded-3xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] relative min-h-[400px]">
+          <div className="bg-white/80 backdrop-blur-xl border border-slate-200/60 p-4 sm:p-6 rounded-3xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] relative min-h-[300px]">
             {!videoFile ? (
               <Dropzone onFileSelect={setVideoFile} />
             ) : (
@@ -203,13 +203,13 @@ export default function Home() {
           </div>
 
           {/* Google AdSense Banner */}
-          <div className="mt-6 w-full max-w-4xl mx-auto">
-            <AdSenseBanner className="rounded-2xl overflow-hidden" />
+          <div className="mt-3.5 w-full max-w-4xl mx-auto">
+            <AdSenseBanner className="rounded-2xl overflow-hidden my-1" />
           </div>
 
           {/* Global Coupang Partners Banner */}
           {isLoaded && (
-            <div className="mt-8 flex flex-col justify-center items-center">
+            <div className="mt-3 flex flex-col justify-center items-center">
               {/* PC Banner */}
               {settings.coupangBannerHtml && (
                 <div className="hidden md:flex max-w-4xl mx-auto overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm p-2">
