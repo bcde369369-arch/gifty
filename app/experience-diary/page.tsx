@@ -30,14 +30,36 @@ import {
 interface Schedule {
   id: string;
   title: string;
-  platform?: string;      // 체험단 플랫폼/출처 (예: 레뷰, 리뷰노트, 강남맛집, 포포몬 등)
-  visitDate: string;
-  deadlineDate: string;
-  benefitAmount?: number; // 제공받은 혜택 (식사권/제품 등)
-  cashAmount?: number;    // 원고료/지원금 (현금 수익)
-  extraExpense?: number;  // 추가 지출 (내돈내산)
+  platform?: string;      // 체험단 플랫폼/출처 (예: 레뷰, 리뷰노트 등 또는 '식비', '부수입' 등)
+  visitDate: string;      // 방문일 또는 지출/수입 날짜
+  deadlineDate: string;   // 마감일
+  benefitAmount?: number; // 제공받은 혜택 (식사권/제품 등 - 생활비 방어)
+  cashAmount?: number;    // 원고료/지원금 또는 부수입 (현금)
+  extraExpense?: number;  // 추가 지출 또는 일상 지출 (현금)
   isCompleted?: boolean;  // 리뷰 작성 완료 여부
+  entryType?: 'campaign' | 'expense' | 'income'; // 항목 유형 (기본값: 'campaign')
+  category?: string;      // 카테고리 라벨
 }
+
+const EXPENSE_CATEGORIES = [
+  { id: 'food', label: '🍔 식비/외식', color: 'bg-amber-50 text-amber-800 border-amber-200' },
+  { id: 'cafe', label: '☕ 카페/디저트', color: 'bg-orange-50 text-orange-800 border-orange-200' },
+  { id: 'shopping', label: '🛍️ 쇼핑/뷰티', color: 'bg-pink-50 text-pink-800 border-pink-200' },
+  { id: 'transport', label: '🚗 교통/차량', color: 'bg-blue-50 text-blue-800 border-blue-200' },
+  { id: 'leisure', label: '🎬 문화/여가', color: 'bg-purple-50 text-purple-800 border-purple-200' },
+  { id: 'living', label: '🏠 생활/주거', color: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+  { id: 'blog', label: '💻 블로그/장비', color: 'bg-indigo-50 text-indigo-800 border-indigo-200' },
+  { id: 'etc', label: '✏️ 기타 지출', color: 'bg-slate-50 text-slate-800 border-slate-200' },
+];
+
+const INCOME_CATEGORIES = [
+  { id: 'ad', label: '📈 블로그 원고료', color: 'bg-indigo-50 text-indigo-800 border-indigo-200' },
+  { id: 'adsense', label: '💵 애드센스 수익', color: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+  { id: 'secondhand', label: '📦 당근/중고판매', color: 'bg-amber-50 text-amber-800 border-amber-200' },
+  { id: 'apptech', label: '📱 앱테크/포인트', color: 'bg-cyan-50 text-cyan-800 border-cyan-200' },
+  { id: 'salary', label: '💼 알바/보너스', color: 'bg-blue-50 text-blue-800 border-blue-200' },
+  { id: 'etc_income', label: '💰 기타 부수입', color: 'bg-violet-50 text-violet-800 border-violet-200' },
+];
 
 /** 달력 칸에 들어갈 짧은 업체명 라벨 추출 (예: "[성수/맛집] 성수동 화덕피자" -> "성수동 화덕피자") */
 function getShortCampaignLabel(title: string): string {
@@ -104,6 +126,9 @@ export default function ExperienceDiary() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [entryType, setEntryType] = useState<'campaign' | 'expense' | 'income'>('campaign');
+  const [newCategory, setNewCategory] = useState<string>('food');
+  const [ledgerFilter, setLedgerFilter] = useState<'all' | 'campaign' | 'expense' | 'income'>('all');
   
   // 폼 상태
   const [newTitle, setNewTitle] = useState('');
@@ -411,9 +436,12 @@ export default function ExperienceDiary() {
     e.target.value = '';
   };
 
-  const openAddModal = () => {
+  const openAddModal = (typeOrEvent?: 'campaign' | 'expense' | 'income' | React.MouseEvent) => {
+    const type = (typeof typeOrEvent === 'string' ? typeOrEvent : 'campaign') as 'campaign' | 'expense' | 'income';
     const defaultStart = selectedDate || toDateInputString(new Date());
     setEditingId(null);
+    setEntryType(type);
+    setNewCategory(type === 'expense' ? 'food' : type === 'income' ? 'ad' : '');
     setNewTitle('');
     setNewPlatform('');
     setCustomPlatform('');
@@ -427,7 +455,10 @@ export default function ExperienceDiary() {
   };
 
   const handleEdit = (schedule: Schedule) => {
+    const type = schedule.entryType || 'campaign';
     setEditingId(schedule.id);
+    setEntryType(type);
+    setNewCategory(schedule.category || (type === 'expense' ? 'food' : type === 'income' ? 'ad' : ''));
     setNewTitle(schedule.title);
     const plat = schedule.platform || '';
     if (plat && !POPULAR_PLATFORMS.includes(plat)) {
@@ -449,6 +480,100 @@ export default function ExperienceDiary() {
 
   const handleSaveSchedule = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1) 일상 지출 저장 분기
+    if (entryType === 'expense') {
+      if (!newTitle.trim()) return alert('지출 내용을 입력해주세요! (예: 점심 식사, 마트 장보기)');
+      const expenseAmount = newExpense ? parseInt(newExpense.replace(/,/g, ''), 10) : 0;
+      if (!expenseAmount || expenseAmount <= 0) return alert('지출 금액을 입력해주세요!');
+      const dateToSave = newVisitDate || toDateInputString(new Date());
+      const catObj = EXPENSE_CATEGORIES.find(c => c.id === newCategory);
+      const catLabel = catObj ? catObj.label : '기타 지출';
+
+      let updated: Schedule[];
+      if (editingId) {
+        updated = schedules.map(s => s.id === editingId ? {
+          ...s,
+          title: newTitle.trim(),
+          entryType: 'expense',
+          category: newCategory || 'etc',
+          platform: catLabel,
+          visitDate: dateToSave,
+          deadlineDate: dateToSave,
+          benefitAmount: 0,
+          cashAmount: 0,
+          extraExpense: expenseAmount,
+          isCompleted: true,
+        } : s);
+      } else {
+        const newItem: Schedule = {
+          id: Date.now().toString(),
+          title: newTitle.trim(),
+          entryType: 'expense',
+          category: newCategory || 'etc',
+          platform: catLabel,
+          visitDate: dateToSave,
+          deadlineDate: dateToSave,
+          benefitAmount: 0,
+          cashAmount: 0,
+          extraExpense: expenseAmount,
+          isCompleted: true,
+        };
+        updated = [newItem, ...schedules];
+      }
+      setSchedules(updated);
+      localStorage.setItem('gifty_schedules', JSON.stringify(updated));
+      setIsModalOpen(false);
+      return;
+    }
+
+    // 2) 부수입 저장 분기
+    if (entryType === 'income') {
+      if (!newTitle.trim()) return alert('부수입 내용을 입력해주세요! (예: 블로그 원고료, 당근 중고 판매)');
+      const incomeAmount = newCash ? parseInt(newCash.replace(/,/g, ''), 10) : 0;
+      if (!incomeAmount || incomeAmount <= 0) return alert('수입 금액을 입력해주세요!');
+      const dateToSave = newVisitDate || toDateInputString(new Date());
+      const catObj = INCOME_CATEGORIES.find(c => c.id === newCategory);
+      const catLabel = catObj ? catObj.label : '기타 부수입';
+
+      let updated: Schedule[];
+      if (editingId) {
+        updated = schedules.map(s => s.id === editingId ? {
+          ...s,
+          title: newTitle.trim(),
+          entryType: 'income',
+          category: newCategory || 'etc_income',
+          platform: catLabel,
+          visitDate: dateToSave,
+          deadlineDate: dateToSave,
+          benefitAmount: 0,
+          cashAmount: incomeAmount,
+          extraExpense: 0,
+          isCompleted: true,
+        } : s);
+      } else {
+        const newItem: Schedule = {
+          id: Date.now().toString(),
+          title: newTitle.trim(),
+          entryType: 'income',
+          category: newCategory || 'etc_income',
+          platform: catLabel,
+          visitDate: dateToSave,
+          deadlineDate: dateToSave,
+          benefitAmount: 0,
+          cashAmount: incomeAmount,
+          extraExpense: 0,
+          isCompleted: true,
+        };
+        updated = [newItem, ...schedules];
+      }
+      setSchedules(updated);
+      localStorage.setItem('gifty_schedules', JSON.stringify(updated));
+      setIsModalOpen(false);
+      return;
+    }
+
+    // 3) 기존 체험단 캠페인 저장
     if (!newTitle || !newDeadlineDate) return alert('캠페인 이름과 포스팅 마감일은 필수입니다!');
 
     const benefitAmount = newBenefit ? parseInt(newBenefit.replace(/,/g, ''), 10) : 0;
@@ -456,11 +581,12 @@ export default function ExperienceDiary() {
     const extraExpense = newExpense ? parseInt(newExpense.replace(/,/g, ''), 10) : 0;
     const platformToSave = isCustomPlatform ? customPlatform.trim() : newPlatform.trim();
 
-    let updated;
+    let updated: Schedule[];
     if (editingId) {
-      updated = schedules.map(s => s.id === editingId ? {
+      updated = schedules.map((s): Schedule => s.id === editingId ? {
         ...s,
         title: newTitle,
+        entryType: 'campaign',
         platform: platformToSave || undefined,
         visitDate: newVisitDate,
         deadlineDate: newDeadlineDate,
@@ -472,6 +598,7 @@ export default function ExperienceDiary() {
       const newSchedule: Schedule = {
         id: Date.now().toString(),
         title: newTitle,
+        entryType: 'campaign',
         platform: platformToSave || undefined,
         visitDate: newVisitDate,
         deadlineDate: newDeadlineDate,
@@ -578,26 +705,46 @@ export default function ExperienceDiary() {
     const d = s.visitDate || s.deadlineDate;
     return d && d.startsWith(currentMonthStr);
   });
+  
+  const monthlyCampaigns = monthlySchedules.filter(s => (s.entryType || 'campaign') === 'campaign');
+  const monthlyExpenses = monthlySchedules.filter(s => s.entryType === 'expense');
+  const monthlyIncomes = monthlySchedules.filter(s => s.entryType === 'income');
+
   const monthlyCount = monthlySchedules.length;
+  const monthlyCampaignCount = monthlyCampaigns.length;
   const monthlyBenefit = monthlySchedules.reduce((acc, cur) => acc + (cur.benefitAmount || 0), 0);
   const monthlyCash = monthlySchedules.reduce((acc, cur) => acc + (cur.cashAmount || 0), 0);
   const monthlyExpense = monthlySchedules.reduce((acc, cur) => acc + (cur.extraExpense || 0), 0);
   const monthlyNetProfit = monthlyBenefit + monthlyCash - monthlyExpense;
-  const avgPerCase = monthlyCount > 0 ? Math.round((monthlyBenefit + monthlyCash) / monthlyCount) : 0;
+  const monthlyNetCash = monthlyCash - monthlyExpense;
+  const avgPerCase = monthlyCampaignCount > 0 ? Math.round((monthlyBenefit + monthlyCampaigns.reduce((acc, cur) => acc + (cur.cashAmount || 0), 0)) / monthlyCampaignCount) : 0;
 
-  // 플랫폼별 횟수 집계
-  const platformStats = monthlySchedules.reduce((acc, cur) => {
-    const p = cur.platform?.trim() || '미지정';
+  // 지출 카테고리별 통계
+  const expenseCategoryStats = EXPENSE_CATEGORIES.map(cat => {
+    const amount = monthlyExpenses
+      .filter(e => (e.category || 'etc') === cat.id)
+      .reduce((acc, cur) => acc + (cur.extraExpense || 0), 0);
+    return { ...cat, amount };
+  }).filter(c => c.amount > 0).sort((a, b) => b.amount - a.amount);
+
+  const totalPureExpense = monthlyExpenses.reduce((acc, cur) => acc + (cur.extraExpense || 0), 0);
+
+  // 플랫폼별 횟수 집계 (체험단 위주)
+  const platformStats = monthlyCampaigns.reduce((acc, cur) => {
+    const p = cur.platform?.trim() || '기타';
     acc[p] = (acc[p] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
   const sortedPlatformStats = Object.entries(platformStats).sort((a, b) => b[1] - a[1]);
 
-  // 플랫폼 필터 적용된 가계부 목록
-  const displayedMonthlySchedules = selectedPlatformFilter
-    ? monthlySchedules.filter(s => (s.platform?.trim() || '미지정') === selectedPlatformFilter)
-    : monthlySchedules;
+  // 통합 가계부 필터 적용된 목록
+  const displayedMonthlySchedules = monthlySchedules.filter(s => {
+    const itemType = s.entryType || 'campaign';
+    if (ledgerFilter !== 'all' && itemType !== ledgerFilter) return false;
+    if (selectedPlatformFilter && (s.platform?.trim() || '미지정') !== selectedPlatformFilter) return false;
+    return true;
+  });
 
   // SNS 정산 공유 모달 상태
   const router = useRouter();
@@ -1173,7 +1320,7 @@ export default function ExperienceDiary() {
                     <Zap size={15} /> 당첨 카톡·내역 1초 자동등록
                   </button>
                   <button 
-                    onClick={openAddModal}
+                    onClick={() => openAddModal('campaign')}
                     className="flex items-center gap-1 bg-indigo-600 text-white text-xs sm:text-sm font-bold px-3.5 py-2 rounded-xl hover:bg-indigo-700 transition active:scale-95"
                   >
                     <Plus size={16} /> 직접 추가
@@ -1324,33 +1471,58 @@ export default function ExperienceDiary() {
                     const isToday = formatDateString(new Date()) === dateStr;
                     const dayOfWeek = d.getDay();
 
-                    // 해당 날짜에 걸린 방문/시작 일정과 마감 일정 추출
+                    // 해당 날짜에 걸린 방문/시작 일정, 마감 일정, 일상 지출, 부수입 추출
                     const dayEvents: {
                       id: string;
-                      type: 'visit' | 'deadline';
+                      type: 'visit' | 'deadline' | 'expense' | 'income';
                       title: string;
                       platform?: string;
                       isCompleted?: boolean;
+                      amount?: number;
                     }[] = [];
 
                     baseCalendarSchedules.forEach((s) => {
-                      if (calendarFilter !== 'deadline' && s.visitDate === dateStr) {
-                        dayEvents.push({
-                          id: `${s.id}_v`,
-                          type: 'visit',
-                          title: s.title,
-                          platform: s.platform,
-                          isCompleted: s.isCompleted,
-                        });
-                      }
-                      if (s.deadlineDate === dateStr) {
-                        dayEvents.push({
-                          id: `${s.id}_d`,
-                          type: 'deadline',
-                          title: s.title,
-                          platform: s.platform,
-                          isCompleted: s.isCompleted,
-                        });
+                      if (s.entryType === 'expense') {
+                        if (calendarFilter !== 'deadline' && (s.visitDate === dateStr || s.deadlineDate === dateStr)) {
+                          dayEvents.push({
+                            id: `${s.id}_e`,
+                            type: 'expense',
+                            title: s.title,
+                            platform: s.platform,
+                            amount: s.extraExpense,
+                            isCompleted: true,
+                          });
+                        }
+                      } else if (s.entryType === 'income') {
+                        if (calendarFilter !== 'deadline' && (s.visitDate === dateStr || s.deadlineDate === dateStr)) {
+                          dayEvents.push({
+                            id: `${s.id}_i`,
+                            type: 'income',
+                            title: s.title,
+                            platform: s.platform,
+                            amount: s.cashAmount,
+                            isCompleted: true,
+                          });
+                        }
+                      } else {
+                        if (calendarFilter !== 'deadline' && s.visitDate === dateStr) {
+                          dayEvents.push({
+                            id: `${s.id}_v`,
+                            type: 'visit',
+                            title: s.title,
+                            platform: s.platform,
+                            isCompleted: s.isCompleted,
+                          });
+                        }
+                        if (s.deadlineDate === dateStr) {
+                          dayEvents.push({
+                            id: `${s.id}_d`,
+                            type: 'deadline',
+                            title: s.title,
+                            platform: s.platform,
+                            isCompleted: s.isCompleted,
+                          });
+                        }
                       }
                     });
 
@@ -1407,7 +1579,17 @@ export default function ExperienceDiary() {
                             let badgeClass = '';
                             let iconPrefix = '';
 
-                            if (ev.isCompleted) {
+                            if (ev.type === 'expense') {
+                              iconPrefix = '💸';
+                              badgeClass = isSelected
+                                ? 'bg-rose-400/30 text-white'
+                                : 'bg-rose-50 text-rose-700 border border-rose-200/70';
+                            } else if (ev.type === 'income') {
+                              iconPrefix = '💰';
+                              badgeClass = isSelected
+                                ? 'bg-emerald-400/30 text-white'
+                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200/70';
+                            } else if (ev.isCompleted) {
                               iconPrefix = '✔';
                               badgeClass = isSelected
                                 ? 'bg-emerald-400/30 text-white'
@@ -1428,10 +1610,14 @@ export default function ExperienceDiary() {
                               <div
                                 key={ev.id}
                                 className={`w-full px-1 py-0.5 rounded text-[9px] sm:text-[10px] font-extrabold truncate leading-tight ${badgeClass}`}
-                                title={`${ev.type === 'deadline' ? '[마감]' : '[방문/시작]'} ${ev.title}`}
+                                title={`${ev.type === 'expense' ? `[지출 -${ev.amount?.toLocaleString()}원]` : ev.type === 'income' ? `[부수입 +${ev.amount?.toLocaleString()}원]` : ev.type === 'deadline' ? '[마감]' : '[방문/시작]'} ${ev.title}`}
                               >
                                 <span className="mr-0.5">{iconPrefix}</span>
-                                {shortName}
+                                {ev.type === 'expense'
+                                  ? `-${ev.amount?.toLocaleString()}원`
+                                  : ev.type === 'income'
+                                  ? `+${ev.amount?.toLocaleString()}원`
+                                  : shortName}
                               </div>
                             );
                           })}
@@ -1477,7 +1663,7 @@ export default function ExperienceDiary() {
                         >
                           <Zap size={14} /> 리뷰노트·당첨톡 1초 자동등록
                         </button>
-                        <button onClick={openAddModal} className="text-xs text-white bg-indigo-600 px-4 py-2 rounded-xl font-bold shadow-sm">
+                        <button onClick={() => openAddModal('campaign')} className="text-xs text-white bg-indigo-600 px-4 py-2 rounded-xl font-bold shadow-sm">
                           + 직접 일정 추가하기
                         </button>
                       </div>
@@ -1486,6 +1672,99 @@ export default function ExperienceDiary() {
                 ) : (
                   <div className="grid gap-3">
                     {filteredSchedules.map((schedule) => {
+                      const isExpense = schedule.entryType === 'expense';
+                      const isIncome = schedule.entryType === 'income';
+
+                      if (isExpense) {
+                        return (
+                          <div
+                            key={schedule.id}
+                            className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-2xl border border-rose-100 bg-rose-50/25 hover:border-rose-200 transition-all group shadow-sm"
+                          >
+                            <div className="flex items-start gap-3">
+                              <span className="mt-0.5 px-2.5 py-1 rounded-xl text-[11px] font-black bg-rose-100 text-rose-700 shrink-0 border border-rose-200">
+                                💸 지출
+                              </span>
+                              <div>
+                                <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                  {schedule.platform && (
+                                    <span className="bg-white text-rose-800 border border-rose-200 text-[10px] font-extrabold px-2 py-0.5 rounded-md">
+                                      {schedule.platform}
+                                    </span>
+                                  )}
+                                  <h3 className="font-bold text-slate-800">{schedule.title}</h3>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium mt-1">
+                                  <span>📅 {schedule.visitDate}</span>
+                                  <span className="text-rose-600 font-extrabold bg-white border border-rose-200 px-2.5 py-0.5 rounded-md text-xs shadow-xs">
+                                    -{schedule.extraExpense?.toLocaleString()}원
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex justify-end gap-2 mt-3 md:mt-0">
+                              <button 
+                                onClick={() => handleEdit(schedule)}
+                                className="text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors px-3 py-1.5 rounded-lg border border-slate-200 md:border-transparent hover:border-indigo-100 hover:bg-white"
+                              >
+                                수정
+                              </button>
+                              <button 
+                                onClick={() => handleDelete(schedule.id)}
+                                className="text-xs font-semibold text-slate-500 hover:text-red-500 transition-colors px-3 py-1.5 rounded-lg border border-slate-200 md:border-transparent hover:border-red-100 hover:bg-white"
+                              >
+                                삭제
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      if (isIncome) {
+                        return (
+                          <div
+                            key={schedule.id}
+                            className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-2xl border border-emerald-100 bg-emerald-50/25 hover:border-emerald-200 transition-all group shadow-sm"
+                          >
+                            <div className="flex items-start gap-3">
+                              <span className="mt-0.5 px-2.5 py-1 rounded-xl text-[11px] font-black bg-emerald-100 text-emerald-800 shrink-0 border border-emerald-200">
+                                💰 부수입
+                              </span>
+                              <div>
+                                <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                  {schedule.platform && (
+                                    <span className="bg-white text-emerald-800 border border-emerald-200 text-[10px] font-extrabold px-2 py-0.5 rounded-md">
+                                      {schedule.platform}
+                                    </span>
+                                  )}
+                                  <h3 className="font-bold text-slate-800">{schedule.title}</h3>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium mt-1">
+                                  <span>📅 {schedule.visitDate}</span>
+                                  <span className="text-emerald-700 font-extrabold bg-white border border-emerald-200 px-2.5 py-0.5 rounded-md text-xs shadow-xs">
+                                    +{schedule.cashAmount?.toLocaleString()}원
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex justify-end gap-2 mt-3 md:mt-0">
+                              <button 
+                                onClick={() => handleEdit(schedule)}
+                                className="text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors px-3 py-1.5 rounded-lg border border-slate-200 md:border-transparent hover:border-indigo-100 hover:bg-white"
+                              >
+                                수정
+                              </button>
+                              <button 
+                                onClick={() => handleDelete(schedule.id)}
+                                className="text-xs font-semibold text-slate-500 hover:text-red-500 transition-colors px-3 py-1.5 rounded-lg border border-slate-200 md:border-transparent hover:border-red-100 hover:bg-white"
+                              >
+                                삭제
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+
                       const dDayInfo = getDDayInfo(schedule.deadlineDate, schedule.isCompleted);
                       return (
                         <div
@@ -1551,6 +1830,11 @@ export default function ExperienceDiary() {
                                     원고료 {schedule.cashAmount?.toLocaleString()}원
                                   </span>
                                 )}
+                                {(schedule.extraExpense || 0) > 0 && (
+                                  <span className="text-rose-600 font-bold bg-rose-50 px-2 py-0.5 rounded-md text-[11px]">
+                                    추가지출 -{schedule.extraExpense?.toLocaleString()}원
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1581,21 +1865,41 @@ export default function ExperienceDiary() {
           {/* 2. Ledger Tab */}
           {activeTab === 'ledger' && (
             <div className="animate-in fade-in duration-300">
-              <div className="flex flex-wrap justify-between items-center gap-2 mb-6">
-                <h2 className="text-xl font-bold text-slate-800">💰 쏠쏠한 체험단 가계부</h2>
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <span>💰 똑똑한 통합 가계부</span>
+                    <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                      체험단 + 일상지출 + 부수입
+                    </span>
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-1">체험단으로 아낀 식비·생활비와 일상 지출, 부수입을 한눈에 정리해요!</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
                   <button
-                    onClick={() => setIsShareModalOpen(true)}
-                    className="flex items-center gap-1.5 bg-gradient-to-r from-fuchsia-600 to-indigo-600 text-white text-xs sm:text-sm font-extrabold px-3.5 py-2 rounded-xl hover:opacity-95 transition shadow-sm active:scale-95"
+                    onClick={() => openAddModal('expense')}
+                    className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs sm:text-sm font-bold px-3 py-2 rounded-xl transition active:scale-95 shadow-xs"
                   >
-                    <Share2 size={15} />
-                    <span>SNS 정산 공유 ✨</span>
+                    <span>💸 지출 기록</span>
+                  </button>
+                  <button
+                    onClick={() => openAddModal('income')}
+                    className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs sm:text-sm font-bold px-3 py-2 rounded-xl transition active:scale-95 shadow-xs"
+                  >
+                    <span>💰 부수입 기록</span>
                   </button>
                   <button 
-                    onClick={openAddModal}
-                    className="bg-indigo-600 text-white text-xs sm:text-sm font-bold px-3.5 py-2 rounded-xl hover:bg-indigo-700 transition"
+                    onClick={() => openAddModal('campaign')}
+                    className="bg-indigo-600 text-white text-xs sm:text-sm font-bold px-3.5 py-2 rounded-xl hover:bg-indigo-700 transition active:scale-95 shadow-xs"
                   >
-                    + 내역 추가
+                    + 체험단 등록
+                  </button>
+                  <button
+                    onClick={() => setIsShareModalOpen(true)}
+                    className="flex items-center gap-1.5 bg-gradient-to-r from-fuchsia-600 to-indigo-600 text-white text-xs sm:text-sm font-extrabold px-3 py-2 rounded-xl hover:opacity-95 transition shadow-xs active:scale-95"
+                  >
+                    <Share2 size={14} />
+                    <span>SNS 정산 ✨</span>
                   </button>
                 </div>
               </div>
@@ -1609,9 +1913,17 @@ export default function ExperienceDiary() {
                   <div className="font-bold text-slate-800 text-lg">
                     {year}년 {month + 1}월 정산
                   </div>
-                  <div className="text-xs font-semibold text-slate-500 mt-0.5">
-                    월 순이득: <span className={monthlyNetProfit >= 0 ? "text-indigo-600 font-bold" : "text-red-500 font-bold"}>
-                      {monthlyNetProfit >= 0 ? `+${monthlyNetProfit.toLocaleString()}원` : `-${Math.abs(monthlyNetProfit).toLocaleString()}원`}
+                  <div className="flex items-center justify-center gap-3 text-xs font-semibold mt-0.5">
+                    <span className="text-slate-500">
+                      총 경제적 이득: <span className={monthlyNetProfit >= 0 ? "text-indigo-600 font-bold" : "text-rose-500 font-bold"}>
+                        {monthlyNetProfit >= 0 ? `+${monthlyNetProfit.toLocaleString()}원` : `-${Math.abs(monthlyNetProfit).toLocaleString()}원`}
+                      </span>
+                    </span>
+                    <span className="text-slate-300">|</span>
+                    <span className="text-slate-500">
+                      순수 현금 흐름: <span className={monthlyNetCash >= 0 ? "text-emerald-600 font-bold" : "text-rose-600 font-bold"}>
+                        {monthlyNetCash >= 0 ? `+${monthlyNetCash.toLocaleString()}원` : `-${Math.abs(monthlyNetCash).toLocaleString()}원`}
+                      </span>
                     </span>
                   </div>
                 </div>
@@ -1623,37 +1935,83 @@ export default function ExperienceDiary() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
                 <div className="bg-indigo-50/80 p-4 md:p-5 rounded-2xl border border-indigo-100 shadow-sm flex flex-col justify-between">
                   <div>
-                    <p className="text-indigo-700 text-xs font-bold mb-1">🎯 총 체험 건수</p>
-                    <p className="text-xl md:text-2xl font-black text-indigo-900">{monthlyCount}건</p>
-                  </div>
-                  {monthlyCount > 0 && (
-                    <p className="text-[11px] text-indigo-600 font-semibold mt-2">
-                      건당 약 {avgPerCase.toLocaleString()}원
+                    <p className="text-indigo-700 text-xs font-bold mb-1">🎯 총 경제적 이득</p>
+                    <p className={`text-xl md:text-2xl font-black ${monthlyNetProfit >= 0 ? 'text-indigo-900' : 'text-rose-600'}`}>
+                      {monthlyNetProfit >= 0 ? `+${monthlyNetProfit.toLocaleString()}원` : `-${Math.abs(monthlyNetProfit).toLocaleString()}원`}
                     </p>
-                  )}
-                </div>
-                <div className="bg-green-50 p-4 md:p-5 rounded-2xl border border-green-100 shadow-sm flex flex-col justify-between">
-                  <div>
-                    <p className="text-green-700 text-xs font-bold mb-1">🎁 월 혜택 (현물)</p>
-                    <p className="text-xl md:text-2xl font-black text-green-700">+{monthlyBenefit.toLocaleString()}원</p>
                   </div>
-                  <p className="text-[11px] text-green-600 font-medium mt-2">식사권/협찬품</p>
+                  <p className="text-[11px] text-indigo-600 font-semibold mt-2">
+                    방어혜택 + 현금수입 - 총지출
+                  </p>
+                </div>
+                <div className="bg-emerald-50 p-4 md:p-5 rounded-2xl border border-emerald-100 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <p className="text-emerald-700 text-xs font-bold mb-1">🎁 방어한 생활비 (체험단)</p>
+                    <p className="text-xl md:text-2xl font-black text-emerald-700">+{monthlyBenefit.toLocaleString()}원</p>
+                  </div>
+                  <p className="text-[11px] text-emerald-600 font-medium mt-2">식사권·협찬품 생활비 절약</p>
                 </div>
                 <div className="bg-blue-50 p-4 md:p-5 rounded-2xl border border-blue-100 shadow-sm flex flex-col justify-between">
                   <div>
-                    <p className="text-blue-700 text-xs font-bold mb-1">💸 월 지원금 (현금)</p>
+                    <p className="text-blue-700 text-xs font-bold mb-1">💵 총 현금 수입 (부수입+지원금)</p>
                     <p className="text-xl md:text-2xl font-black text-blue-700">+{monthlyCash.toLocaleString()}원</p>
                   </div>
-                  <p className="text-[11px] text-blue-600 font-medium mt-2">원고료/교통비</p>
+                  <p className="text-[11px] text-blue-600 font-medium mt-2">원고료, 애드센스, 중고판매</p>
                 </div>
-                <div className="bg-red-50 p-4 md:p-5 rounded-2xl border border-red-100 shadow-sm flex flex-col justify-between">
+                <div className="bg-rose-50 p-4 md:p-5 rounded-2xl border border-rose-100 shadow-sm flex flex-col justify-between">
                   <div>
-                    <p className="text-red-700 text-xs font-bold mb-1">💳 초과 지출</p>
-                    <p className="text-xl md:text-2xl font-black text-red-700">-{monthlyExpense.toLocaleString()}원</p>
+                    <p className="text-rose-700 text-xs font-bold mb-1">💳 총 지출 (일상+초과금)</p>
+                    <p className="text-xl md:text-2xl font-black text-rose-700">-{monthlyExpense.toLocaleString()}원</p>
                   </div>
-                  <p className="text-[11px] text-red-600 font-medium mt-2">내돈내산 추가금</p>
+                  <p className="text-[11px] text-rose-600 font-medium mt-2">식비/카페/쇼핑/추가지출</p>
                 </div>
               </div>
+
+              {/* 지출 카테고리별 비중 분석 바 */}
+              {expenseCategoryStats.length > 0 && (
+                <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 md:p-5 mb-6 shadow-xs">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-xs md:text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+                      <span>📊 이번 달 일상 지출 분석</span>
+                    </h4>
+                    <span className="text-xs font-bold text-rose-600">
+                      총 {totalPureExpense.toLocaleString()}원
+                    </span>
+                  </div>
+                  <div className="h-3 w-full bg-slate-200/80 rounded-full overflow-hidden flex mb-3">
+                    {expenseCategoryStats.map((cat, idx) => {
+                      const pct = Math.max(3, Math.round((cat.amount / totalPureExpense) * 100));
+                      const colors = [
+                        'bg-amber-400', 'bg-orange-400', 'bg-pink-400', 'bg-blue-400',
+                        'bg-purple-400', 'bg-emerald-400', 'bg-indigo-400', 'bg-slate-400'
+                      ];
+                      return (
+                        <div
+                          key={cat.id}
+                          style={{ width: `${pct}%` }}
+                          className={`${colors[idx % colors.length]} h-full transition-all`}
+                          title={`${cat.label}: ${cat.amount.toLocaleString()}원 (${pct}%)`}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {expenseCategoryStats.map((cat) => {
+                      const pct = Math.round((cat.amount / totalPureExpense) * 100);
+                      return (
+                        <div
+                          key={cat.id}
+                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border ${cat.color}`}
+                        >
+                          <span>{cat.label}</span>
+                          <span className="font-black">{cat.amount.toLocaleString()}원</span>
+                          <span className="opacity-70 text-[10px]">({pct}%)</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* SNS 리포트 카드 & 커뮤니티 자랑하기 배너 */}
               {monthlyCount > 0 && (
@@ -1661,7 +2019,7 @@ export default function ExperienceDiary() {
                   <div className="flex items-center gap-3 text-center sm:text-left">
                     <span className="text-2xl">🎉</span>
                     <div>
-                      <p className="font-extrabold text-sm md:text-base">이번 달 {monthlyCount}건 완주! 정산 리포트 카드로 SNS에 공유해보세요</p>
+                      <p className="font-extrabold text-sm md:text-base">이번 달 {monthlyCount}건 기록! 정산 리포트 카드로 SNS에 공유해보세요</p>
                       <p className="text-xs text-indigo-100 opacity-90">인스타 스토리·스레드·네이버 블로그용 정산 카드 이미지와 요약 표를 1초 만에 만들어 드려요.</p>
                     </div>
                   </div>
@@ -1683,15 +2041,15 @@ export default function ExperienceDiary() {
               )}
 
               {/* 체험단별 진행 횟수 통계 */}
-              {monthlyCount > 0 && (
-                <div className="bg-slate-50 border border-slate-200/70 rounded-2xl p-4 md:p-5 mb-8">
+              {monthlyCampaignCount > 0 && (
+                <div className="bg-slate-50 border border-slate-200/70 rounded-2xl p-4 md:p-5 mb-6">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <h4 className="text-xs md:text-sm font-bold text-slate-800 flex items-center gap-1.5">
                         <span>🏷️ 체험단별 진행 횟수</span>
                       </h4>
                       <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
-                        총 {monthlyCount}건
+                        총 {monthlyCampaignCount}건
                       </span>
                     </div>
                     {selectedPlatformFilter && (
@@ -1706,7 +2064,7 @@ export default function ExperienceDiary() {
                   
                   <div className="flex flex-wrap gap-2">
                     {sortedPlatformStats.map(([platName, count]) => {
-                      const percent = Math.round((count / monthlyCount) * 100);
+                      const percent = Math.round((count / monthlyCampaignCount) * 100);
                       const isSelected = selectedPlatformFilter === platName;
                       return (
                         <button
@@ -1739,15 +2097,55 @@ export default function ExperienceDiary() {
                 </div>
               )}
 
-              {/* 가계부 리스트 */}
+              {/* 가계부 리스트 헤더 및 유형 필터 */}
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-slate-700">
-                    {month + 1}월 상세 내역 {selectedPlatformFilter ? `(${selectedPlatformFilter} ${displayedMonthlySchedules.length}건)` : `(총 ${monthlyCount}건)`}
-                  </h3>
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      onClick={() => { setLedgerFilter('all'); setSelectedPlatformFilter(null); }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                        ledgerFilter === 'all'
+                          ? 'bg-slate-800 text-white shadow-sm'
+                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      🔥 전체 ({monthlyCount}건)
+                    </button>
+                    <button
+                      onClick={() => { setLedgerFilter('campaign'); setSelectedPlatformFilter(null); }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                        ledgerFilter === 'campaign'
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      🎁 체험단 ({monthlyCampaignCount}건)
+                    </button>
+                    <button
+                      onClick={() => { setLedgerFilter('expense'); setSelectedPlatformFilter(null); }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                        ledgerFilter === 'expense'
+                          ? 'bg-rose-600 text-white shadow-sm'
+                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      💸 일상 지출 ({monthlyExpenses.length}건)
+                    </button>
+                    <button
+                      onClick={() => { setLedgerFilter('income'); setSelectedPlatformFilter(null); }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                        ledgerFilter === 'income'
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      💰 부수입 ({monthlyIncomes.length}건)
+                    </button>
+                  </div>
+
                   {selectedPlatformFilter && (
                     <button onClick={() => setSelectedPlatformFilter(null)} className="text-xs text-indigo-600 font-semibold hover:underline">
-                      필터 해제
+                      플랫폼 필터 해제 ({selectedPlatformFilter})
                     </button>
                   )}
                 </div>
@@ -1757,42 +2155,104 @@ export default function ExperienceDiary() {
                     <p className="text-slate-400 text-sm">
                       {selectedPlatformFilter 
                         ? `'${selectedPlatformFilter}'에 해당하는 내역이 없습니다.` 
+                        : ledgerFilter === 'expense'
+                        ? '이번 달에 기록된 일상 지출이 없습니다.'
+                        : ledgerFilter === 'income'
+                        ? '이번 달에 기록된 부수입이 없습니다.'
                         : '해당 월에 기록된 내역이 없습니다.'}
                     </p>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <button
+                        onClick={() => openAddModal('expense')}
+                        className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl"
+                      >
+                        + 지출 기록하기
+                      </button>
+                      <button
+                        onClick={() => openAddModal('income')}
+                        className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold rounded-xl"
+                      >
+                        + 부수입 기록하기
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="grid gap-3">
-                    {displayedMonthlySchedules.map((schedule) => (
-                      <div key={schedule.id} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 bg-white shadow-sm hover:border-indigo-100 transition-colors">
-                        <div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {schedule.platform && (
-                              <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-extrabold px-2 py-0.5 rounded-md">
-                                {schedule.platform}
-                              </span>
-                            )}
-                            <p className="font-bold text-slate-800">{schedule.title}</p>
+                    {displayedMonthlySchedules.map((schedule) => {
+                      const isExpense = schedule.entryType === 'expense';
+                      const isIncome = schedule.entryType === 'income';
+
+                      return (
+                        <div key={schedule.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl border border-slate-100 bg-white shadow-xs hover:border-indigo-100 transition-colors gap-3">
+                          <div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {isExpense ? (
+                                <span className="bg-rose-100 text-rose-800 border border-rose-200 text-[10px] font-black px-2 py-0.5 rounded-md">
+                                  💸 지출
+                                </span>
+                              ) : isIncome ? (
+                                <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-black px-2 py-0.5 rounded-md">
+                                  💰 부수입
+                                </span>
+                              ) : (
+                                <span className="bg-indigo-100 text-indigo-800 border border-indigo-200 text-[10px] font-black px-2 py-0.5 rounded-md">
+                                  🎁 체험단
+                                </span>
+                              )}
+                              {schedule.platform && (
+                                <span className="bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-extrabold px-2 py-0.5 rounded-md">
+                                  {schedule.platform}
+                                </span>
+                              )}
+                              <p className="font-bold text-slate-800">{schedule.title}</p>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                              <CalendarIcon size={12} /> {schedule.visitDate || schedule.deadlineDate}
+                            </p>
                           </div>
-                          <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                            <CalendarIcon size={12} /> {schedule.visitDate || schedule.deadlineDate}
-                          </p>
+                          <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                            <div className="text-right flex flex-col gap-0.5">
+                              {isExpense && (
+                                <p className="text-sm font-black text-rose-600">-{schedule.extraExpense?.toLocaleString()}원</p>
+                              )}
+                              {isIncome && (
+                                <p className="text-sm font-black text-blue-600">+{schedule.cashAmount?.toLocaleString()}원</p>
+                              )}
+                              {!isExpense && !isIncome && (
+                                <>
+                                  {(schedule.benefitAmount || 0) > 0 && (
+                                    <p className="text-xs font-bold text-green-600">혜택 +{schedule.benefitAmount?.toLocaleString()}원</p>
+                                  )}
+                                  {(schedule.cashAmount || 0) > 0 && (
+                                    <p className="text-xs font-bold text-blue-600">지원금 +{schedule.cashAmount?.toLocaleString()}원</p>
+                                  )}
+                                  {(schedule.extraExpense || 0) > 0 && (
+                                    <p className="text-xs font-bold text-red-500">초과 -{schedule.extraExpense?.toLocaleString()}원</p>
+                                  )}
+                                  {!schedule.benefitAmount && !schedule.extraExpense && !schedule.cashAmount && (
+                                    <p className="text-xs text-slate-400 font-medium">금액 미입력</p>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 border-l border-slate-100 pl-2">
+                              <button
+                                onClick={() => handleEdit(schedule)}
+                                className="text-xs text-slate-400 hover:text-indigo-600 px-2 py-1 hover:bg-indigo-50 rounded-lg transition"
+                              >
+                                수정
+                              </button>
+                              <button
+                                onClick={() => handleDelete(schedule.id)}
+                                className="text-xs text-slate-400 hover:text-red-500 px-2 py-1 hover:bg-red-50 rounded-lg transition"
+                              >
+                                삭제
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-right flex flex-col gap-0.5">
-                          {(schedule.benefitAmount || 0) > 0 && (
-                            <p className="text-xs font-bold text-green-600">혜택 +{schedule.benefitAmount?.toLocaleString()}원</p>
-                          )}
-                          {(schedule.cashAmount || 0) > 0 && (
-                            <p className="text-xs font-bold text-blue-600">지원금 +{schedule.cashAmount?.toLocaleString()}원</p>
-                          )}
-                          {(schedule.extraExpense || 0) > 0 && (
-                            <p className="text-xs font-bold text-red-500">지출 -{schedule.extraExpense?.toLocaleString()}원</p>
-                          )}
-                          {!schedule.benefitAmount && !schedule.extraExpense && !schedule.cashAmount && (
-                            <p className="text-xs text-slate-400 font-medium">금액 미입력</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -2022,14 +2482,285 @@ export default function ExperienceDiary() {
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-slate-900">{editingId ? '체험단 일정 수정' : '새 체험단 등록'}</h3>
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-xl font-bold text-slate-900">
+                {editingId 
+                  ? (entryType === 'expense' ? '지출 내역 수정' : entryType === 'income' ? '부수입 내역 수정' : '체험단 일정 수정') 
+                  : (entryType === 'expense' ? '💸 새 지출 기록' : entryType === 'income' ? '💰 새 부수입 기록' : '🎁 새 체험단 등록')}
+              </h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <X size={24} />
               </button>
             </div>
             
+            {/* 상단 유형 전환 탭 (신규 등록 시) */}
+            {!editingId && (
+              <div className="flex bg-slate-100 p-1 rounded-2xl mb-4">
+                <button
+                  type="button"
+                  onClick={() => setEntryType('campaign')}
+                  className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition-all ${
+                    entryType === 'campaign'
+                      ? 'bg-white text-indigo-600 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  🎁 체험단
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEntryType('expense');
+                    if (!newCategory) setNewCategory('food');
+                  }}
+                  className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition-all ${
+                    entryType === 'expense'
+                      ? 'bg-rose-600 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  💸 일상 지출
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEntryType('income');
+                    if (!newCategory) setNewCategory('ad');
+                  }}
+                  className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition-all ${
+                    entryType === 'income'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  💰 부수입
+                </button>
+              </div>
+            )}
+
             <form onSubmit={handleSaveSchedule} className="flex flex-col gap-4">
+              {/* 💸 1. 일상 지출 폼 */}
+              {entryType === 'expense' && (
+                <div className="flex flex-col gap-4">
+                  {/* 카테고리 선택 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">지출 카테고리</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                      {EXPENSE_CATEGORIES.map((cat) => {
+                        const isSelected = (newCategory || 'food') === cat.id;
+                        return (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => setNewCategory(cat.id)}
+                            className={`p-2 rounded-xl text-xs font-bold transition-all text-center border ${
+                              isSelected
+                                ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            {cat.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 지출 내용 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">지출 내용 <span className="text-red-500">*</span></label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="예: 점심 쌀국수, 스타벅스 라떼, 마트 장보기"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-100 transition-all text-sm font-medium"
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                    />
+                  </div>
+
+                  {/* 지출 금액 */}
+                  <div className="bg-rose-50/50 p-3.5 rounded-2xl border border-rose-100">
+                    <label className="block text-xs font-bold text-rose-800 mb-1">지출 금액 (원) <span className="text-red-500">*</span></label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="예: 12000"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-100 transition-all text-base font-black text-rose-600 bg-white"
+                      value={newExpense}
+                      onChange={(e) => setNewExpense(e.target.value)}
+                    />
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {[
+                        { label: '+3천', val: 3000 },
+                        { label: '+5천', val: 5000 },
+                        { label: '+1만', val: 10000 },
+                        { label: '+2만', val: 20000 },
+                        { label: '+5만', val: 50000 },
+                        { label: '+10만', val: 100000 },
+                      ].map((btn) => (
+                        <button
+                          key={btn.label}
+                          type="button"
+                          onClick={() => setNewExpense(String((Number(newExpense) || 0) + btn.val))}
+                          className="px-2 py-1 rounded-lg bg-white hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-bold active:scale-95"
+                        >
+                          {btn.label}
+                        </button>
+                      ))}
+                      {newExpense && (
+                        <button
+                          type="button"
+                          onClick={() => setNewExpense('')}
+                          className="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-400 border border-slate-200 text-[11px] font-bold"
+                        >
+                          초기화
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 지출 날짜 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">지출 날짜</label>
+                    <input
+                      type="date"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-100 transition-all text-sm font-medium"
+                      value={newVisitDate || toDateInputString(new Date())}
+                      onChange={(e) => setNewVisitDate(e.target.value)}
+                    />
+                    <div className="flex gap-1.5 mt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setNewVisitDate(toDateInputString(new Date()))}
+                        className="px-2.5 py-1 rounded-md bg-white border border-slate-200 hover:border-rose-300 text-[11px] font-bold text-slate-600 hover:text-rose-600"
+                      >
+                        오늘
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewVisitDate(getOffsetDateString(-1))}
+                        className="px-2.5 py-1 rounded-md bg-white border border-slate-200 hover:border-rose-300 text-[11px] font-bold text-slate-600 hover:text-rose-600"
+                      >
+                        어제
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 💰 2. 부수입 폼 */}
+              {entryType === 'income' && (
+                <div className="flex flex-col gap-4">
+                  {/* 카테고리 선택 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">부수입 카테고리</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                      {INCOME_CATEGORIES.map((cat) => {
+                        const isSelected = (newCategory || 'ad') === cat.id;
+                        return (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => setNewCategory(cat.id)}
+                            className={`p-2 rounded-xl text-xs font-bold transition-all text-center border ${
+                              isSelected
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            {cat.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 수입 내용 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">수입 내용 <span className="text-red-500">*</span></label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="예: OOO브랜드 리뷰 원고료 입금, 구글 애드센스 정산, 당근 옷 판매"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all text-sm font-medium"
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                    />
+                  </div>
+
+                  {/* 수입 금액 */}
+                  <div className="bg-emerald-50/50 p-3.5 rounded-2xl border border-emerald-100">
+                    <label className="block text-xs font-bold text-emerald-800 mb-1">수입 금액 (원) <span className="text-red-500">*</span></label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="예: 50000"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all text-base font-black text-emerald-700 bg-white"
+                      value={newCash}
+                      onChange={(e) => setNewCash(e.target.value)}
+                    />
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {[
+                        { label: '+1만', val: 10000 },
+                        { label: '+3만', val: 30000 },
+                        { label: '+5만', val: 50000 },
+                        { label: '+10만', val: 100000 },
+                        { label: '+30만', val: 300000 },
+                      ].map((btn) => (
+                        <button
+                          key={btn.label}
+                          type="button"
+                          onClick={() => setNewCash(String((Number(newCash) || 0) + btn.val))}
+                          className="px-2 py-1 rounded-lg bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold active:scale-95"
+                        >
+                          {btn.label}
+                        </button>
+                      ))}
+                      {newCash && (
+                        <button
+                          type="button"
+                          onClick={() => setNewCash('')}
+                          className="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-400 border border-slate-200 text-[11px] font-bold"
+                        >
+                          초기화
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 입금 날짜 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">입금/수익 날짜</label>
+                    <input
+                      type="date"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all text-sm font-medium"
+                      value={newVisitDate || toDateInputString(new Date())}
+                      onChange={(e) => setNewVisitDate(e.target.value)}
+                    />
+                    <div className="flex gap-1.5 mt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setNewVisitDate(toDateInputString(new Date()))}
+                        className="px-2.5 py-1 rounded-md bg-white border border-slate-200 hover:border-emerald-300 text-[11px] font-bold text-slate-600 hover:text-emerald-600"
+                      >
+                        오늘
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewVisitDate(getOffsetDateString(-1))}
+                        className="px-2.5 py-1 rounded-md bg-white border border-slate-200 hover:border-emerald-300 text-[11px] font-bold text-slate-600 hover:text-emerald-600"
+                      >
+                        어제
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 🎁 3. 기존 체험단 캠페인 폼 */}
+              {entryType === 'campaign' && (
+                <>
               {/* ⚡ 당첨 카톡/내역 1초 자동완성 바 (신규 등록 시) */}
               {!editingId && (
                 <div className="bg-amber-50/90 border border-amber-200 p-3.5 rounded-2xl flex flex-col gap-2">
@@ -2291,6 +3022,8 @@ export default function ExperienceDiary() {
                   </div>
                 </div>
               </div>
+            </>
+          )}
 
               <div className="flex gap-3 mt-2">
                 <button 
@@ -2302,7 +3035,13 @@ export default function ExperienceDiary() {
                 </button>
                 <button 
                   type="submit" 
-                  className="flex-1 py-3 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-md"
+                  className={`flex-1 py-3 rounded-xl font-bold text-white transition-colors shadow-md ${
+                    entryType === 'expense'
+                      ? 'bg-rose-600 hover:bg-rose-700'
+                      : entryType === 'income'
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-indigo-600 hover:bg-indigo-700'
+                  }`}
                 >
                   저장하기
                 </button>
