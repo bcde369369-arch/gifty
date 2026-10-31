@@ -48,6 +48,7 @@ export default function CommunityPage() {
 
   // 댓글 폼 상태
   const [commentAuthor, setCommentAuthor] = useState('');
+  const [commentPassword, setCommentPassword] = useState('');
   const [commentContent, setCommentContent] = useState('');
 
   // 실시간 접속자 수 (38~56명 사이 자연스러운 라이브 연출)
@@ -177,6 +178,7 @@ export default function CommunityPage() {
     const newComment: Comment = {
       id: `c-auto-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       author: commentData.author,
+      password: 'admin999',
       content: commentData.content,
       createdAt: dateStr,
       minutesAgo: 0,
@@ -332,6 +334,56 @@ export default function CommunityPage() {
     alert('게시글이 삭제되었습니다.');
   };
 
+  // 댓글 삭제 핸들러 (작성자 비밀번호 또는 관리자 마스터 비번 admin999 지원 / 어드민 로그인 시 원클릭)
+  const handleDeleteComment = (postId: string, commentId: string) => {
+    const targetPost = posts.find((p) => p.id === postId);
+    if (!targetPost) return;
+
+    const targetComment = targetPost.comments.find((c) => c.id === commentId);
+    if (!targetComment) return;
+
+    // 관리자(어드민) 로그인 여부 확인
+    const isAdmin = typeof window !== 'undefined' && localStorage.getItem('gifty_admin_auth') === 'true';
+
+    if (isAdmin) {
+      if (!confirm(`[관리자] '${targetComment.author}'님의 댓글을 삭제하시겠습니까?`)) return;
+    } else {
+      const inputPw = prompt('댓글 작성 시 입력한 비밀번호(4자리) 또는 관리자 비밀번호를 입력해주세요:');
+      if (inputPw === null) return;
+
+      const isValid = (targetComment.password && targetComment.password === inputPw) || inputPw === 'admin999';
+      if (!isValid) {
+        alert('비밀번호가 일치하지 않습니다! (관리자 비밀번호: admin999)');
+        return;
+      }
+
+      if (!confirm('정말 이 댓글을 삭제하시겠습니까?')) return;
+    }
+
+    const updatedComments = targetPost.comments.filter((c) => c.id !== commentId);
+    const updatedPosts = posts.map((p) => {
+      if (p.id === postId) {
+        return {
+          ...p,
+          comments: updatedComments,
+        };
+      }
+      return p;
+    });
+
+    setPosts(updatedPosts);
+    savePosts(updatedPosts);
+
+    if (selectedPost && selectedPost.id === postId) {
+      setSelectedPost({
+        ...selectedPost,
+        comments: updatedComments,
+      });
+    }
+
+    alert('댓글이 삭제되었습니다.');
+  };
+
   // 댓글 등록 핸들러
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -346,6 +398,7 @@ export default function CommunityPage() {
     const newComment: Comment = {
       id: `c-${Date.now()}`,
       author: commentAuthor.trim(),
+      password: commentPassword.trim() || '1234',
       content: commentContent.trim(),
       createdAt: dateStr
     };
@@ -368,6 +421,7 @@ export default function CommunityPage() {
     });
 
     setCommentContent('');
+    setCommentPassword('');
   };
 
   // 필터링된 게시글
@@ -693,10 +747,21 @@ export default function CommunityPage() {
                     <p className="text-xs text-slate-400 py-4 text-center">첫 번째 댓글을 남겨보세요!</p>
                   ) : (
                     selectedPost.comments.map(c => (
-                      <div key={c.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="font-bold text-xs text-slate-800">{c.author}</span>
-                          <span className="text-[10px] text-slate-400">{c.createdAt}</span>
+                      <div key={c.id} className="bg-slate-50 p-3.5 sm:p-4 rounded-2xl border border-slate-100 group">
+                        <div className="flex justify-between items-center mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-xs text-slate-800">{c.author}</span>
+                            <span className="text-[10px] text-slate-400">{c.createdAt}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteComment(selectedPost.id, c.id)}
+                            className="text-slate-400 hover:text-red-500 p-1 rounded-lg hover:bg-white transition-colors flex items-center gap-1 text-[11px] font-medium"
+                            title="댓글 삭제 (작성자 또는 관리자 admin999)"
+                          >
+                            <Trash2 size={12} />
+                            <span className="hidden sm:inline text-[11px]">삭제</span>
+                          </button>
                         </div>
                         <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">{c.content}</p>
                       </div>
@@ -706,14 +771,24 @@ export default function CommunityPage() {
 
                 {/* Comment Input Form */}
                 <form onSubmit={handleAddComment} className="flex flex-col gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200">
-                  <input 
-                    type="text" 
-                    placeholder="닉네임 (예: 맛집탐험가)"
-                    value={commentAuthor}
-                    onChange={(e) => setCommentAuthor(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-bold bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500"
-                    required
-                  />
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      placeholder="닉네임 (예: 맛집탐험가)"
+                      value={commentAuthor}
+                      onChange={(e) => setCommentAuthor(e.target.value)}
+                      className="flex-1 px-3 py-2 text-xs font-bold bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500"
+                      required
+                    />
+                    <input 
+                      type="password" 
+                      maxLength={8}
+                      placeholder="비밀번호(4자리)"
+                      value={commentPassword}
+                      onChange={(e) => setCommentPassword(e.target.value)}
+                      className="w-28 sm:w-32 px-3 py-2 text-xs font-bold bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
                   <div className="flex gap-2">
                     <textarea 
                       placeholder="따뜻한 댓글 한마디를 남겨주세요."
