@@ -24,6 +24,7 @@ import {
   getPosts, 
   savePosts 
 } from '@/lib/community';
+import { generateSmartComments } from '@/lib/autoResponder';
 import CoupangBanner from '@/components/CoupangBanner';
 import { useSiteSettings } from '@/lib/settings';
 
@@ -82,6 +83,69 @@ export default function CommunityPage() {
     const loaded = getPosts();
     setPosts(loaded);
 
+    // 대기 중인 스마트 자동 댓글이 있는지 확인 후 자동 주입
+    try {
+      const pendingStr = localStorage.getItem('gifty_pending_comments');
+      if (pendingStr) {
+        const pendingList: Array<{
+          postId: string;
+          createdAt: number;
+          comments: Array<{ author: string; content: string; delivered?: boolean }>;
+        }> = JSON.parse(pendingStr);
+
+        const now = Date.now();
+        let postStateChanged = false;
+
+        pendingList.forEach((item) => {
+          const elapsed = (now - item.createdAt) / 1000;
+          const targetPost = loaded.find((p) => p.id === item.postId);
+          if (!targetPost) return;
+
+          // 1번째 댓글 (25초 이상 경과 시)
+          if (elapsed >= 25 && item.comments[0] && !item.comments[0].delivered) {
+            if (!targetPost.comments.some((c) => c.content === item.comments[0].content)) {
+              targetPost.comments.push({
+                id: `c-auto-${Date.now()}-1`,
+                author: item.comments[0].author,
+                content: item.comments[0].content,
+                createdAt: '방금 전',
+                minutesAgo: 1,
+              });
+              postStateChanged = true;
+            }
+            item.comments[0].delivered = true;
+          }
+
+          // 2번째 댓글 (65초 이상 경과 시)
+          if (elapsed >= 65 && item.comments[1] && !item.comments[1].delivered) {
+            if (!targetPost.comments.some((c) => c.content === item.comments[1].content)) {
+              targetPost.comments.push({
+                id: `c-auto-${Date.now()}-2`,
+                author: item.comments[1].author,
+                content: item.comments[1].content,
+                createdAt: '방금 전',
+                minutesAgo: 1,
+              });
+              postStateChanged = true;
+            }
+            item.comments[1].delivered = true;
+          }
+        });
+
+        if (postStateChanged) {
+          savePosts(loaded);
+          setPosts([...loaded]);
+        }
+
+        const remainingPending = pendingList.filter((item) =>
+          item.comments.some((c) => !c.delivered)
+        );
+        localStorage.setItem('gifty_pending_comments', JSON.stringify(remainingPending));
+      }
+    } catch (e) {
+      console.warn('Failed to process pending comments', e);
+    }
+
     const draftStr = sessionStorage.getItem('gifty_community_draft');
     if (draftStr) {
       sessionStorage.removeItem('gifty_community_draft');
@@ -98,6 +162,57 @@ export default function CommunityPage() {
     }
   }, []);
 
+  // 지능형 자동 댓글 추가 헬퍼 함수
+  const addAutoCommentToPost = (
+    postId: string,
+    commentData: { author: string; content: string }
+  ) => {
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+      now.getDate()
+    ).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(
+      now.getMinutes()
+    ).padStart(2, '0')}`;
+
+    const newComment: Comment = {
+      id: `c-auto-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      author: commentData.author,
+      content: commentData.content,
+      createdAt: dateStr,
+      minutesAgo: 0,
+    };
+
+    setPosts((prevPosts) => {
+      const updated = prevPosts.map((p) => {
+        if (p.id === postId) {
+          if (p.comments.some((c) => c.content === commentData.content)) {
+            return p;
+          }
+          return {
+            ...p,
+            comments: [...p.comments, newComment],
+          };
+        }
+        return p;
+      });
+      savePosts(updated);
+      return updated;
+    });
+
+    setSelectedPost((prevSelected) => {
+      if (prevSelected && prevSelected.id === postId) {
+        if (prevSelected.comments.some((c) => c.content === commentData.content)) {
+          return prevSelected;
+        }
+        return {
+          ...prevSelected,
+          comments: [...prevSelected.comments, newComment],
+        };
+      }
+      return prevSelected;
+    });
+  };
+
   // 글 작성 핸들러
   const handleCreatePost = (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,11 +224,15 @@ export default function CommunityPage() {
     const now = new Date();
     const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
+    const postTitle = newTitle.trim();
+    const postContent = newContent.trim();
+    const postCat = newCategory;
+
     const newPost: Post = {
       id: `post-${Date.now()}`,
-      category: newCategory,
-      title: newTitle.trim(),
-      content: newContent.trim(),
+      category: postCat,
+      title: postTitle,
+      content: postContent,
       author: newAuthor.trim(),
       password: newPassword.trim() || '1234',
       views: 1,
@@ -126,6 +245,41 @@ export default function CommunityPage() {
     const updated = [newPost, ...posts];
     setPosts(updated);
     savePosts(updated);
+
+    // 스마트 맞춤형 자동 댓글 생성 및 예약
+    const smartComments = generateSmartComments(postTitle, postContent, postCat);
+    if (smartComments && smartComments.length > 0) {
+      // 1) 새로고침 대비 백업 큐 저장
+      try {
+        const pendingStr = localStorage.getItem('gifty_pending_comments');
+        const pendingList = pendingStr ? JSON.parse(pendingStr) : [];
+        pendingList.push({
+          postId: newPost.id,
+          createdAt: Date.now(),
+          comments: smartComments.map((c) => ({
+            author: c.author,
+            content: c.content,
+            delivered: false,
+          })),
+        });
+        localStorage.setItem('gifty_pending_comments', JSON.stringify(pendingList));
+      } catch (err) {
+        console.warn('Failed to save pending comments', err);
+      }
+
+      // 2) 실시간 타이머 (1차: 25~35초 후, 2차: 65~80초 후 자연스럽게 등록)
+      const delay1 = 25000 + Math.floor(Math.random() * 10000);
+      setTimeout(() => {
+        addAutoCommentToPost(newPost.id, smartComments[0]);
+      }, delay1);
+
+      if (smartComments.length > 1) {
+        const delay2 = 65000 + Math.floor(Math.random() * 15000);
+        setTimeout(() => {
+          addAutoCommentToPost(newPost.id, smartComments[1]);
+        }, delay2);
+      }
+    }
 
     // 초기화
     setNewTitle('');
