@@ -681,23 +681,6 @@ export default function ExperienceDiary() {
     }
   };
 
-  // 호환용 삭제 함수 (직접 호출 시에도 안전하게 confirmDelete 또는 모달 오픈)
-  const handleDelete = (id: string) => {
-    const target = schedules.find(s => String(s.id) === String(id));
-    if (target) {
-      setDeleteConfirmTarget(target);
-    } else {
-      lastLocalUpdateRef.current = Date.now();
-      const updated = schedules.filter(s => String(s.id) !== String(id));
-      setSchedules(updated);
-      localStorage.setItem('gifty_schedules', JSON.stringify(updated));
-      const syncCode = getSavedSyncCode();
-      if (syncCode) {
-        pushSchedulesToCloud(updated, syncCode).catch(() => {});
-      }
-    }
-  };
-
   // 리뷰 작성 완료 / 미완료 원클릭 토글
   const handleToggleComplete = (id: string) => {
     const updated = schedules.map((s) =>
@@ -1762,7 +1745,11 @@ export default function ExperienceDiary() {
                             key={schedule.id}
                             className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-2xl border border-rose-100 bg-rose-50/25 hover:border-rose-200 transition-all group shadow-sm"
                           >
-                            <div className="flex items-start gap-3">
+                            <div 
+                              onClick={() => handleEdit(schedule)}
+                              className="flex items-start gap-3 cursor-pointer flex-1"
+                              title="클릭하여 수정하기"
+                            >
                               <span className="mt-0.5 px-2.5 py-1 rounded-xl text-[11px] font-black bg-rose-100 text-rose-700 shrink-0 border border-rose-200">
                                 💸 지출
                               </span>
@@ -1773,7 +1760,7 @@ export default function ExperienceDiary() {
                                       {schedule.platform}
                                     </span>
                                   )}
-                                  <h3 className="font-bold text-slate-800">{schedule.title}</h3>
+                                  <h3 className="font-bold text-slate-800 hover:text-rose-600 transition-colors">{schedule.title}</h3>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium mt-1">
                                   <span>📅 {schedule.visitDate}</span>
@@ -1807,7 +1794,11 @@ export default function ExperienceDiary() {
                             key={schedule.id}
                             className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-2xl border border-emerald-100 bg-emerald-50/25 hover:border-emerald-200 transition-all group shadow-sm"
                           >
-                            <div className="flex items-start gap-3">
+                            <div 
+                              onClick={() => handleEdit(schedule)}
+                              className="flex items-start gap-3 cursor-pointer flex-1"
+                              title="클릭하여 수정하기"
+                            >
                               <span className="mt-0.5 px-2.5 py-1 rounded-xl text-[11px] font-black bg-emerald-100 text-emerald-800 shrink-0 border border-emerald-200">
                                 💰 부수입
                               </span>
@@ -1818,7 +1809,7 @@ export default function ExperienceDiary() {
                                       {schedule.platform}
                                     </span>
                                   )}
-                                  <h3 className="font-bold text-slate-800">{schedule.title}</h3>
+                                  <h3 className="font-bold text-slate-800 hover:text-emerald-600 transition-colors">{schedule.title}</h3>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium mt-1">
                                   <span>📅 {schedule.visitDate}</span>
@@ -1871,7 +1862,11 @@ export default function ExperienceDiary() {
                               {schedule.isCompleted ? '✔ 완료됨' : '⬜ 완료체크'}
                             </button>
 
-                            <div>
+                            <div 
+                              onClick={() => handleEdit(schedule)}
+                              className="cursor-pointer flex-1 select-none"
+                              title="클릭하여 수정하기"
+                            >
                               <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                                 <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${dDayInfo.style}`}>
                                   {dDayInfo.label}

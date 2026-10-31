@@ -221,9 +221,6 @@ export default function CommunityPage() {
       return;
     }
 
-    const now = new Date();
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
     const postTitle = newTitle.trim();
     const postContent = newContent.trim();
     const postCat = newCategory;
