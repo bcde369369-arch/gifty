@@ -203,6 +203,11 @@ export default function Home() {
             )}
           </div>
 
+          {/* 메인 첫 화면 상단: 쿠팡 로켓배송 최저가 검색 & 무료 응원 카드 (스크롤 없이 바로 노출) */}
+          <div className="mt-4 max-w-4xl mx-auto w-full">
+            <CoupangSupportCard category="general" />
+          </div>
+
           {/* Global Coupang Partners Banner (업로드 상자 바로 밑에 밀착 배치) */}
           {isLoaded && (
             <div className="mt-3.5 flex flex-col justify-center items-center">
