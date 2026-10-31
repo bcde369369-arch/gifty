@@ -2043,6 +2043,84 @@ export default function ExperienceDiary() {
                 </div>
               </div>
 
+              {/* 🏷️ 정산 바로 밑: 체험단별 진행 횟수 통계 */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-4 md:p-5 mb-6 shadow-xs">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs md:text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+                      <span>🏷️ 체험단별 진행 횟수</span>
+                    </h4>
+                    <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">
+                      총 {monthlyCampaignCount}건
+                    </span>
+                    {monthlyCampaignCount > 0 && avgPerCase > 0 && (
+                      <span className="hidden sm:inline-block text-[11px] font-bold text-slate-500">
+                        (건당 평균 이득: <span className="text-indigo-600 font-black">+{avgPerCase.toLocaleString()}원</span>)
+                      </span>
+                    )}
+                  </div>
+                  {selectedPlatformFilter && (
+                    <button 
+                      onClick={() => setSelectedPlatformFilter(null)} 
+                      className="text-xs font-bold text-indigo-600 hover:text-indigo-800 underline flex items-center gap-1"
+                    >
+                      전체 보기
+                    </button>
+                  )}
+                </div>
+                
+                {monthlyCampaignCount > 0 ? (
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      {sortedPlatformStats.map(([platName, count]) => {
+                        const percent = Math.round((count / monthlyCampaignCount) * 100);
+                        const isSelected = selectedPlatformFilter === platName;
+                        return (
+                          <button
+                            key={platName}
+                            type="button"
+                            onClick={() => setSelectedPlatformFilter(isSelected ? null : platName)}
+                            className={`flex items-center gap-1.5 md:gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs font-bold transition-all ${
+                              isSelected 
+                                ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-200 scale-105' 
+                                : 'bg-slate-50 text-slate-700 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 shadow-2xs'
+                            }`}
+                            title="클릭하여 이 플랫폼 내역만 필터링"
+                          >
+                            <span>{platName}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                              isSelected ? 'bg-white/20 text-white' : 'bg-indigo-100/70 text-indigo-700 border border-indigo-200/60'
+                            }`}>
+                              {count}건
+                            </span>
+                            <span className={`text-[10px] ${isSelected ? 'text-indigo-200' : 'text-slate-400'}`}>
+                              ({percent}%)
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {selectedPlatformFilter && (
+                      <p className="text-xs text-indigo-600 font-bold mt-2.5 flex items-center gap-1">
+                        <span>🔍</span>
+                        <span><strong>[{selectedPlatformFilter}]</strong> 필터링 적용 중 ({displayedMonthlySchedules.length}건 표시)</span>
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="py-4 text-center text-slate-400 text-xs flex flex-col sm:flex-row items-center justify-center gap-2 bg-slate-50 rounded-xl border border-slate-100">
+                    <span>이번 달에 등록된 체험단 일정이 아직 없습니다.</span>
+                    <button
+                      type="button"
+                      onClick={() => openAddModal('campaign')}
+                      className="text-xs font-bold text-indigo-600 underline hover:text-indigo-800"
+                    >
+                      + 첫 체험단 등록하기
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* 지출 카테고리별 비중 분석 바 */}
               {expenseCategoryStats.length > 0 && (
                 <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 md:p-5 mb-6 shadow-xs">
@@ -2113,63 +2191,6 @@ export default function ExperienceDiary() {
                       커뮤니티 자랑 📢
                     </button>
                   </div>
-                </div>
-              )}
-
-              {/* 체험단별 진행 횟수 통계 */}
-              {monthlyCampaignCount > 0 && (
-                <div className="bg-slate-50 border border-slate-200/70 rounded-2xl p-4 md:p-5 mb-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-xs md:text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                        <span>🏷️ 체험단별 진행 횟수</span>
-                      </h4>
-                      <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
-                        총 {monthlyCampaignCount}건
-                      </span>
-                    </div>
-                    {selectedPlatformFilter && (
-                      <button 
-                        onClick={() => setSelectedPlatformFilter(null)} 
-                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline"
-                      >
-                        전체 보기
-                      </button>
-                    )}
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-2">
-                    {sortedPlatformStats.map(([platName, count]) => {
-                      const percent = Math.round((count / monthlyCampaignCount) * 100);
-                      const isSelected = selectedPlatformFilter === platName;
-                      return (
-                        <button
-                          key={platName}
-                          onClick={() => setSelectedPlatformFilter(isSelected ? null : platName)}
-                          className={`flex items-center gap-1.5 md:gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs font-bold transition-all ${
-                            isSelected 
-                              ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-200 scale-105' 
-                              : 'bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 shadow-sm'
-                          }`}
-                        >
-                          <span>{platName}</span>
-                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
-                            isSelected ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
-                          }`}>
-                            {count}건
-                          </span>
-                          <span className={`text-[10px] ${isSelected ? 'text-indigo-200' : 'text-slate-400'}`}>
-                            ({percent}%)
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {selectedPlatformFilter && (
-                    <p className="text-xs text-indigo-600 font-medium mt-3">
-                      * <strong>{selectedPlatformFilter}</strong> ({displayedMonthlySchedules.length}건) 내역만 필터링되어 표시 중입니다.
-                    </p>
-                  )}
                 </div>
               )}
 
