@@ -20,7 +20,7 @@ import { removeBackground } from '@imgly/background-removal';
 import CoupangBanner from '@/components/CoupangBanner';
 import { useSiteSettings } from '@/lib/settings';
 
-type StickerShape = 'pill' | 'SpeechBubble' | 'highlighter' | 'stamp' | 'nametag';
+type StickerShape = 'pill' | 'SpeechBubble' | 'highlighter' | 'stamp' | 'nametag' | 'rating';
 
 interface PresetItem {
   category: string;
@@ -37,6 +37,9 @@ const PRESETS: PresetItem[] = [
   { category: '소제목', text: '🍽️ 오늘의 주문 메뉴 & 가격', subText: '직접 먹어본 메뉴 솔직 리뷰', shape: 'highlighter', themeId: 'amber' },
   { category: '소제목', text: '✨ 매장 외부 & 내부 분위기', subText: '깔끔하고 감성 넘치는 공간', shape: 'highlighter', themeId: 'pink' },
   { category: '소제목', text: '💡 총평 & 재방문 의사', subText: '한눈에 보는 핵심 요약', shape: 'SpeechBubble', themeId: 'indigo' },
+  { category: '별점/총평', text: '⭐ 솔직 방문 별점 총평', subText: '재방문 의사 100%! 자신 있게 추천하는 곳', shape: 'rating', themeId: 'amber' },
+  { category: '공정위/인증', text: '⚖️ 공정위 문구 준수 포스팅', subText: '업체로부터 서비스를 제공받아 솔직하게 작성함', shape: 'pill', themeId: 'indigo' },
+  { category: '공정위/인증', text: '🧾 영수증 인증 내돈내산', subText: '내 돈 내고 직접 사먹은 100% 리얼 솔직 리뷰', shape: 'stamp', themeId: 'green' },
   { category: '인증도장', text: '💯 100% 내돈내산 솔직후기', subText: '직접 결제하고 솔직하게 작성했습니다', shape: 'stamp', themeId: 'pink' },
   { category: '인증도장', text: '🎁 체험단 협찬 솔직 리뷰', subText: '서비스를 제공받아 솔직하게 작성함', shape: 'stamp', themeId: 'blue' },
   { category: '인증도장', text: '👍 재방문 의사 200% 강추!', subText: '지인에게도 자신 있게 추천하는 곳', shape: 'stamp', themeId: 'green' },
@@ -74,10 +77,16 @@ export default function StickerMakerPage() {
   const [subText, setSubText] = useState('직접 결제하고 솔직하게 작성했습니다');
   const [shape, setShape] = useState<StickerShape>('pill');
   const [themeId, setThemeId] = useState('indigo');
+  const [stickerFont, setStickerFont] = useState<'Jua' | 'Gaegu' | 'BlackHanSans' | 'NanumGothic'>('Jua');
   const [presetCategory, setPresetCategory] = useState<string>('전체');
   const [textStickerUrl, setTextStickerUrl] = useState<string>('');
   const [copiedTextSticker, setCopiedTextSticker] = useState(false);
   const textCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // 별점 스티커 전용 상태
+  const [ratingTaste, setRatingTaste] = useState<number>(5);
+  const [ratingPrice, setRatingPrice] = useState<number>(4);
+  const [ratingMood, setRatingMood] = useState<number>(5);
 
   // === 탭 2: AI 사진 칼선 스티커 상태 ===
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -153,12 +162,12 @@ export default function StickerMakerPage() {
       // 텍스트
       ctx.textAlign = 'center';
       ctx.fillStyle = '#ffffff';
-      ctx.font = '900 38px sans-serif';
+      ctx.font = `900 38px ${stickerFont}, sans-serif`;
       ctx.fillText(mainText || '문구를 입력하세요', 370, hasSub ? 112 : 134);
 
       if (hasSub) {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
-        ctx.font = 'bold 22px sans-serif';
+        ctx.font = `bold 22px ${stickerFont}, sans-serif`;
         ctx.fillText(subText, 370, 156);
       }
     } else if (shape === 'SpeechBubble') {
@@ -203,12 +212,12 @@ export default function StickerMakerPage() {
 
       ctx.textAlign = 'center';
       ctx.fillStyle = '#ffffff';
-      ctx.font = '900 36px sans-serif';
+      ctx.font = `900 36px ${stickerFont}, sans-serif`;
       ctx.fillText(mainText || '문구를 입력하세요', 370, hasSub ? 96 : 118);
 
       if (hasSub) {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.font = 'bold 21px sans-serif';
+        ctx.font = `bold 21px ${stickerFont}, sans-serif`;
         ctx.fillText(subText, 370, 140);
       }
     } else if (shape === 'highlighter') {
@@ -243,12 +252,12 @@ export default function StickerMakerPage() {
 
       ctx.textAlign = 'left';
       ctx.fillStyle = theme.darkText;
-      ctx.font = '900 36px sans-serif';
+      ctx.font = `900 36px ${stickerFont}, sans-serif`;
       ctx.fillText(mainText || '문구를 입력하세요', boxX + 58, hasSub ? 110 : 130);
 
       if (hasSub) {
         ctx.fillStyle = '#64748b';
-        ctx.font = 'bold 21px sans-serif';
+        ctx.font = `bold 21px ${stickerFont}, sans-serif`;
         ctx.fillText(subText, boxX + 58, 158);
       }
     } else if (shape === 'stamp') {
@@ -284,13 +293,87 @@ export default function StickerMakerPage() {
 
       ctx.textAlign = 'center';
       ctx.fillStyle = theme.primary;
-      ctx.font = '900 36px sans-serif';
+      ctx.font = `900 36px ${stickerFont}, sans-serif`;
       ctx.fillText(mainText || '문구를 입력하세요', 370, hasSub ? 110 : 132);
 
       if (hasSub) {
         ctx.fillStyle = theme.darkText;
-        ctx.font = 'bold 21px sans-serif';
+        ctx.font = `bold 21px ${stickerFont}, sans-serif`;
         ctx.fillText(subText, 370, 154);
+      }
+    } else if (shape === 'rating') {
+      const boxX = 30;
+      const boxY = 22;
+      const boxW = 680;
+      const boxH = 196;
+      const radius = 28;
+
+      // 흰색 외곽선 + 부드러운 그림자
+      ctx.save();
+      ctx.shadowColor = 'rgba(15, 23, 42, 0.16)';
+      ctx.shadowBlur = 22;
+      ctx.shadowOffsetY = 8;
+      drawRoundRect(boxX - 8, boxY - 8, boxW + 16, boxH + 16, radius + 8);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.restore();
+
+      // 메인 카드 배경
+      drawRoundRect(boxX, boxY, boxW, boxH, radius);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = theme.primary;
+      ctx.stroke();
+
+      // 상단 헤더 띠
+      drawRoundRect(boxX, boxY, boxW, 52, radius);
+      ctx.fillStyle = theme.light;
+      ctx.fill();
+      ctx.fillRect(boxX, boxY + 28, boxW, 24);
+
+      // 상단 메인 타이틀
+      ctx.textAlign = 'center';
+      ctx.fillStyle = theme.darkText;
+      ctx.font = `900 24px ${stickerFont}, sans-serif`;
+      ctx.fillText(mainText || '⭐ 솔직 방문 별점 총평', 370, boxY + 36);
+
+      // 3개 별점 점수 항목 (맛 / 가성비 / 분위기)
+      const items = [
+        { label: '맛 / 퀄리티', score: ratingTaste },
+        { label: '가격 / 가성비', score: ratingPrice },
+        { label: '분위기 / 서비스', score: ratingMood },
+      ];
+      const colWidth = boxW / 3;
+      items.forEach((item, idx) => {
+        const cx = boxX + colWidth * idx + colWidth / 2;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#64748b';
+        ctx.font = `bold 16px ${stickerFont}, sans-serif`;
+        ctx.fillText(item.label, cx, boxY + 84);
+
+        // 노란 별점 아이콘
+        ctx.fillStyle = '#f59e0b';
+        ctx.font = 'bold 20px sans-serif';
+        const stars = '★'.repeat(item.score) + '☆'.repeat(5 - item.score);
+        ctx.fillText(stars, cx, boxY + 112);
+
+        // 점수 숫자
+        ctx.fillStyle = '#1e293b';
+        ctx.font = `900 17px ${stickerFont}, sans-serif`;
+        ctx.fillText(`${item.score}.0 점`, cx, boxY + 135);
+      });
+
+      // 하단 한 줄 총평 배지
+      if (hasSub) {
+        const badgeY = boxY + 150;
+        drawRoundRect(boxX + 24, badgeY, boxW - 48, 34, 17);
+        ctx.fillStyle = theme.light;
+        ctx.fill();
+        ctx.textAlign = 'center';
+        ctx.fillStyle = theme.primary;
+        ctx.font = `900 16px ${stickerFont}, sans-serif`;
+        ctx.fillText(`💬 "${subText}"`, 370, badgeY + 23);
       }
     } else {
       // nametag
@@ -321,22 +404,22 @@ export default function StickerMakerPage() {
       ctx.fill();
       ctx.textAlign = 'center';
       ctx.fillStyle = '#ffffff';
-      ctx.font = '900 18px sans-serif';
+      ctx.font = `900 18px ${stickerFont}, sans-serif`;
       ctx.fillText('✨ BLOG STICKER ✨', 370, boxY + 6);
 
       ctx.fillStyle = theme.darkText;
-      ctx.font = '900 34px sans-serif';
+      ctx.font = `900 34px ${stickerFont}, sans-serif`;
       ctx.fillText(mainText || '문구를 입력하세요', 370, hasSub ? 118 : 136);
 
       if (hasSub) {
         ctx.fillStyle = '#475569';
-        ctx.font = 'bold 20px sans-serif';
+        ctx.font = `bold 20px ${stickerFont}, sans-serif`;
         ctx.fillText(subText, 370, 158);
       }
     }
 
     setTextStickerUrl(canvas.toDataURL('image/png'));
-  }, [mainText, subText, shape, themeId]);
+  }, [mainText, subText, shape, themeId, stickerFont, ratingTaste, ratingPrice, ratingMood]);
 
   // === 탭 2: AI 사진 칼선 스티커 렌더링 (740x640 OGQ & 블로그 규격) ===
   const renderPhotoSticker = useCallback(() => {
@@ -434,12 +517,32 @@ export default function StickerMakerPage() {
 
       ctx.textAlign = 'center';
       ctx.fillStyle = '#ffffff';
-      ctx.font = '900 42px sans-serif';
+      ctx.font = `900 42px ${stickerFont}, sans-serif`;
       ctx.fillText(photoCaption.trim(), canvas.width / 2, badgeY + 61);
     }
 
     setPhotoStickerUrl(canvas.toDataURL('image/png'));
-  }, [cutoutImage, outlineSize, photoCaption, photoThemeId]);
+  }, [cutoutImage, outlineSize, photoCaption, photoThemeId, stickerFont]);
+
+  // 단축키 Ctrl + V 클립보드 이미지 붙여넣기 지원
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          const file = items[i].getAsFile();
+          if (file) {
+            setActiveTab('photo');
+            handlePhotoUpload(file);
+            break;
+          }
+        }
+      }
+    };
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, []);
 
   useEffect(() => {
     renderPhotoSticker();
@@ -723,7 +826,55 @@ export default function StickerMakerPage() {
 
               {/* 문구 및 디자인 직접 수정 */}
               <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-5">
-                <h3 className="text-sm font-extrabold text-slate-800">🎨 내 마음대로 문구 · 디자인 바꾸기</h3>
+                <h3 className="text-sm font-extrabold text-slate-800">🎨 내 마음대로 문구 · 글꼴 · 디자인 바꾸기</h3>
+
+                {/* 1. 감성 글꼴(폰트) 선택 */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    스티커 글꼴 (폰트)
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { id: 'Jua' as const, label: '둥글 귀염', fontFam: 'Jua' },
+                      { id: 'Gaegu' as const, label: '감성 손글씨', fontFam: 'Gaegu' },
+                      { id: 'BlackHanSans' as const, label: '예능 볼드', fontFam: 'BlackHanSans' },
+                      { id: 'NanumGothic' as const, label: '깔끔 기본', fontFam: 'NanumGothic' },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setStickerFont(f.id)}
+                        style={{ fontFamily: f.fontFam }}
+                        className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
+                          stickerFont === f.id
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span className="text-sm">{f.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 빠른 이모지 클릭 바 */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] font-bold text-slate-500">빠른 이모지 삽입 (클릭 시 문구 뒤에 추가)</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {['📍', '🕒', '🚗', '🍽️', '✨', '💡', '⭐', '💯', '🎁', '👍', '💬', '📸', '☕', '🍔', '🧾', '⚖️'].map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => setMainText((prev) => `${prev} ${emoji}`.trim())}
+                        className="px-2 py-1 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg text-sm transition-colors"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
@@ -741,14 +892,14 @@ export default function StickerMakerPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      보조 문구 / 블로그 이름 <span className="text-slate-400 font-normal">(비워두면 생략)</span>
+                      {shape === 'rating' ? '총평 한 줄 코멘트' : '보조 문구 / 블로그 이름'} <span className="text-slate-400 font-normal">(비워두면 생략)</span>
                     </label>
                     <input
                       type="text"
                       maxLength={32}
                       value={subText}
                       onChange={(e) => setSubText(e.target.value)}
-                      placeholder="예: by. 맛동산블로거"
+                      placeholder={shape === 'rating' ? '예: 재방문 의사 100%! 강추' : '예: by. 맛동산블로거'}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
@@ -756,19 +907,26 @@ export default function StickerMakerPage() {
 
                 {/* 모양 선택 */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-2">스티커 모양 (5종)</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  <label className="block text-xs font-bold text-slate-700 mb-2">스티커 모양 (6종)</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                     {[
                       { id: 'pill', label: '💊 캡슐 배지' },
                       { id: 'highlighter', label: '📝 형광펜 노트' },
                       { id: 'SpeechBubble', label: '💬 말풍선' },
                       { id: 'stamp', label: '📮 인증 도장' },
                       { id: 'nametag', label: '🎀 리본 네임택' },
+                      { id: 'rating', label: '⭐ 별점 총평' },
                     ].map((s) => (
                       <button
                         key={s.id}
                         type="button"
-                        onClick={() => setShape(s.id as StickerShape)}
+                        onClick={() => {
+                          setShape(s.id as StickerShape);
+                          if (s.id === 'rating' && !mainText.includes('별점')) {
+                            setMainText('⭐ 솔직 방문 별점 총평');
+                            setSubText('재방문 의사 100%! 자신 있게 추천');
+                          }
+                        }}
                         className={`py-2.5 px-2 rounded-xl text-xs font-bold border transition-all ${
                           shape === s.id
                             ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
@@ -780,6 +938,45 @@ export default function StickerMakerPage() {
                     ))}
                   </div>
                 </div>
+
+                {/* 별점 스티커 전용 항목 점수 조절 */}
+                {shape === 'rating' && (
+                  <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-2xl space-y-3 animate-in fade-in">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
+                      <span>⭐ 항목별 별점 점수 설정 (클릭하여 조절)</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {[
+                        { label: '맛 / 퀄리티', score: ratingTaste, setScore: setRatingTaste },
+                        { label: '가격 / 가성비', score: ratingPrice, setScore: setRatingPrice },
+                        { label: '분위기 / 서비스', score: ratingMood, setScore: setRatingMood },
+                      ].map((item, i) => (
+                        <div key={i} className="bg-white p-2.5 rounded-xl border border-amber-200/60 shadow-2xs">
+                          <div className="flex justify-between items-center text-xs font-bold text-slate-700 mb-1">
+                            <span>{item.label}</span>
+                            <span className="text-amber-600 font-extrabold">{item.score}.0점</span>
+                          </div>
+                          <div className="flex gap-1 justify-center">
+                            {[1, 2, 3, 4, 5].map((val) => (
+                              <button
+                                key={val}
+                                type="button"
+                                onClick={() => item.setScore(val)}
+                                className={`w-6 h-6 rounded-md text-xs font-bold flex items-center justify-center transition-all ${
+                                  item.score >= val
+                                    ? 'bg-amber-400 text-white shadow-xs'
+                                    : 'bg-slate-100 text-slate-400'
+                                }`}
+                              >
+                                ★
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* 컬러 테마 선택 */}
                 <div>
@@ -853,6 +1050,11 @@ export default function StickerMakerPage() {
                   <p className="text-base font-extrabold text-slate-800 mb-1">
                     스티커로 만들 사진을 올려주세요!
                   </p>
+                  <div className="flex items-center gap-1.5 my-2 px-3 py-1 bg-white border border-pink-200 rounded-full text-xs font-semibold text-slate-600 shadow-2xs">
+                    <span>💡 캡처 후</span>
+                    <kbd className="px-1.5 py-0.5 bg-pink-50 border border-pink-300 rounded text-pink-600 font-extrabold">Ctrl + V</kbd>
+                    <span>로 바로 붙여넣기도 가능해요!</span>
+                  </div>
                   <p className="text-xs text-slate-500 max-w-xs">
                     반려동물, 내 캐릭터, 음식, 제품 사진을 올리면 AI가 배경을 지우고 도톰한 흰색 칼선 테두리를 자동으로 입혀줍니다.
                   </p>
