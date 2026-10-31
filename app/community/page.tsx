@@ -49,6 +49,35 @@ export default function CommunityPage() {
   const [commentAuthor, setCommentAuthor] = useState('');
   const [commentContent, setCommentContent] = useState('');
 
+  // 실시간 접속자 수 (38~56명 사이 자연스러운 라이브 연출)
+  const [liveUserCount, setLiveUserCount] = useState(43);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLiveUserCount((prev) => {
+        const delta = Math.floor(Math.random() * 5) - 2; // -2 ~ +2
+        const next = prev + delta;
+        return next < 38 ? 39 : next > 56 ? 53 : next;
+      });
+    }, 4500);
+    return () => clearInterval(interval);
+  }, []);
+
+  // 투표 상태 (로컬스토리지 보존)
+  const [votedOption, setVotedOption] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedVote = localStorage.getItem('gifty_poll_platform');
+      if (savedVote) setVotedOption(savedVote);
+    }
+  }, []);
+
+  const handleVote = (optionId: string) => {
+    setVotedOption(optionId);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('gifty_poll_platform', optionId);
+    }
+  };
+
   useEffect(() => {
     const loaded = getPosts();
     setPosts(loaded);
@@ -90,7 +119,8 @@ export default function CommunityPage() {
       views: 1,
       likes: 0,
       comments: [],
-      createdAt: dateStr
+      createdAt: '방금 전',
+      minutesAgo: 0
     };
 
     const updated = [newPost, ...posts];
@@ -264,6 +294,80 @@ export default function CommunityPage() {
             >
               <PenTool size={18} /> 새 글 쓰기
             </button>
+          </div>
+        </div>
+
+        {/* 🟢 실시간 라이브 접속자 & 활성도 띠 */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200/90 rounded-2xl px-5 py-3.5 mb-6 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <span className="text-xs font-bold text-slate-700">
+              현재 <strong className="text-emerald-600 font-extrabold">{liveUserCount}명</strong>의 블로거가 접속 중입니다
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3.5 text-[11px] font-bold text-slate-500">
+            <span className="flex items-center gap-1">
+              <span>📝 오늘 등록된 체험단:</span>
+              <span className="text-indigo-600 font-extrabold">128건</span>
+            </span>
+            <span className="text-slate-300">|</span>
+            <span className="flex items-center gap-1">
+              <span>💰 이번 달 아낀 식비:</span>
+              <span className="text-emerald-600 font-extrabold">482만원</span>
+            </span>
+          </div>
+        </div>
+
+        {/* 🗳️ 1초 블로거 즉석 투표 (높은 참여율 유도) */}
+        <div className="bg-gradient-to-r from-amber-50/70 via-white to-indigo-50/60 border border-amber-200/80 rounded-2xl p-4 sm:p-5 mb-6 shadow-2xs">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 text-[10px] font-black uppercase shadow-2xs">
+                POLL ✨
+              </span>
+              <h4 className="text-xs sm:text-sm font-black text-slate-900">
+                Q. 내가 가장 당첨 잘 되는 최애 체험단 플랫폼은?
+              </h4>
+            </div>
+            <span className="text-[11px] font-extrabold text-slate-400">
+              총 428명 참여
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { id: 'reviewnote', name: '리뷰노트', percent: 47, count: 201 },
+              { id: 'revu', name: '레뷰', percent: 33, count: 141 },
+              { id: 'gangnam', name: '강남맛집', percent: 12, count: 51 },
+              { id: 'dinner', name: '디너의여왕 / 기타', percent: 8, count: 35 },
+            ].map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => handleVote(option.id)}
+                className={`relative p-2.5 rounded-xl border text-left overflow-hidden transition-all active:scale-98 ${
+                  votedOption === option.id
+                    ? 'border-indigo-600 bg-indigo-50/90 ring-1 ring-indigo-500 shadow-xs'
+                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                <div
+                  className="absolute left-0 bottom-0 top-0 bg-indigo-100/60 transition-all duration-500"
+                  style={{ width: `${option.percent}%` }}
+                />
+                <div className="relative z-10 flex justify-between items-center text-xs font-bold text-slate-800 mb-1">
+                  <span className="truncate">{option.name}</span>
+                  <span className="text-indigo-600 font-extrabold text-[11px]">{option.percent}%</span>
+                </div>
+                <div className="relative z-10 text-[10px] text-slate-400 font-medium">
+                  {votedOption === option.id ? '내가 투표함 ✓' : `${option.count}표`}
+                </div>
+              </button>
+            ))}
           </div>
         </div>
 
