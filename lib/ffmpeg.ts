@@ -19,12 +19,22 @@ export const getFFmpeg = async (): Promise<FFmpeg> => {
   return ffmpeg;
 };
 
+export interface SubtitleConfig {
+  text: string;
+  font?: 'Jua' | 'Gaegu' | 'BlackHanSans' | 'NanumGothic';
+  size?: 'small' | 'medium' | 'large' | 'xlarge';
+  color?: string;
+  borderWidth?: 'none' | 'thin' | 'bold' | 'heavy';
+  borderColor?: string;
+  position?: 'bottom' | 'center' | 'top';
+}
+
 export const convertToGif = async (
   videoFile: File,
   startTime: number,
   duration: number,
   quality: 'high' | 'normal' | 'low',
-  textOverlay: string,
+  textOverlay: string | SubtitleConfig,
   speed: number,
   logoFile: File | null,
   videoFilter: 'none' | 'grayscale' | 'sepia' | 'bright',
@@ -42,17 +52,41 @@ export const convertToGif = async (
     await ffmpegInstance.writeFile(logoName, await fetchFile(logoFile));
   }
 
-  // If text overlay is provided, we need to load the font
-  let fontFilter = '';
-  if (textOverlay.trim()) {
+  // Parse text overlay options
+  const subtitle: SubtitleConfig = typeof textOverlay === 'string' 
+    ? { text: textOverlay } 
+    : textOverlay || { text: '' };
+
+  const rawText = subtitle.text || '';
+  const fontChoice = subtitle.font || 'Jua';
+  const fontColor = subtitle.color || '#FFE812'; // 기본 상큼한 예능 옐로우
+  const borderColor = subtitle.borderColor || 'black';
+  const borderPreset = subtitle.borderWidth || 'bold';
+  const sizePreset = subtitle.size || 'medium';
+  const positionPreset = subtitle.position || 'bottom';
+
+  const fontFileMap: Record<string, string> = {
+    Jua: '/fonts/Jua.ttf',
+    Gaegu: '/fonts/Gaegu.ttf',
+    BlackHanSans: '/fonts/BlackHanSans.ttf',
+    NanumGothic: '/fonts/NanumGothic.ttf',
+  };
+
+  // If text overlay is provided, we need to load the selected font
+  let hasValidFont = false;
+  if (rawText.trim()) {
     try {
-      const fontUrl = '/fonts/NanumGothic.ttf';
+      const fontUrl = fontFileMap[fontChoice] || '/fonts/Jua.ttf';
       await ffmpegInstance.writeFile('font.ttf', await fetchFile(fontUrl));
-      // Escape text properly for ffmpeg drawtext filter
-      const safeText = textOverlay.replace(/'/g, "\\'").replace(/:/g, "\\:");
-      fontFilter = `,drawtext=fontfile=font.ttf:text='${safeText}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h-(text_h*1.5):borderw=3:bordercolor=black`;
+      hasValidFont = true;
     } catch (e) {
-      console.warn("Failed to load font for text overlay", e);
+      console.warn("Failed to load font for text overlay, fallback to NanumGothic", e);
+      try {
+        await ffmpegInstance.writeFile('font.ttf', await fetchFile('/fonts/NanumGothic.ttf'));
+        hasValidFont = true;
+      } catch (err) {
+        console.warn("Font fallback also failed", err);
+      }
     }
   }
 
@@ -107,6 +141,39 @@ export const convertToGif = async (
       colorFilterStr = ',colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131';
     } else if (videoFilter === 'bright') {
       colorFilterStr = ',eq=brightness=0.05:contrast=1.1:saturation=1.2';
+    }
+
+    // Build dynamic font filter according to profile scale
+    let fontFilter = '';
+    if (hasValidFont && rawText.trim()) {
+      // Escape text properly for ffmpeg drawtext filter
+      const safeText = rawText.replace(/'/g, "\\'").replace(/:/g, "\\:");
+      
+      // Calculate font size relative to video width
+      let sizeRatio = 0.095; // medium default
+      if (sizePreset === 'small') sizeRatio = 0.07;
+      else if (sizePreset === 'large') sizeRatio = 0.12;
+      else if (sizePreset === 'xlarge') sizeRatio = 0.15;
+      const dynamicFontSize = Math.max(18, Math.round(profile.scale * sizeRatio));
+
+      // Calculate border width
+      let borderW = 4;
+      if (borderPreset === 'none') borderW = 0;
+      else if (borderPreset === 'thin') borderW = 2;
+      else if (borderPreset === 'heavy') borderW = 6;
+
+      // Calculate Y position
+      let yExpr = 'h-(text_h*1.6)';
+      if (positionPreset === 'top') {
+        yExpr = 'text_h*0.8';
+      } else if (positionPreset === 'center') {
+        yExpr = '(h-text_h)/2';
+      }
+
+      const cleanFontColor = fontColor.startsWith('#') ? fontColor : `#${fontColor}`;
+      const cleanBorderColor = borderColor.startsWith('#') ? borderColor : borderColor;
+
+      fontFilter = `,drawtext=fontfile=font.ttf:text='${safeText}':fontcolor=${cleanFontColor}:fontsize=${dynamicFontSize}:x=(w-text_w)/2:y=${yExpr}:borderw=${borderW}:bordercolor=${cleanBorderColor}`;
     }
 
     // Build the filtergraph

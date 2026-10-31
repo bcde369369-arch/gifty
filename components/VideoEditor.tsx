@@ -35,6 +35,13 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
 
   const [quality, setQuality] = useState<'high' | 'normal' | 'low'>('normal');
   const [textOverlay, setTextOverlay] = useState<string>('');
+  const [textFont, setTextFont] = useState<'Jua' | 'Gaegu' | 'BlackHanSans' | 'NanumGothic'>('Jua');
+  const [textSize, setTextSize] = useState<'small' | 'medium' | 'large' | 'xlarge'>('medium');
+  const [textColor, setTextColor] = useState<string>('#FFE812');
+  const [textBorderWidth, setTextBorderWidth] = useState<'none' | 'thin' | 'bold' | 'heavy'>('bold');
+  const [textBorderColor, setTextBorderColor] = useState<string>('#000000');
+  const [textPosition, setTextPosition] = useState<'bottom' | 'center' | 'top'>('bottom');
+
   const [playbackSpeed, setPlaybackSpeed] = useState<string>('1.0');
   const [videoFilter, setVideoFilter] = useState<'none' | 'grayscale' | 'sepia' | 'bright'>('none');
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -328,10 +335,28 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
     const resultDuration = Math.min(endTime - startTime, 15);
 
     try {
-      const result = await convertToGif(videoFile, startTime, resultDuration, quality, textOverlay, parseFloat(playbackSpeed), logoFile, videoFilter, (ratio, status) => {
-        setProgress(Math.round(ratio * 100));
-        if (status) setStatusMessage(status);
-      });
+      const result = await convertToGif(
+        videoFile,
+        startTime,
+        resultDuration,
+        quality,
+        {
+          text: textOverlay,
+          font: textFont,
+          size: textSize,
+          color: textColor,
+          borderWidth: textBorderWidth,
+          borderColor: textBorderColor,
+          position: textPosition,
+        },
+        parseFloat(playbackSpeed),
+        logoFile,
+        videoFilter,
+        (ratio, status) => {
+          setProgress(Math.round(ratio * 100));
+          if (status) setStatusMessage(status);
+        }
+      );
       setGifUrl(result.url);
       setGifSize(result.size);
     } catch (error: unknown) {
@@ -398,12 +423,37 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
 
         {/* Live Subtitle Overlay Preview */}
         {textOverlay.trim() && (
-          <div className="pointer-events-none absolute bottom-10 inset-x-4 text-center z-10">
+          <div
+            className={`pointer-events-none absolute inset-x-4 text-center z-10 transition-all duration-200 ${
+              textPosition === 'top'
+                ? 'top-4'
+                : textPosition === 'center'
+                ? 'top-1/2 -translate-y-1/2'
+                : 'bottom-8'
+            }`}
+          >
             <span
-              className="inline-block text-white font-extrabold text-lg md:text-xl px-2 py-0.5 tracking-wide"
+              className="inline-block px-3 py-1 tracking-wide break-keep select-none transition-all duration-200"
               style={{
+                fontFamily: textFont,
+                color: textColor,
+                fontSize:
+                  textSize === 'small'
+                    ? '1.1rem'
+                    : textSize === 'medium'
+                    ? '1.45rem'
+                    : textSize === 'large'
+                    ? '1.9rem'
+                    : '2.4rem',
+                fontWeight: textFont === 'BlackHanSans' ? 900 : textFont === 'NanumGothic' ? 800 : 700,
                 textShadow:
-                  '-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 0px 2px 6px rgba(0,0,0,0.7)',
+                  textBorderWidth === 'none'
+                    ? '0 2px 4px rgba(0,0,0,0.5)'
+                    : textBorderWidth === 'thin'
+                    ? `-1.5px -1.5px 0 ${textBorderColor}, 1.5px -1.5px 0 ${textBorderColor}, -1.5px 1.5px 0 ${textBorderColor}, 1.5px 1.5px 0 ${textBorderColor}`
+                    : textBorderWidth === 'bold'
+                    ? `-2.5px -2.5px 0 ${textBorderColor}, 2.5px -2.5px 0 ${textBorderColor}, -2.5px 2.5px 0 ${textBorderColor}, 2.5px 2.5px 0 ${textBorderColor}, 0 2px 6px rgba(0,0,0,0.7)`
+                    : `-3.5px -3.5px 0 ${textBorderColor}, 3.5px -3.5px 0 ${textBorderColor}, -3.5px 3.5px 0 ${textBorderColor}, 3.5px 3.5px 0 ${textBorderColor}, -3.5px 0 0 ${textBorderColor}, 3.5px 0 0 ${textBorderColor}, 0 -3.5px 0 ${textBorderColor}, 0 3.5px 0 ${textBorderColor}, 0 3px 8px rgba(0,0,0,0.85)`,
               }}
             >
               {textOverlay}
@@ -731,20 +781,209 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
           </div>
 
           {/* New Feature: Text Overlay */}
-          <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 mb-2">
-            <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-              움짤 자막 달기 (선택)
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-red-500 text-white animate-pulse shadow-sm shadow-red-200">NEW ✨</span>
-            </h4>
-            <input 
-              type="text" 
+          <div className="flex flex-col gap-2.5 animate-in fade-in slide-in-from-bottom-2 mb-2 p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                <span>💬 움짤 자막 달기</span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-indigo-600 text-white shadow-xs">
+                  디자인 UP ✨
+                </span>
+              </h4>
+              {textOverlay && (
+                <button
+                  onClick={() => setTextOverlay('')}
+                  className="text-xs text-slate-400 hover:text-slate-600"
+                >
+                  자막 지우기 ✕
+                </button>
+              )}
+            </div>
+
+            {/* 자막 입력 인풋 */}
+            <input
+              type="text"
               value={textOverlay}
               onChange={(e) => setTextOverlay(e.target.value)}
-              placeholder="예: 가즈아아아!! ㅋㅋ"
-              maxLength={20}
+              placeholder="예: 지글지글 육즙 대박! 🥩"
+              maxLength={25}
               disabled={isConverting}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-slate-400 disabled:opacity-50"
+              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-slate-400 disabled:opacity-50 shadow-xs"
             />
+
+            {/* 자막 상세 스타일링 옵션 (글꼴, 색상, 크기, 테두리) */}
+            <div className="space-y-3 pt-1">
+              {/* 1. 글꼴 선택 */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 block mb-1.5">
+                  글꼴 선택
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                  {[
+                    { id: 'Jua' as const, label: '둥글 귀염', fontFam: 'Jua' },
+                    { id: 'Gaegu' as const, label: '감성 손글씨', fontFam: 'Gaegu' },
+                    { id: 'BlackHanSans' as const, label: '예능 볼드', fontFam: 'BlackHanSans' },
+                    { id: 'NanumGothic' as const, label: '깔끔 기본', fontFam: 'NanumGothic' },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setTextFont(f.id)}
+                      disabled={isConverting}
+                      style={{ fontFamily: f.fontFam }}
+                      className={`py-2 px-2 rounded-xl border text-xs text-center transition-all ${
+                        textFont === f.id
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-bold shadow-xs ring-1 ring-indigo-500'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                      } disabled:opacity-50`}
+                    >
+                      <span className="block text-[13px]">{f.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 2. 글자 색상 & 테두리 프리셋 */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-[11px] font-bold text-slate-500">
+                    인기 색상 배색
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-slate-400">직접 지정:</span>
+                    <input
+                      type="color"
+                      value={textColor}
+                      onChange={(e) => setTextColor(e.target.value)}
+                      disabled={isConverting}
+                      className="w-5 h-5 rounded cursor-pointer border border-slate-200 p-0 bg-transparent"
+                      title="커스텀 글자색"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                  {[
+                    { name: '예능 옐로우', color: '#FFE812', border: '#000000', chip: 'bg-[#FFE812]' },
+                    { name: '클래식 화이트', color: '#FFFFFF', border: '#000000', chip: 'bg-white' },
+                    { name: '러블리 핑크', color: '#FF6EA7', border: '#000000', chip: 'bg-[#FF6EA7]' },
+                    { name: '네온 민트', color: '#00F5D4', border: '#000000', chip: 'bg-[#00F5D4]' },
+                    { name: '상큼 오렌지', color: '#FF7A00', border: '#000000', chip: 'bg-[#FF7A00]' },
+                    { name: '바이올렛', color: '#C084FC', border: '#000000', chip: 'bg-[#C084FC]' },
+                  ].map((c) => {
+                    const isSelected = textColor === c.color && textBorderColor === c.border;
+                    return (
+                      <button
+                        key={c.name}
+                        type="button"
+                        onClick={() => {
+                          setTextColor(c.color);
+                          setTextBorderColor(c.border);
+                        }}
+                        disabled={isConverting}
+                        className={`flex items-center justify-center gap-1.5 py-1.5 px-1 rounded-xl border text-[11px] font-bold transition-all ${
+                          isSelected
+                            ? 'border-indigo-600 bg-indigo-50/80 text-indigo-700 shadow-xs ring-1 ring-indigo-500'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        } disabled:opacity-50`}
+                      >
+                        <span
+                          className={`w-3 h-3 rounded-full border border-black/20 ${c.chip}`}
+                        />
+                        <span className="truncate">{c.name.split(' ')[1] || c.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. 크기 / 두께 / 위치 컨트롤 */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-slate-200/60">
+                {/* 크기 */}
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 block mb-1">
+                    글자 크기
+                  </label>
+                  <div className="grid grid-cols-4 gap-1">
+                    {[
+                      { id: 'small' as const, label: 'S' },
+                      { id: 'medium' as const, label: 'M' },
+                      { id: 'large' as const, label: 'L' },
+                      { id: 'xlarge' as const, label: 'XL' },
+                    ].map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setTextSize(s.id)}
+                        disabled={isConverting}
+                        className={`py-1.5 rounded-lg border text-xs font-bold transition-all ${
+                          textSize === s.id
+                            ? 'border-indigo-600 bg-indigo-600 text-white shadow-xs'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        } disabled:opacity-50`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 테두리 굵기 */}
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 block mb-1">
+                    테두리 두께
+                  </label>
+                  <div className="grid grid-cols-4 gap-1">
+                    {[
+                      { id: 'none' as const, label: '없음' },
+                      { id: 'thin' as const, label: '얇게' },
+                      { id: 'bold' as const, label: '도톰' },
+                      { id: 'heavy' as const, label: '굵게' },
+                    ].map((b) => (
+                      <button
+                        key={b.id}
+                        type="button"
+                        onClick={() => setTextBorderWidth(b.id)}
+                        disabled={isConverting}
+                        className={`py-1.5 rounded-lg border text-xs font-bold transition-all ${
+                          textBorderWidth === b.id
+                            ? 'border-indigo-600 bg-indigo-600 text-white shadow-xs'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        } disabled:opacity-50`}
+                      >
+                        {b.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 위치 */}
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 block mb-1">
+                    자막 위치
+                  </label>
+                  <div className="grid grid-cols-3 gap-1">
+                    {[
+                      { id: 'top' as const, label: '상단' },
+                      { id: 'center' as const, label: '중앙' },
+                      { id: 'bottom' as const, label: '하단' },
+                    ].map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setTextPosition(p.id)}
+                        disabled={isConverting}
+                        className={`py-1.5 rounded-lg border text-xs font-bold transition-all ${
+                          textPosition === p.id
+                            ? 'border-indigo-600 bg-indigo-600 text-white shadow-xs'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        } disabled:opacity-50`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* New Feature: Logo Upload */}
