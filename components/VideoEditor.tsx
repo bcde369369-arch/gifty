@@ -5,6 +5,7 @@ import { convertToGif } from '@/lib/ffmpeg';
 import { Loader2, Download, RotateCcw, Sparkles, Copy, Play, Pause, Repeat, Film } from 'lucide-react';
 import { useSiteSettings } from '@/lib/settings';
 import CoupangBanner from '@/components/CoupangBanner';
+import CoupangSupportCard from '@/components/CoupangSupportCard';
 
 interface VideoEditorProps {
   videoFile: File;
@@ -1068,6 +1069,22 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
                   <div className="absolute top-0 left-0 bottom-0 right-0 bg-white/20 animate-pulse"></div>
                 </div>
               </div>
+
+              {/* 로딩 대기 시간 쿠팡 핫딜 넛지 */}
+              <div className="mt-2 p-3 bg-amber-50/80 border border-amber-200 rounded-xl flex items-center justify-between gap-2 text-xs">
+                <span className="text-amber-900 font-bold flex items-center gap-1.5 truncate">
+                  <span>☕</span>
+                  <span className="truncate">움짤 제작 중 잠시만요! 오늘자 쿠팡 로켓배송 특가 보러가기</span>
+                </span>
+                <a
+                  href="https://www.coupang.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-black px-3 py-1 rounded-lg shrink-0 transition-all shadow-xs"
+                >
+                  쿠팡 보기 🚀
+                </a>
+              </div>
             </div>
           ) : (
             <button
@@ -1150,6 +1167,9 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
             <Copy size={18} />
             네이버 블로그용 출처 문구 복사 (추천✨)
           </button>
+
+          {/* 블로그 촬영 장비 추천 & 서버 응원 쿠팡 위젯 */}
+          <CoupangSupportCard category="gif" className="mt-4" />
 
           {/* Coupang Partners Banner */}
           {isLoaded && (

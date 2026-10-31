@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { removeBackground } from '@imgly/background-removal';
 import CoupangBanner from '@/components/CoupangBanner';
+import CoupangSupportCard from '@/components/CoupangSupportCard';
 import { useSiteSettings } from '@/lib/settings';
 
 type StickerShape = 'pill' | 'SpeechBubble' | 'highlighter' | 'stamp' | 'nametag' | 'rating';
@@ -1188,6 +1189,11 @@ export default function StickerMakerPage() {
             </div>
           </div>
         )}
+
+        {/* 블로그 감성 소품 & 무료 운영 응원 쿠팡 카드 */}
+        <div className="mt-8">
+          <CoupangSupportCard category="sticker" />
+        </div>
 
         {/* 쿠팡 파트너스 배너 */}
         {isLoaded && (settings.coupangBannerHtml || settings.coupangBannerHtmlMobile) && (

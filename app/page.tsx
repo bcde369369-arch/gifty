@@ -6,6 +6,7 @@ import VideoEditor from '@/components/VideoEditor';
 import ShareButton from '@/components/ShareButton';
 import UpdateModal from '@/components/UpdateModal';
 import CoupangBanner from '@/components/CoupangBanner';
+import CoupangSupportCard from '@/components/CoupangSupportCard';
 import AdSenseBanner from '@/components/AdSenseBanner';
 import { Sparkles, Video, Wand2, DownloadCloud, Menu, ExternalLink, X, AlertTriangle, CheckCircle2, HelpCircle, ShieldCheck, Layers, BookOpen } from 'lucide-react';
 import { useSiteSettings } from '@/lib/settings';
@@ -534,6 +535,11 @@ export default function Home() {
               <p className="text-[11px] text-slate-500 line-clamp-2">검색 피드에서 정지된 사진들 사이 시선을 사로잡는 1:1 정사각형 썸네일 제작법.</p>
             </a>
           </div>
+        </div>
+
+        {/* 쿠팡 로켓배송 최저가 검색 & 100% 무료 유지 응원 카드 */}
+        <div className="w-full max-w-4xl mx-auto pt-6">
+          <CoupangSupportCard category="general" />
         </div>
 
         {/* Bottom AdSense Banner */}

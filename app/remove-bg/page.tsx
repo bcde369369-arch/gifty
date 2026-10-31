@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { removeBackground } from '@imgly/background-removal';
 import CoupangBanner from '@/components/CoupangBanner';
+import CoupangSupportCard from '@/components/CoupangSupportCard';
 import { useSiteSettings } from '@/lib/settings';
 
 const COLOR_PRESETS = [
@@ -648,6 +649,11 @@ export default function RemoveBg() {
             accept="image/*" 
             className="hidden" 
           />
+        </div>
+
+        {/* 누끼 촬영 소품 & 쿠팡 검색/응원 카드 */}
+        <div className="w-full max-w-4xl mx-auto mt-8">
+          <CoupangSupportCard category="nukki" />
         </div>
 
         {/* Global Coupang Partners Banner */}

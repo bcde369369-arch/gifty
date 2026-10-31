@@ -5,6 +5,7 @@ import { Sparkles, Calendar as CalendarIcon, Calculator, Link as LinkIcon, Arrow
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import CoupangBanner from '@/components/CoupangBanner';
+import CoupangSupportCard from '@/components/CoupangSupportCard';
 import SyncModal from '@/components/SyncModal';
 import {
   getSavedSyncCode,
@@ -2456,6 +2457,11 @@ export default function ExperienceDiary() {
               </span>
             </div>
           </div>
+        </div>
+
+        {/* 체험단 외출 꿀템 & 쿠팡 파트너스 무료 운영 응원 카드 */}
+        <div className="max-w-4xl mx-auto w-full mt-8">
+          <CoupangSupportCard category="diary" />
         </div>
 
         {/* 쿠팡 파트너스 광고 배너 영역 */}
