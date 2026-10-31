@@ -158,6 +158,10 @@ export default function ExperienceDiary() {
   const [activeSyncCode, setActiveSyncCode] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const isInitialLoadedRef = useRef(false);
+  const lastLocalUpdateRef = useRef<number>(0);
+
+  // 삭제 확인 커스텀 모달 상태 (브라우저 confirm 차단 및 인앱 브라우저 호환)
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<Schedule | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -258,9 +262,11 @@ export default function ExperienceDiary() {
 
     // 3) 연동 중일 때 15초 주기 및 창 포커스(화면 돌아올 때) 자동 실시간 동기화
     const syncInterval = setInterval(() => {
+      if (Date.now() - lastLocalUpdateRef.current < 5000) return;
       const code = getSavedSyncCode();
       if (code) {
         pullSchedulesFromCloud<Schedule[]>(code).then((res) => {
+          if (Date.now() - lastLocalUpdateRef.current < 5000) return;
           if (res.success && res.data && Array.isArray(res.data)) {
             setSchedules((prev) => {
               if (JSON.stringify(prev) !== JSON.stringify(res.data)) {
@@ -275,9 +281,11 @@ export default function ExperienceDiary() {
     }, 15000);
 
     const handleWindowFocus = () => {
+      if (Date.now() - lastLocalUpdateRef.current < 5000) return;
       const code = getSavedSyncCode();
       if (code) {
         pullSchedulesFromCloud<Schedule[]>(code).then((res) => {
+          if (Date.now() - lastLocalUpdateRef.current < 5000) return;
           if (res.success && res.data && Array.isArray(res.data)) {
             setSchedules((prev) => {
               if (JSON.stringify(prev) !== JSON.stringify(res.data)) {
@@ -481,11 +489,12 @@ export default function ExperienceDiary() {
 
   const handleSaveSchedule = (e: React.FormEvent) => {
     e.preventDefault();
+    lastLocalUpdateRef.current = Date.now();
 
     // 1) 일상 지출 저장 분기
     if (entryType === 'expense') {
       if (!newTitle.trim()) return alert('지출 내용을 입력해주세요! (예: 점심 식사, 마트 장보기)');
-      const expenseAmount = newExpense ? parseInt(newExpense.replace(/,/g, ''), 10) : 0;
+      const expenseAmount = newExpense ? parseInt(String(newExpense).replace(/,/g, ''), 10) : 0;
       if (!expenseAmount || expenseAmount <= 0) return alert('지출 금액을 입력해주세요!');
       const dateToSave = newVisitDate || toDateInputString(new Date());
       const catObj = EXPENSE_CATEGORIES.find(c => c.id === newCategory);
@@ -493,7 +502,7 @@ export default function ExperienceDiary() {
 
       let updated: Schedule[];
       if (editingId) {
-        updated = schedules.map(s => s.id === editingId ? {
+        updated = schedules.map(s => String(s.id) === String(editingId) ? {
           ...s,
           title: newTitle.trim(),
           entryType: 'expense',
@@ -524,6 +533,13 @@ export default function ExperienceDiary() {
       }
       setSchedules(updated);
       localStorage.setItem('gifty_schedules', JSON.stringify(updated));
+      const syncCode = getSavedSyncCode();
+      if (syncCode) {
+        pushSchedulesToCloud(updated, syncCode).catch(() => {});
+      }
+      setEditingId(null);
+      setNewTitle('');
+      setNewExpense('');
       setIsModalOpen(false);
       return;
     }
@@ -531,7 +547,7 @@ export default function ExperienceDiary() {
     // 2) 부수입 저장 분기
     if (entryType === 'income') {
       if (!newTitle.trim()) return alert('부수입 내용을 입력해주세요! (예: 블로그 원고료, 당근 중고 판매)');
-      const incomeAmount = newCash ? parseInt(newCash.replace(/,/g, ''), 10) : 0;
+      const incomeAmount = newCash ? parseInt(String(newCash).replace(/,/g, ''), 10) : 0;
       if (!incomeAmount || incomeAmount <= 0) return alert('수입 금액을 입력해주세요!');
       const dateToSave = newVisitDate || toDateInputString(new Date());
       const catObj = INCOME_CATEGORIES.find(c => c.id === newCategory);
@@ -539,7 +555,7 @@ export default function ExperienceDiary() {
 
       let updated: Schedule[];
       if (editingId) {
-        updated = schedules.map(s => s.id === editingId ? {
+        updated = schedules.map(s => String(s.id) === String(editingId) ? {
           ...s,
           title: newTitle.trim(),
           entryType: 'income',
@@ -570,6 +586,13 @@ export default function ExperienceDiary() {
       }
       setSchedules(updated);
       localStorage.setItem('gifty_schedules', JSON.stringify(updated));
+      const syncCode = getSavedSyncCode();
+      if (syncCode) {
+        pushSchedulesToCloud(updated, syncCode).catch(() => {});
+      }
+      setEditingId(null);
+      setNewTitle('');
+      setNewCash('');
       setIsModalOpen(false);
       return;
     }
@@ -577,14 +600,14 @@ export default function ExperienceDiary() {
     // 3) 기존 체험단 캠페인 저장
     if (!newTitle || !newDeadlineDate) return alert('캠페인 이름과 포스팅 마감일은 필수입니다!');
 
-    const benefitAmount = newBenefit ? parseInt(newBenefit.replace(/,/g, ''), 10) : 0;
-    const cashAmount = newCash ? parseInt(newCash.replace(/,/g, ''), 10) : 0;
-    const extraExpense = newExpense ? parseInt(newExpense.replace(/,/g, ''), 10) : 0;
+    const benefitAmount = newBenefit ? parseInt(String(newBenefit).replace(/,/g, ''), 10) : 0;
+    const cashAmount = newCash ? parseInt(String(newCash).replace(/,/g, ''), 10) : 0;
+    const extraExpense = newExpense ? parseInt(String(newExpense).replace(/,/g, ''), 10) : 0;
     const platformToSave = isCustomPlatform ? customPlatform.trim() : newPlatform.trim();
 
     let updated: Schedule[];
     if (editingId) {
-      updated = schedules.map((s): Schedule => s.id === editingId ? {
+      updated = schedules.map((s): Schedule => String(s.id) === String(editingId) ? {
         ...s,
         title: newTitle,
         entryType: 'campaign',
@@ -612,6 +635,10 @@ export default function ExperienceDiary() {
 
     setSchedules(updated);
     localStorage.setItem('gifty_schedules', JSON.stringify(updated));
+    const syncCode = getSavedSyncCode();
+    if (syncCode) {
+      pushSchedulesToCloud(updated, syncCode).catch(() => {});
+    }
     
     // 초기화
     setEditingId(null);
@@ -627,11 +654,48 @@ export default function ExperienceDiary() {
     setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return;
-    const updated = schedules.filter(s => s.id !== id);
+  // 삭제 확인 모달 열기 (브라우저 confirm 차단 문제 해결 및 모바일 최적화)
+  const handleDeleteClick = (schedule: Schedule) => {
+    setDeleteConfirmTarget(schedule);
+  };
+
+  // 실제 삭제 확정 실행
+  const confirmDelete = () => {
+    if (!deleteConfirmTarget) return;
+    const targetId = deleteConfirmTarget.id;
+    lastLocalUpdateRef.current = Date.now();
+
+    const updated = schedules.filter(s => String(s.id) !== String(targetId));
     setSchedules(updated);
     localStorage.setItem('gifty_schedules', JSON.stringify(updated));
+
+    const syncCode = getSavedSyncCode();
+    if (syncCode) {
+      pushSchedulesToCloud(updated, syncCode).catch(() => {});
+    }
+
+    setDeleteConfirmTarget(null);
+    if (editingId && String(editingId) === String(targetId)) {
+      setIsModalOpen(false);
+      setEditingId(null);
+    }
+  };
+
+  // 호환용 삭제 함수 (직접 호출 시에도 안전하게 confirmDelete 또는 모달 오픈)
+  const handleDelete = (id: string) => {
+    const target = schedules.find(s => String(s.id) === String(id));
+    if (target) {
+      setDeleteConfirmTarget(target);
+    } else {
+      lastLocalUpdateRef.current = Date.now();
+      const updated = schedules.filter(s => String(s.id) !== String(id));
+      setSchedules(updated);
+      localStorage.setItem('gifty_schedules', JSON.stringify(updated));
+      const syncCode = getSavedSyncCode();
+      if (syncCode) {
+        pushSchedulesToCloud(updated, syncCode).catch(() => {});
+      }
+    }
   };
 
   // 리뷰 작성 완료 / 미완료 원클릭 토글
@@ -1480,6 +1544,7 @@ export default function ExperienceDiary() {
                       platform?: string;
                       isCompleted?: boolean;
                       amount?: number;
+                      rawSchedule: Schedule;
                     }[] = [];
 
                     baseCalendarSchedules.forEach((s) => {
@@ -1492,6 +1557,7 @@ export default function ExperienceDiary() {
                             platform: s.platform,
                             amount: s.extraExpense,
                             isCompleted: true,
+                            rawSchedule: s,
                           });
                         }
                       } else if (s.entryType === 'income') {
@@ -1503,6 +1569,7 @@ export default function ExperienceDiary() {
                             platform: s.platform,
                             amount: s.cashAmount,
                             isCompleted: true,
+                            rawSchedule: s,
                           });
                         }
                       } else {
@@ -1513,6 +1580,7 @@ export default function ExperienceDiary() {
                             title: s.title,
                             platform: s.platform,
                             isCompleted: s.isCompleted,
+                            rawSchedule: s,
                           });
                         }
                         if (s.deadlineDate === dateStr) {
@@ -1522,6 +1590,7 @@ export default function ExperienceDiary() {
                             title: s.title,
                             platform: s.platform,
                             isCompleted: s.isCompleted,
+                            rawSchedule: s,
                           });
                         }
                       }
@@ -1531,11 +1600,17 @@ export default function ExperienceDiary() {
                     const hiddenCount = dayEvents.length - visibleEvents.length;
 
                     return (
-                      <button
+                      <div
                         key={i}
-                        type="button"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => setSelectedDate(isSelected ? '' : dateStr)}
-                        className={`min-h-[68px] sm:min-h-[88px] p-1 sm:p-1.5 flex flex-col items-stretch justify-start rounded-xl transition-all text-left border ${
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            setSelectedDate(isSelected ? '' : dateStr);
+                          }
+                        }}
+                        className={`min-h-[68px] sm:min-h-[88px] p-1 sm:p-1.5 flex flex-col items-stretch justify-start rounded-xl transition-all text-left border cursor-pointer select-none ${
                           isSelected
                             ? 'bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-200'
                             : isToday
@@ -1573,7 +1648,7 @@ export default function ExperienceDiary() {
                           )}
                         </div>
 
-                        {/* 미니 일정 배지 리스트 (최대 2개 노출) */}
+                        {/* 미니 일정 배지 리스트 (최대 2개 노출, 클릭 시 즉시 수정 모달 오픈) */}
                         <div className="flex flex-col gap-0.5 w-full overflow-hidden">
                           {visibleEvents.map((ev) => {
                             const shortName = getShortCampaignLabel(ev.title);
@@ -1584,34 +1659,39 @@ export default function ExperienceDiary() {
                               iconPrefix = '💸';
                               badgeClass = isSelected
                                 ? 'bg-rose-400/30 text-white'
-                                : 'bg-rose-50 text-rose-700 border border-rose-200/70';
+                                : 'bg-rose-50 text-rose-700 border border-rose-200/70 hover:bg-rose-100';
                             } else if (ev.type === 'income') {
                               iconPrefix = '💰';
                               badgeClass = isSelected
                                 ? 'bg-emerald-400/30 text-white'
-                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200/70';
+                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200/70 hover:bg-emerald-100';
                             } else if (ev.isCompleted) {
                               iconPrefix = '✔';
                               badgeClass = isSelected
                                 ? 'bg-emerald-400/30 text-white'
-                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200/70 line-through opacity-80';
+                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200/70 line-through opacity-80 hover:bg-emerald-100';
                             } else if (ev.type === 'deadline') {
                               iconPrefix = '⏰';
                               badgeClass = isSelected
                                 ? 'bg-rose-400/40 text-white'
-                                : 'bg-rose-50 text-rose-700 border border-rose-200/80';
+                                : 'bg-rose-50 text-rose-700 border border-rose-200/80 hover:bg-rose-100';
                             } else {
                               iconPrefix = '📍';
                               badgeClass = isSelected
                                 ? 'bg-white/20 text-white'
-                                : 'bg-indigo-50 text-indigo-700 border border-indigo-200/80';
+                                : 'bg-indigo-50 text-indigo-700 border border-indigo-200/80 hover:bg-indigo-100';
                             }
 
                             return (
-                              <div
+                              <button
                                 key={ev.id}
-                                className={`w-full px-1 py-0.5 rounded text-[9px] sm:text-[10px] font-extrabold truncate leading-tight ${badgeClass}`}
-                                title={`${ev.type === 'expense' ? `[지출 -${ev.amount?.toLocaleString()}원]` : ev.type === 'income' ? `[부수입 +${ev.amount?.toLocaleString()}원]` : ev.type === 'deadline' ? '[마감]' : '[방문/시작]'} ${ev.title}`}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEdit(ev.rawSchedule);
+                                }}
+                                className={`w-full px-1 py-0.5 rounded text-[9px] sm:text-[10px] font-extrabold truncate leading-tight text-left transition active:scale-95 ${badgeClass}`}
+                                title={`${ev.type === 'expense' ? `[지출 -${ev.amount?.toLocaleString()}원]` : ev.type === 'income' ? `[부수입 +${ev.amount?.toLocaleString()}원]` : ev.type === 'deadline' ? '[마감]' : '[방문/시작]'} ${ev.title} (클릭하여 수정/삭제)`}
                               >
                                 <span className="mr-0.5">{iconPrefix}</span>
                                 {ev.type === 'expense'
@@ -1619,11 +1699,11 @@ export default function ExperienceDiary() {
                                   : ev.type === 'income'
                                   ? `+${ev.amount?.toLocaleString()}원`
                                   : shortName}
-                              </div>
+                              </button>
                             );
                           })}
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -1711,7 +1791,7 @@ export default function ExperienceDiary() {
                                 수정
                               </button>
                               <button 
-                                onClick={() => handleDelete(schedule.id)}
+                                onClick={() => handleDeleteClick(schedule)}
                                 className="text-xs font-semibold text-slate-500 hover:text-red-500 transition-colors px-3 py-1.5 rounded-lg border border-slate-200 md:border-transparent hover:border-red-100 hover:bg-white"
                               >
                                 삭제
@@ -1756,7 +1836,7 @@ export default function ExperienceDiary() {
                                 수정
                               </button>
                               <button 
-                                onClick={() => handleDelete(schedule.id)}
+                                onClick={() => handleDeleteClick(schedule)}
                                 className="text-xs font-semibold text-slate-500 hover:text-red-500 transition-colors px-3 py-1.5 rounded-lg border border-slate-200 md:border-transparent hover:border-red-100 hover:bg-white"
                               >
                                 삭제
@@ -1848,7 +1928,7 @@ export default function ExperienceDiary() {
                               수정
                             </button>
                             <button 
-                              onClick={() => handleDelete(schedule.id)}
+                              onClick={() => handleDeleteClick(schedule)}
                               className="text-xs font-semibold text-slate-500 hover:text-red-500 transition-colors px-3 py-1.5 rounded-lg border border-slate-200 md:border-transparent hover:border-red-100 hover:bg-red-50"
                             >
                               삭제
@@ -2244,7 +2324,7 @@ export default function ExperienceDiary() {
                                 수정
                               </button>
                               <button
-                                onClick={() => handleDelete(schedule.id)}
+                                onClick={() => handleDeleteClick(schedule)}
                                 className="text-xs text-slate-400 hover:text-red-500 px-2 py-1 hover:bg-red-50 rounded-lg transition"
                               >
                                 삭제
@@ -3031,7 +3111,19 @@ export default function ExperienceDiary() {
             </>
           )}
 
-              <div className="flex gap-3 mt-2">
+              <div className="flex gap-2.5 mt-2">
+                {editingId && (
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      const target = schedules.find(s => String(s.id) === String(editingId));
+                      if (target) handleDeleteClick(target);
+                    }}
+                    className="py-3 px-4 rounded-xl font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors border border-rose-200"
+                  >
+                    삭제
+                  </button>
+                )}
                 <button 
                   type="button" 
                   onClick={() => setIsModalOpen(false)}
@@ -3049,10 +3141,41 @@ export default function ExperienceDiary() {
                       : 'bg-indigo-600 hover:bg-indigo-700'
                   }`}
                 >
-                  저장하기
+                  {editingId ? '수정 완료' : '저장하기'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 삭제 확인 커스텀 모달 (브라우저 confirm 차단 및 인앱 브라우저 호환) */}
+      {deleteConfirmTarget && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-in zoom-in-95 duration-150 text-center">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
+              <X size={24} className="stroke-[2.5]" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 mb-1">일정을 삭제하시겠습니까?</h3>
+            <p className="text-xs text-slate-500 mb-5 break-keep px-2">
+              <span className="font-bold text-slate-700">&apos;{deleteConfirmTarget.title}&apos;</span> 일정이 다이어리와 가계부에서 완전히 삭제됩니다.
+            </p>
+            <div className="flex gap-2.5">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmTarget(null)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 shadow-sm transition active:scale-95"
+              >
+                삭제하기
+              </button>
+            </div>
           </div>
         </div>
       )}
