@@ -309,7 +309,7 @@ export default function NeighborAnalyticsPage() {
         resolve([]);
       };
 
-      script.src = `https://apis.naver.com/commentBox/cbox/web_naver_list_jsonp.json?ticket=blog&pool=cbox3&_callback=${callbackName}&lang=ko&country=KR&objectId=${encodeURIComponent(targetBlogId)}_${encodeURIComponent(logNo)}&pageSize=100`;
+      script.src = `https://apis.naver.com/commentBox/cbox/web_naver_list_jsonp.json?ticket=blog&pool=cbox3&_callback=${callbackName}&lang=ko&country=KR&objectId=${encodeURIComponent(targetBlogId)}_201_${encodeURIComponent(logNo)}&pageSize=100`;
       document.body.appendChild(script);
     });
   };
@@ -778,7 +778,10 @@ export default function NeighborAnalyticsPage() {
       '❌ 무소통 이웃 자동 선택: ' + checkedCount + '명 (분홍색 표시 & 체크 완료)\\n\\n' +
       '소통 이웃은 안전하게 보호되었습니다! 상단의 [이웃 삭제] 버튼을 누르시면 안전하게 정리됩니다.');
   } else {
-    alert('현재 화면에서 일치하는 이웃을 찾지 못했습니다.\\n\\n네이버 [내가 추가한 이웃 > 이웃목록] 화면인지 확인해 주세요.');
+    alert('💡 [알림] 네이버 내부 프레임(mainFrame) 선택이 필요합니다!\\n\\n' +
+      '1. 현재 F12 콘솔 창 상단의 [top ▾] 버튼을 클릭해 주세요.\\n' +
+      '2. 목록에서 [mainFrame]을 선택해 주세요.\\n' +
+      '3. 코드를 다시 붙여넣고 Enter를 누르시면 1초 만에 자동 선택됩니다!');
   }
 })();`.replace(/\n\s+/g, ' ');
 
@@ -1905,7 +1908,7 @@ export default function NeighborAnalyticsPage() {
                 <div className="space-y-1">
                   <p className="font-bold text-indigo-950">붙여넣기(Ctrl + V) 후 엔터(Enter) 치기</p>
                   <p className="text-indigo-900/80 text-[11px] leading-relaxed">
-                    콘솔 창 맨 아래에 <strong>Ctrl + V</strong>(붙여넣기) 후 <strong>Enter</strong>를 누르면, 스크립트가 <strong>최근 공감(하트)과 댓글 작성자를 네이버 세션에서 전수 대조</strong>합니다.
+                    콘솔 창 상단의 <strong>[top ▾]</strong>을 클릭하여 <strong>[mainFrame]</strong>으로 변경한 뒤, <strong>Ctrl + V</strong>(붙여넣기) 후 <strong>Enter</strong>를 누르면 1초 만에 자동 선택됩니다.
                   </p>
                 </div>
               </div>
