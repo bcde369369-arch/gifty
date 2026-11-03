@@ -387,6 +387,9 @@ export default function NeighborAnalyticsPage() {
     if (neighborNicknameToCopy) {
       navigator.clipboard.writeText(neighborNicknameToCopy);
       alert(`'${neighborNicknameToCopy}' 닉네임이 복사되었습니다!\n\n열린 네이버 창 좌측에서 [내가 추가한 이웃]을 누르고, 검색창에 붙여넣기(Ctrl+V) 하시면 1초 만에 삭제하실 수 있습니다.`);
+    } else {
+      // 일반 바로열기 버튼을 누른 경우 친절한 안내 알림
+      alert(`네이버 관리자 창이 새 탭으로 열립니다!\n\n열린 네이버 화면 상단의 3번째 탭인 [이웃순서]를 클릭하시면 그룹별 이웃 명단을 가장 편하게 복사하실 수 있습니다.\n\n(※ 첫 화면인 [이웃목록]에서 그냥 복사하셔도 날짜와 버튼은 Gifty가 자동으로 깨끗하게 걸러냅니다!)`);
     }
 
     // 네이버 공식 이웃 관리 검증된 URL
@@ -478,19 +481,24 @@ export default function NeighborAnalyticsPage() {
               </button>
             </div>
 
-            <ol className="text-xs text-slate-600 space-y-2 list-decimal list-inside leading-relaxed font-medium">
+            <ol className="text-xs text-slate-600 space-y-2.5 list-decimal list-inside leading-relaxed font-medium">
               <li>
                 아래 ①번에 내 아이디 입력 후 위 <strong>[네이버 이웃관리 바로열기]</strong>를 누릅니다.
               </li>
-              <li>
-                열린 네이버 창 상단의 <strong>[이웃순서]</strong> 탭을 클릭합니다. (원하는 그룹 클릭 가능!)
+              <li className="bg-emerald-50/80 p-2.5 rounded-xl border border-emerald-200">
+                <span>열린 네이버 창 상단의 </span>
+                <span className="inline-flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 text-[11px] font-bold text-slate-500 mx-1">
+                  이웃목록 | 이웃그룹 | <strong className="text-emerald-700 font-black underline decoration-emerald-500 underline-offset-2">이웃순서 👈 클릭</strong>
+                </span>
+                <span>탭을 눌러주세요! (원하는 그룹 선택 가능)</span>
               </li>
               <li>
-                우측 박스의 이웃 목록을 마우스로 쭉 드래그하여 <strong>복사(Ctrl+C)</strong> 후 아래 ②번에 <strong>붙여넣기(Ctrl+V)</strong>하세요!
+                우측 박스의 이웃 목록을 마우스로 드래그하여 <strong>복사(Ctrl+C)</strong> 후 아래 ②번에 <strong>붙여넣기(Ctrl+V)</strong>하세요!
               </li>
             </ol>
-            <div className="mt-2.5 pt-2 border-t border-emerald-100 text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
-              ✨ 꿀팁: [이웃순서] 탭에서는 날짜나 버튼 없이 순수하게 이웃 닉네임만 모여있어 1초 만에 가장 깔끔하게 복사됩니다!
+            <div className="mt-2.5 pt-2 border-t border-emerald-100 text-[11px] text-emerald-800 font-semibold space-y-1">
+              <div>✨ <strong>안내:</strong> 네이버 사이트 보안상 외부 웹사이트에서 네이버 화면 안의 탭을 대신 눌러줄 수 없으므로, 열린 화면에서 <strong>[이웃순서]</strong>를 1번만 클릭해 주시면 됩니다.</div>
+              <div className="text-slate-500 font-normal">※ 굳이 [이웃순서]를 누르지 않고, 처음 열리는 <strong>[이웃목록] 화면 그대로 드래그 복사하셔도</strong> Gifty가 날짜와 버튼을 알아서 100% 깔끔하게 걸러냅니다!</div>
             </div>
           </div>
 
