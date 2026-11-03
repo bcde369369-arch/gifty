@@ -496,6 +496,30 @@ export default function NeighborAnalyticsPage() {
         )}
       </nav>
 
+      {/* 모바일 상단 카테고리 2줄 그리드 바 (모든 카테고리 한눈에 노출) */}
+      <div className="md:hidden w-full bg-white border-b border-slate-200/80 p-2.5 shadow-sm z-40 relative">
+        <div className="grid grid-cols-3 gap-1.5 text-center">
+          <Link href="/neighbor" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-emerald-50 text-emerald-800 font-black text-[12px] rounded-xl border border-emerald-300 shadow-sm active:scale-95 transition-transform">
+            📊 이웃 소통
+          </Link>
+          <Link href="/sticker" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-pink-50 text-pink-700 font-bold text-[12px] rounded-xl border border-pink-200/60 shadow-sm active:scale-95 transition-transform">
+            🎨 스티커
+          </Link>
+          <Link href="/experience-diary" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-blue-50 text-blue-700 font-bold text-[12px] rounded-xl border border-blue-200/60 shadow-sm active:scale-95 transition-transform">
+            📓 체험단
+          </Link>
+          <Link href="/community" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-indigo-50 text-indigo-700 font-bold text-[12px] rounded-xl border border-indigo-200/60 shadow-sm active:scale-95 transition-transform">
+            💬 커뮤니티
+          </Link>
+          <Link href="/remove-bg" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-purple-50 text-purple-700 font-bold text-[12px] rounded-xl border border-purple-200/60 shadow-sm active:scale-95 transition-transform">
+            ✂️ 누끼따기
+          </Link>
+          <Link href="/" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-slate-100 text-slate-700 font-bold text-[12px] rounded-xl border border-slate-200 shadow-sm active:scale-95 transition-transform">
+            🏠 홈
+          </Link>
+        </div>
+      </div>
+
       {/* Hero Header */}
       <section className="bg-gradient-to-b from-emerald-50/70 via-white to-slate-50 border-b border-slate-200/80 pt-10 pb-12 px-6">
         <div className="max-w-4xl mx-auto text-center">
@@ -717,47 +741,54 @@ export default function NeighborAnalyticsPage() {
               </div>
             </div>
 
-            {/* Tab Navigation */}
-            <div className="flex border-b border-slate-200 overflow-x-auto gap-2 text-sm font-extrabold">
+            {/* Tab Navigation (모바일 2줄 x 2열 그리드로 모든 탭 100% 노출, 데스크톱 가로 탭) */}
+            <div className="grid grid-cols-2 md:flex border-b border-slate-200 gap-2 text-xs sm:text-sm font-extrabold pb-2 md:pb-0">
               <button
                 onClick={() => setActiveTab('inactive')}
-                className={`pb-3 px-4 border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                className={`py-2.5 px-3 rounded-xl md:rounded-none md:pb-3 md:px-4 md:border-b-2 transition-all flex items-center justify-center gap-1.5 ${
                   activeTab === 'inactive'
-                    ? 'border-rose-600 text-rose-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                    ? 'bg-rose-50 text-rose-700 border border-rose-200 md:border-0 md:bg-transparent md:border-b-2 md:border-rose-600 md:text-rose-600 font-black shadow-sm md:shadow-none'
+                    : 'bg-slate-50 text-slate-600 md:bg-transparent md:border-b-2 md:border-transparent md:text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <UserX size={16} className="text-rose-500" /> ⚠️ 무소통 이웃 리포트 ({inactiveNeighbors.length})
+                <UserX size={15} className="text-rose-500 shrink-0" />
+                <span className="truncate">무소통 이웃 ({inactiveNeighbors.length})</span>
               </button>
+
               <button
                 onClick={() => setActiveTab('top')}
-                className={`pb-3 px-4 border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                className={`py-2.5 px-3 rounded-xl md:rounded-none md:pb-3 md:px-4 md:border-b-2 transition-all flex items-center justify-center gap-1.5 ${
                   activeTab === 'top'
-                    ? 'border-emerald-600 text-emerald-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 md:border-0 md:bg-transparent md:border-b-2 md:border-emerald-600 md:text-emerald-600 font-black shadow-sm md:shadow-none'
+                    : 'bg-slate-50 text-slate-600 md:bg-transparent md:border-b-2 md:border-transparent md:text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Trophy size={16} className="text-amber-500" /> 🏆 찐이웃 랭킹 ({topCommunicators.length})
+                <Trophy size={15} className="text-amber-500 shrink-0" />
+                <span className="truncate">찐이웃 랭킹 ({topCommunicators.length})</span>
               </button>
+
               <button
                 onClick={() => setActiveTab('summary')}
-                className={`pb-3 px-4 border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                className={`py-2.5 px-3 rounded-xl md:rounded-none md:pb-3 md:px-4 md:border-b-2 transition-all flex items-center justify-center gap-1.5 ${
                   activeTab === 'summary'
-                    ? 'border-emerald-600 text-emerald-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 md:border-0 md:bg-transparent md:border-b-2 md:border-emerald-600 md:text-emerald-600 font-black shadow-sm md:shadow-none'
+                    : 'bg-slate-50 text-slate-600 md:bg-transparent md:border-b-2 md:border-transparent md:text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <TrendingUp size={16} /> 종합 소통 분석
+                <TrendingUp size={15} className="shrink-0" />
+                <span className="truncate">종합 소통 분석</span>
               </button>
+
               <button
                 onClick={() => setActiveTab('guide')}
-                className={`pb-3 px-4 border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                className={`py-2.5 px-3 rounded-xl md:rounded-none md:pb-3 md:px-4 md:border-b-2 transition-all flex items-center justify-center gap-1.5 ${
                   activeTab === 'guide'
-                    ? 'border-indigo-600 text-indigo-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                    ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 md:border-0 md:bg-transparent md:border-b-2 md:border-indigo-600 md:text-indigo-600 font-black shadow-sm md:shadow-none'
+                    : 'bg-slate-50 text-slate-600 md:bg-transparent md:border-b-2 md:border-transparent md:text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <HelpCircle size={16} /> 💡 모바일 1초 삭제 가이드
+                <HelpCircle size={15} className="shrink-0" />
+                <span className="truncate">이웃 삭제 가이드</span>
               </button>
             </div>
 

@@ -128,23 +128,26 @@ export default function Home() {
         )}
       </nav>
 
-      {/* Mobile Quick Links (Category Bar) */}
-      <div className="md:hidden w-full bg-white border-b border-slate-100 overflow-x-auto whitespace-nowrap scrollbar-hide shadow-sm z-40 relative">
-        <div className="px-4 py-3 flex gap-2.5">
-          <a href="/neighbor" className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-50/90 text-emerald-700 font-extrabold text-[13px] rounded-full border border-emerald-200/60 shadow-sm active:scale-95 transition-transform">
-            📊 이웃 소통 지표
+      {/* Mobile Quick Links (Category Bar - 모바일 2줄로 전체 카테고리 100% 노출) */}
+      <div className="md:hidden w-full bg-white border-b border-slate-200/80 p-2.5 shadow-sm z-40 relative">
+        <div className="grid grid-cols-3 gap-1.5 text-center">
+          <a href="/neighbor" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-emerald-50 text-emerald-800 font-black text-[12px] rounded-xl border border-emerald-300 shadow-sm active:scale-95 transition-transform">
+            📊 이웃 소통
           </a>
-          <a href="/community" className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-50/80 text-indigo-700 font-extrabold text-[13px] rounded-full border border-indigo-200/50 shadow-sm active:scale-95 transition-transform">
+          <a href="/sticker" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-pink-50 text-pink-700 font-bold text-[12px] rounded-xl border border-pink-200/60 shadow-sm active:scale-95 transition-transform">
+            🎨 스티커
+          </a>
+          <a href="/experience-diary" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-blue-50 text-blue-700 font-bold text-[12px] rounded-xl border border-blue-200/60 shadow-sm active:scale-95 transition-transform">
+            📓 체험단
+          </a>
+          <a href="/community" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-indigo-50 text-indigo-700 font-bold text-[12px] rounded-xl border border-indigo-200/60 shadow-sm active:scale-95 transition-transform">
             💬 커뮤니티
           </a>
-          <a href="/experience-diary" className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-50/80 text-blue-700 font-extrabold text-[13px] rounded-full border border-blue-200/50 shadow-sm active:scale-95 transition-transform">
-            📓 체험단 다이어리
+          <a href="/remove-bg" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-purple-50 text-purple-700 font-bold text-[12px] rounded-xl border border-purple-200/60 shadow-sm active:scale-95 transition-transform">
+            ✂️ 누끼따기
           </a>
-          <a href="/sticker" className="inline-flex items-center gap-1.5 px-4 py-2 bg-pink-50/80 text-pink-700 font-extrabold text-[13px] rounded-full border border-pink-200/50 shadow-sm active:scale-95 transition-transform">
-            🎨 블로그 스티커
-          </a>
-          <a href="/remove-bg" className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-50/80 text-purple-700 font-extrabold text-[13px] rounded-full border border-purple-200/50 shadow-sm active:scale-95 transition-transform">
-            ✂️ 누끼따기(AI)
+          <a href="/" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-slate-100 text-slate-700 font-bold text-[12px] rounded-xl border border-slate-200 shadow-sm active:scale-95 transition-transform">
+            🏠 홈
           </a>
         </div>
       </div>
