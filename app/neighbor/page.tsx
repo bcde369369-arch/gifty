@@ -60,6 +60,8 @@ export default function NeighborAnalyticsPage() {
   const [hasResult, setHasResult] = useState(false);
   const [activeTab, setActiveTab] = useState<'inactive' | 'top' | 'summary' | 'guide'>('inactive');
   const [copiedId, setCopiedId] = useState(false);
+  const [copiedScript, setCopiedScript] = useState(false);
+  const [showScriptGuide, setShowScriptGuide] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // 분석 결과 상태
@@ -348,6 +350,24 @@ export default function NeighborAnalyticsPage() {
       setCopiedId(true);
       setTimeout(() => setCopiedId(false), 2000);
       alert(`${selectedList.length}명의 실제 무소통 이웃 닉네임이 클립보드에 복사되었습니다!`);
+    });
+  };
+
+  // ⚡ 네이버 화면에서 1초 만에 일괄 자동 체크해주는 스크립트 복사 핸들러
+  const handleCopyAutoCheckScript = () => {
+    const selectedList = inactiveNeighbors.filter((i) => i.selected);
+    if (selectedList.length === 0) {
+      alert('자동 체크할 무소통 이웃을 1명 이상 선택해 주세요.');
+      return;
+    }
+
+    const nicks = selectedList.map((i) => i.nickname.trim()).filter(Boolean);
+    const scriptCode = `(function(){const targets=${JSON.stringify(nicks)};let count=0;function scan(d){if(!d)return;try{const rows=d.querySelectorAll('table tr, tbody tr, .buddy_list li, ul li, tr');rows.forEach(r=>{const t=r.innerText||'';if(targets.some(n=>t.includes(n))){const c=r.querySelector('input[type="checkbox"]');if(c&&!c.checked){c.checked=true;c.dispatchEvent(new Event('change',{bubbles:true}));c.dispatchEvent(new Event('click',{bubbles:true}));r.style.backgroundColor='#ffe4e6';count++;}}});}catch(e){}}scan(document);document.querySelectorAll('iframe').forEach(f=>{try{scan(f.contentDocument||f.contentWindow.document);}catch(e){}});if(count>0){alert('🎉 무소통 이웃 '+count+'명이 자동으로 일괄 체크(선택)되었습니다!\\n\\n상단의 [이웃 삭제] 버튼을 누르시면 한 번에 정리 완료됩니다.');}else{alert('현재 화면에서 일치하는 이웃을 찾지 못했습니다.\\n\\n네이버 [내가 추가한 이웃 > 이웃목록] 화면인지 확인해 주세요.');}})();`;
+
+    navigator.clipboard.writeText(scriptCode).then(() => {
+      setCopiedScript(true);
+      setTimeout(() => setCopiedScript(false), 3000);
+      setShowScriptGuide(true);
     });
   };
 
@@ -703,10 +723,10 @@ export default function NeighborAnalyticsPage() {
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <button
                       onClick={handleCopyInactiveList}
-                      className="flex-1 sm:flex-none px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
+                      className="flex-1 sm:flex-none px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
                     >
                       {copiedId ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                      <span>선택 명단 복사</span>
+                      <span>선택 명단 텍스트 복사</span>
                     </button>
 
                     <button
@@ -720,12 +740,49 @@ export default function NeighborAnalyticsPage() {
                   </div>
                 </div>
 
+                {/* ⚡ 1초 일괄 자동체크 마법사 배너 */}
+                <div className="bg-gradient-to-br from-rose-500 via-pink-600 to-rose-700 text-white p-5 rounded-2xl shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div className="space-y-1 text-center md:text-left">
+                    <div className="flex items-center justify-center md:justify-start gap-2">
+                      <span className="bg-white/20 text-white text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider backdrop-blur-sm">
+                        초강력 추천 꿀팁
+                      </span>
+                      <h4 className="text-base font-black flex items-center gap-1.5">
+                        ⚡ 1초 일괄 자동체크 마법사
+                      </h4>
+                    </div>
+                    <p className="text-xs text-rose-100 leading-relaxed">
+                      네이버에서 30번 검색할 필요 없습니다! <strong>코드 복사 후 네이버 콘솔(F12)에 붙여넣기</strong>하면 화면 속 무소통 이웃이 1초 만에 한 번에 자동 체크(선택)됩니다.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleCopyAutoCheckScript}
+                      className="flex-1 md:flex-none px-4 py-2.5 bg-white text-rose-600 hover:bg-rose-50 font-black rounded-xl text-xs transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 active:scale-95"
+                    >
+                      {copiedScript ? <Check size={16} className="text-emerald-600" /> : <Sparkles size={16} />}
+                      <span>{copiedScript ? '코드 복사 완료!' : '🪄 1초 자동체크 코드 복사'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowScriptGuide(true)}
+                      className="px-3.5 py-2.5 bg-rose-800/60 hover:bg-rose-800 text-white font-bold rounded-xl text-xs transition-colors border border-white/20 flex items-center gap-1"
+                    >
+                      <HelpCircle size={15} />
+                      <span>사용법 보기</span>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Direct Action Link Banner */}
-                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2 text-rose-800 font-semibold text-center sm:text-left">
-                    <AlertCircle size={18} className="text-rose-600 shrink-0" />
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 text-slate-700 font-medium text-center sm:text-left">
+                    <AlertCircle size={18} className="text-rose-500 shrink-0" />
                     <span>
-                      각 이웃 우측의 <strong>[복사 후 검색 ➔]</strong>을 누르면 닉네임이 자동 복사되며 네이버가 열립니다! 네이버 창 좌측 <strong>[내가 추가한 이웃]</strong>을 누르고 검색창에 <strong>붙여넣기(Ctrl+V)</strong> 후 엔터를 치면 1초 만에 바로 삭제하실 수 있습니다.
+                      <strong>수동 1건씩 정리:</strong> 각 이웃 우측의 <strong>[복사 후 검색 ➔]</strong>을 누르면 닉네임이 자동 복사되며 네이버가 열립니다. 네이버 좌측 <strong>[내가 추가한 이웃]</strong> 검색창에 붙여넣기(Ctrl+V) 하시면 1초 만에 삭제하실 수 있습니다.
                     </span>
                   </div>
                 </div>
@@ -935,50 +992,72 @@ export default function NeighborAnalyticsPage() {
 
             {/* TAB 4: 가이드 */}
             {activeTab === 'guide' && (
-              <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+              <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-8">
                 <div>
-                  <h3 className="text-lg font-black text-slate-800 mb-2">
-                    📱 모바일 스마트폰에서 1초 만에 이웃 삭제하는 법
+                  <h3 className="text-xl font-black text-slate-800 mb-2 flex items-center gap-2">
+                    <Sparkles className="text-rose-500" /> 무소통 이웃 가장 빠르게 정리하는 2가지 방법
                   </h3>
                   <p className="text-xs text-slate-500">
-                    스마트폰으로 네이버 블로그 앱 또는 브라우저에서 가장 빠르게 이웃을 정리하는 순서입니다.
+                    상황에 맞게 가장 편한 방법을 선택하세요. PC 사용 시 방법 1이 압도적으로 빠르고 편합니다.
                   </p>
                 </div>
 
-                <div className="grid sm:grid-cols-3 gap-4">
-                  <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                    <div className="w-8 h-8 bg-emerald-600 text-white rounded-lg flex items-center justify-center font-black text-xs mb-3">
-                      STEP 1
-                    </div>
-                    <h4 className="font-bold text-slate-800 text-sm mb-1.5">이웃 관리자 접속</h4>
-                    <p className="text-xs text-slate-600 leading-relaxed">
-                      네이버 블로그 관리자 페이지 또는 위 <strong>[이웃 관리자 바로가기]</strong> 버튼을 누릅니다.
-                    </p>
+                {/* 방법 1: PC 1초 일괄 자동체크 (강력 추천) */}
+                <div className="p-6 bg-gradient-to-br from-rose-50 to-pink-50 border border-rose-200 rounded-3xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="px-3 py-1 bg-rose-600 text-white rounded-full font-black text-xs">
+                      방법 1 (초강력 추천)
+                    </span>
+                    <span className="text-xs font-bold text-rose-700">⚡ 소요시간 약 5초</span>
                   </div>
-
-                  <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                    <div className="w-8 h-8 bg-emerald-600 text-white rounded-lg flex items-center justify-center font-black text-xs mb-3">
-                      STEP 2
+                  <h4 className="text-base font-black text-slate-900">
+                    💻 PC에서 [1초 일괄 자동체크 코드]로 30명 한 번에 삭제하기
+                  </h4>
+                  <div className="grid sm:grid-cols-3 gap-3 text-xs">
+                    <div className="p-3.5 bg-white rounded-xl border border-rose-100 shadow-sm">
+                      <p className="font-black text-rose-600 mb-1">1단계: 코드 복사</p>
+                      <p className="text-slate-700 leading-relaxed">우리 사이트에서 <strong>[🪄 1초 자동체크 코드 복사]</strong> 버튼을 누릅니다.</p>
                     </div>
-                    <h4 className="font-bold text-slate-800 text-sm mb-1.5">이웃 검색 및 선택</h4>
-                    <p className="text-xs text-slate-600 leading-relaxed">
-                      우리 사이트에서 복사한 무소통 이웃 아이디/닉네임을 검색창에 입력하면 해당 이웃이 바로 뜹니다.
-                    </p>
+                    <div className="p-3.5 bg-white rounded-xl border border-rose-100 shadow-sm">
+                      <p className="font-black text-rose-600 mb-1">2단계: 콘솔 열기</p>
+                      <p className="text-slate-700 leading-relaxed">네이버 [내가 추가한 이웃] 화면에서 <strong>F12</strong>를 누르고 <strong>Console</strong> 탭을 클릭합니다.</p>
+                    </div>
+                    <div className="p-3.5 bg-white rounded-xl border border-rose-100 shadow-sm">
+                      <p className="font-black text-rose-600 mb-1">3단계: 붙여넣고 엔터</p>
+                      <p className="text-slate-700 leading-relaxed"><strong>Ctrl + V</strong> 후 엔터 치면 자동 체크 완료! 상단 <strong>[이웃 삭제]</strong> 버튼만 1번 누르면 끝!</p>
+                    </div>
                   </div>
+                </div>
 
-                  <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                    <div className="w-8 h-8 bg-emerald-600 text-white rounded-lg flex items-center justify-center font-black text-xs mb-3">
-                      STEP 3
+                {/* 방법 2: 모바일/수동 검색 삭제 */}
+                <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="px-3 py-1 bg-slate-700 text-white rounded-full font-black text-xs">
+                      방법 2
+                    </span>
+                    <span className="text-xs font-bold text-slate-600">📱 모바일 / 건별 검색</span>
+                  </div>
+                  <h4 className="text-base font-black text-slate-900">
+                    📱 [복사 후 검색] 버튼으로 1명씩 안전하게 확인하며 삭제하기
+                  </h4>
+                  <div className="grid sm:grid-cols-3 gap-3 text-xs">
+                    <div className="p-3.5 bg-white rounded-xl border border-slate-200">
+                      <p className="font-black text-slate-800 mb-1">1단계</p>
+                      <p className="text-slate-700 leading-relaxed">목록에서 삭제할 이웃 옆 <strong>[복사 후 검색 ➔]</strong> 버튼을 누릅니다.</p>
                     </div>
-                    <h4 className="font-bold text-slate-800 text-sm mb-1.5">[삭제] 버튼 터치</h4>
-                    <p className="text-xs text-slate-600 leading-relaxed">
-                      우측의 [이웃 끊기 / 삭제] 버튼을 누르면 상대방 모르게 조용하고 안전하게 정리가 완료됩니다!
-                    </p>
+                    <div className="p-3.5 bg-white rounded-xl border border-slate-200">
+                      <p className="font-black text-slate-800 mb-1">2단계</p>
+                      <p className="text-slate-700 leading-relaxed">열린 네이버 화면 좌측 <strong>[내가 추가한 이웃]</strong> 검색창에 붙여넣기(Ctrl+V) 후 검색합니다.</p>
+                    </div>
+                    <div className="p-3.5 bg-white rounded-xl border border-slate-200">
+                      <p className="font-black text-slate-800 mb-1">3단계</p>
+                      <p className="text-slate-700 leading-relaxed">검색된 이웃 체크박스를 선택하고 <strong>[이웃 삭제]</strong>를 누르면 끝!</p>
+                    </div>
                   </div>
                 </div>
 
                 <div className="bg-slate-900 text-white p-6 rounded-2xl">
-                  <h4 className="font-black text-sm mb-2 text-emerald-300">💡 왜 무소통 이웃을 정리해야 할까요?</h4>
+                  <h4 className="font-black text-sm mb-2 text-emerald-300">💡 왜 무소통 이웃을 정기적으로 정리해야 할까요?</h4>
                   <ul className="text-xs text-slate-300 space-y-2 list-disc list-inside leading-relaxed">
                     <li><strong>서로이웃 5,000명 한도 관리:</strong> 네이버 서로이웃은 최대 5,000명까지만 추가할 수 있어서 유령 이웃을 비워두어야 새로운 찐이웃을 맺을 수 있습니다.</li>
                     <li><strong>블로그 체류시간 &amp; 지수 보호:</strong> 글을 읽지 않고 품앗이 성의 없는 공감만 누르거나 아예 안 들어오는 이웃을 정리하면 블로그 품질 관리에 유리합니다.</li>
@@ -1053,6 +1132,106 @@ export default function NeighborAnalyticsPage() {
           </div>
         </div>
       </footer>
+
+      {/* ⚡ 1초 자동체크 사용법 모달 */}
+      {showScriptGuide && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6 relative max-h-[90vh] overflow-y-auto">
+            <button
+              type="button"
+              onClick={() => setShowScriptGuide(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-100 text-rose-700 rounded-full text-xs font-bold">
+                <Sparkles size={14} /> 1초 만에 30명 일괄 체크하는 꿀팁!
+              </div>
+              <h3 className="text-xl font-black text-slate-900">
+                무소통 이웃 일괄 자동선택 가이드
+              </h3>
+              <p className="text-xs text-slate-500">
+                네이버에서 30번, 50번씩 일일이 검색할 필요 없이 딱 3초 만에 끝납니다.
+              </p>
+            </div>
+
+            <div className="space-y-3.5 text-xs text-slate-700">
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-rose-600 text-white font-black flex items-center justify-center shrink-0 text-xs">
+                  1
+                </span>
+                <div className="space-y-1">
+                  <p className="font-bold text-slate-900">코드 복사 완료 확인</p>
+                  <p className="text-slate-600 text-[11px] leading-relaxed">
+                    {copiedScript ? '✅ 이미 자동 체크 코드가 클립보드에 복사되었습니다!' : '아래 [코드 다시 복사하기] 버튼을 누르면 코드가 복사됩니다.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-rose-600 text-white font-black flex items-center justify-center shrink-0 text-xs">
+                  2
+                </span>
+                <div className="space-y-1">
+                  <p className="font-bold text-slate-900">네이버 [내가 추가한 이웃] 화면에서 F12 누르기</p>
+                  <p className="text-slate-600 text-[11px] leading-relaxed">
+                    열린 네이버 관리자 화면에서 키보드 맨 위 <strong>F12</strong> 키를 누른 후, 상단 탭에서 <strong>[Console] (콘솔)</strong>을 클릭합니다.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-rose-600 text-white font-black flex items-center justify-center shrink-0 text-xs">
+                  3
+                </span>
+                <div className="space-y-1">
+                  <p className="font-bold text-slate-900">붙여넣기(Ctrl + V) 후 엔터(Enter) 치기</p>
+                  <p className="text-slate-600 text-[11px] leading-relaxed">
+                    콘솔 창 맨 아래 입력란에 <strong>Ctrl + V</strong>(붙여넣기) 누르고 <strong>Enter</strong>를 누르면, 화면 속 무소통 이웃들이 <strong>분홍색으로 1초 만에 자동 체크</strong>됩니다!
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center shrink-0 text-xs">
+                  4
+                </span>
+                <div className="space-y-1">
+                  <p className="font-bold text-emerald-900">상단 [이웃 삭제] 버튼 클릭</p>
+                  <p className="text-emerald-700 text-[11px] leading-relaxed">
+                    모두 체크된 상태에서 네이버 목록 상단의 <strong>[이웃 삭제]</strong> 버튼만 딱 1번 누르시면 즉시 정리 완료됩니다!
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleCopyAutoCheckScript}
+                className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+              >
+                <Sparkles size={16} />
+                <span>{copiedScript ? '코드 복사 완료!' : '코드 다시 복사하기'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  setShowScriptGuide(false);
+                  handleOpenNaverAdmin(e);
+                }}
+                className="flex-1 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+              >
+                <span>네이버 창 열고 실행하기</span>
+                <ExternalLink size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
