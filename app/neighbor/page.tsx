@@ -349,7 +349,7 @@ export default function NeighborAnalyticsPage() {
 
   const targetIdClean = cleanBlogId(blogId);
 
-  // 네이버 공식 [내가 추가한 이웃] 관리 페이지 안전 열기 핸들러
+  // 네이버 공식 이웃 관리 페이지 안전 열기 핸들러
   const handleOpenNaverAdmin = (e?: React.MouseEvent, neighborNicknameToCopy?: string) => {
     if (e) e.preventDefault();
     if (!targetIdClean) {
@@ -362,10 +362,11 @@ export default function NeighborAnalyticsPage() {
     // 만약 특정 이웃 행에서 눌렀다면 해당 이웃 닉네임을 자동으로 클립보드에 복사해 줌!
     if (neighborNicknameToCopy) {
       navigator.clipboard.writeText(neighborNicknameToCopy);
+      alert(`'${neighborNicknameToCopy}' 닉네임이 복사되었습니다!\n\n열린 네이버 창 좌측에서 [내가 추가한 이웃]을 누르고, 검색창에 붙여넣기(Ctrl+V) 하시면 1초 만에 삭제하실 수 있습니다.`);
     }
 
-    // 네이버 공식 [내가 추가한 이웃] 관리자 직접 URL (BuddyManage.nhn = 내가 추가한 이웃 관리)
-    const directManageUrl = `https://admin.blog.naver.com/BuddyManage.nhn?blogId=${targetIdClean}`;
+    // 네이버 공식 이웃 관리 검증된 URL
+    const directManageUrl = `https://admin.blog.naver.com/${targetIdClean}/buddy/relation`;
     window.open(directManageUrl, '_blank');
   };
 
@@ -448,17 +449,17 @@ export default function NeighborAnalyticsPage() {
                 onClick={handleOpenNaverAdmin}
                 className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-extrabold bg-emerald-50 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
               >
-                <span>네이버 [내가 추가한 이웃] 바로열기</span>
+                <span>네이버 이웃관리 바로열기</span>
                 <ExternalLink size={12} />
               </button>
             </div>
 
             <ol className="text-xs text-slate-600 space-y-2 list-decimal list-inside leading-relaxed font-medium">
               <li>
-                아래 ①번에 내 아이디 입력 후 위 <strong>[네이버 [내가 추가한 이웃] 바로열기]</strong>를 누릅니다.
+                아래 ①번에 내 아이디 입력 후 위 <strong>[네이버 이웃관리 바로열기]</strong>를 누릅니다.
               </li>
               <li>
-                새 창으로 열린 화면에서 이웃 목록 표를 마우스로 쭉 드래그하여 <strong>복사(Ctrl+C)</strong>합니다.
+                네이버 창 좌측 메뉴의 <strong>[내가 추가한 이웃]</strong>을 누르고, 화면의 이웃 목록 표를 마우스로 쭉 드래그하여 <strong>복사(Ctrl+C)</strong>합니다.
               </li>
               <li>
                 우리 사이트 아래 ②번에 <strong>붙여넣기(Ctrl+V)</strong> 후 <strong>[소통 지표 진단]</strong>을 누르세요!
@@ -709,7 +710,7 @@ export default function NeighborAnalyticsPage() {
                       onClick={(e) => handleOpenNaverAdmin(e)}
                       className="flex-1 sm:flex-none px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-extrabold transition-all shadow-md flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
                     >
-                      <span>🚀 네이버 [내가 추가한 이웃] 열기</span>
+                      <span>🚀 네이버 이웃관리 열기</span>
                       <ExternalLink size={14} />
                     </button>
                   </div>
@@ -720,7 +721,7 @@ export default function NeighborAnalyticsPage() {
                   <div className="flex items-center gap-2 text-rose-800 font-semibold text-center sm:text-left">
                     <AlertCircle size={18} className="text-rose-600 shrink-0" />
                     <span>
-                      각 이웃 우측의 <strong>[복사 후 검색 ➔]</strong>을 누르면 닉네임이 자동 복사되며 네이버 관리자가 열립니다! 네이버 검색창에 <strong>붙여넣기(Ctrl+V)</strong> 후 엔터를 치면 1초 만에 바로 체크 삭제하실 수 있습니다.
+                      각 이웃 우측의 <strong>[복사 후 검색 ➔]</strong>을 누르면 닉네임이 자동 복사되며 네이버가 열립니다! 네이버 창 좌측 <strong>[내가 추가한 이웃]</strong>을 누르고 검색창에 <strong>붙여넣기(Ctrl+V)</strong> 후 엔터를 치면 1초 만에 바로 삭제하실 수 있습니다.
                     </span>
                   </div>
                 </div>
