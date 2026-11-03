@@ -623,7 +623,11 @@ export default function NeighborAnalyticsPage() {
     navigator.clipboard.writeText(text).then(() => {
       setCopiedId(true);
       setTimeout(() => setCopiedId(false), 2000);
-      alert(`${targetList.length}명의 실제 무소통 이웃 닉네임이 클립보드에 복사되었습니다!`);
+      alert(
+        `${targetList.length}명의 실제 무소통 이웃 닉네임이 복사되었습니다!\n\n` +
+        `📌 [알림] 이 명단은 메모장 백업 및 검색용 일반 텍스트입니다.\n` +
+        `네이버 콘솔(F12)에 붙여넣어 1초 만에 자동 체크하려면 바로 옆 [⚡ 스마트 F12 코드 복사] 버튼을 눌러주세요!`
+      );
     });
   };
 
