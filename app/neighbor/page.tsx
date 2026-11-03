@@ -627,12 +627,12 @@ export default function NeighborAnalyticsPage() {
                     </button>
 
                     <a
-                      href="https://m.blog.naver.com/BuddyManageList.naver"
+                      href={targetIdClean ? `https://admin.blog.naver.com/${targetIdClean}/buddy/relation` : 'https://admin.blog.naver.com'}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 sm:flex-none px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-extrabold transition-all shadow-md flex items-center justify-center gap-1.5 active:scale-95"
                     >
-                      <span>🚀 네이버 이웃 삭제 바로가기</span>
+                      <span>🚀 네이버 이웃 관리자 바로가기</span>
                       <ExternalLink size={14} />
                     </a>
                   </div>
@@ -643,7 +643,7 @@ export default function NeighborAnalyticsPage() {
                   <div className="flex items-center gap-2 text-rose-800 font-semibold text-center sm:text-left">
                     <AlertCircle size={18} className="text-rose-600 shrink-0" />
                     <span>
-                      네이버 정책상 외부 사이트에서 자동 삭제는 불가능합니다. 위 <strong>[이웃 삭제 바로가기]</strong>를 누르면 <strong>모바일 네이버 관리자</strong>에서 1초 만에 바로 삭제하실 수 있습니다!
+                      네이버 정책상 외부 사이트에서 자동 삭제는 불가능합니다. 위 <strong>[이웃 관리자 바로가기]</strong>를 누르면 <strong>네이버 공식 이웃 관리 페이지</strong>로 이동하여 선택 삭제하실 수 있습니다!
                     </span>
                   </div>
                 </div>
@@ -687,13 +687,13 @@ export default function NeighborAnalyticsPage() {
                           {item.reason}
                         </span>
                         <a
-                          href={`https://m.blog.naver.com/BuddyManageList.naver`}
+                          href={targetIdClean ? `https://admin.blog.naver.com/${targetIdClean}/buddy/relation` : 'https://admin.blog.naver.com'}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-slate-400 hover:text-rose-600 font-bold"
                           title="네이버 관리자에서 삭제"
                         >
-                          삭제 &rarr;
+                          관리 &rarr;
                         </a>
                       </div>
                     </div>
@@ -721,7 +721,7 @@ export default function NeighborAnalyticsPage() {
                     </div>
                     <h4 className="font-bold text-slate-800 text-sm mb-1.5">이웃 관리 페이지 접속</h4>
                     <p className="text-xs text-slate-600 leading-relaxed">
-                      네이버 블로그 앱 [MY] &rarr; [이웃 관리]로 들어가거나, 위 <strong>[이웃 삭제 바로가기]</strong> 버튼을 탭합니다.
+                      네이버 블로그 앱 [MY] &rarr; [이웃 관리]로 들어가거나, 위 <strong>[이웃 관리자 바로가기]</strong> 버튼을 탭합니다.
                     </p>
                   </div>
 
