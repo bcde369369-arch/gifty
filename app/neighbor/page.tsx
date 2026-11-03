@@ -80,60 +80,131 @@ export default function NeighborAnalyticsPage() {
     return cleaned.replace(/[^a-zA-Z0-9_-]/g, '');
   };
 
+  // 닉네임 중복 정제 함수 (예: "옥정더퍼스트부동산옥정더퍼스트부동산" -> "옥정더퍼스트부동산", "배병직 세무사|배병직 세무사 | 위너스" -> "배병직 세무사")
+  const cleanNickname = (raw: string): string => {
+    let s = raw.trim();
+    // 1. 파이프(|) 구분 시 첫 번째 닉네임만 취함
+    if (s.includes('|')) {
+      const parts = s.split('|').map((p) => p.trim()).filter(Boolean);
+      if (parts.length > 0) s = parts[0];
+    }
+    // 2. 동일한 단어가 두 번 연속 붙은 경우 정제
+    const len = s.length;
+    if (len >= 4 && len % 2 === 0) {
+      const half = len / 2;
+      if (s.slice(0, half) === s.slice(half)) {
+        s = s.slice(0, half);
+      }
+    }
+    return s.trim();
+  };
+
+  // 유효한 네이버 아이디인지 검증 (날짜, 전화번호, 시스템 단어 제외)
+  const isValidNaverId = (id: string): boolean => {
+    if (!id) return false;
+    const cleaned = id.replace(/[^a-zA-Z0-9_-]/g, '');
+    if (cleaned.length < 3 || cleaned.length > 25) return false;
+    // 순수 숫자(날짜 261031, 전화번호 등)는 네이버 아이디가 아님!
+    if (/^\d+$/.test(cleaned)) return false;
+    // 시스템 UI 단어 제외
+    const blacklist = [
+      '기본그룹', '이웃그룹', '새글소식', '이웃', '서로이웃', '열린이웃',
+      '전체선택', '그룹변경', '이웃삭제', '소식받기', 'on', 'off', 'admin', 'manage'
+    ];
+    if (blacklist.includes(cleaned.toLowerCase())) return false;
+    return true;
+  };
+
+  // 날짜 형식인지 체크 (예: 26.11.02. 또는 2024.11.02.)
+  const isDateString = (str: string): boolean => {
+    return /^\d{2,4}\.\d{1,2}\.\d{1,2}\.?$/.test(str.trim());
+  };
+
   // 네이버 관리자 텍스트 지능형 파서
   const parseNaverBuddyText = (text: string): ParsedNeighbor[] => {
-    const lines = text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+    const rawLines = text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
     const neighbors: ParsedNeighbor[] = [];
-    const seenIds = new Set<string>();
+    const seenNickOrId = new Set<string>();
 
-    for (const line of lines) {
-      // 1. 닉네임 (아이디) 형태: 예) "달콤라떼 (sweet_latte)" 또는 "달콤라떼(sweet_latte)"
-      const parenMatch = line.match(/^([^(]+)\s*\(([-_a-zA-Z0-9]{4,25})\)/);
+    for (const line of rawLines) {
+      // 날짜 한 줄 단독인 경우 무조건 스킵 (이웃이 아님)
+      if (isDateString(line)) continue;
+
+      // 시스템 버튼/메뉴 줄 스킵
+      if (/^(새글소식|소식받기|ON|OFF|전체선택|그룹변경|이웃삭제|열린이웃|이웃\/서로이웃 관리)$/i.test(line)) {
+        continue;
+      }
+
+      // 패턴 1: "닉네임 (아이디)" 형태
+      const parenMatch = line.match(/^([^(]+)\s*\(([-_a-zA-Z0-9]{3,25})\)/);
       if (parenMatch) {
-        const nick = parenMatch[1].trim();
-        const id = parenMatch[2].trim();
-        if (!seenIds.has(id)) {
-          seenIds.add(id);
-          neighbors.push({ id, nickname: nick });
+        const rawNick = parenMatch[1].trim();
+        const potentialId = parenMatch[2].trim();
+        const nick = cleanNickname(rawNick);
+        const validId = isValidNaverId(potentialId) ? potentialId : nick;
+        if (!seenNickOrId.has(nick) && !seenNickOrId.has(validId)) {
+          seenNickOrId.add(nick);
+          seenNickOrId.add(validId);
+          neighbors.push({ id: validId, nickname: nick });
         }
         continue;
       }
 
-      // 2. 탭 구분 또는 띄어쓰기 구분: "닉네임 \t 아이디 \t 그룹 \t 날짜"
+      // 패턴 2: 탭(\t) 구분 테이블 행 (네이버 관리자 표 복사 시 가장 흔함)
       const tabParts = line.split(/[\t]+/).map((p) => p.trim()).filter((p) => p.length > 0);
       if (tabParts.length >= 2) {
-        const potentialId = tabParts[1].replace(/[^a-zA-Z0-9_-]/g, '');
-        if (potentialId.length >= 4 && potentialId.length <= 25) {
-          if (!seenIds.has(potentialId)) {
-            seenIds.add(potentialId);
-            neighbors.push({
-              nickname: tabParts[0],
-              id: potentialId,
-              group: tabParts[2] || '기본그룹',
-              addedDate: tabParts[3] || ''
-            });
+        const rawNick = tabParts[0];
+        const nick = cleanNickname(rawNick);
+        
+        // 날짜나 시스템 단어가 아닌 유효한 ID 파트 탐색
+        let foundId = '';
+        let foundGroup = '기본그룹';
+        let foundDate = '';
+
+        for (let i = 1; i < tabParts.length; i++) {
+          const part = tabParts[i];
+          if (isDateString(part)) {
+            foundDate = part;
+          } else if (part.includes('그룹')) {
+            foundGroup = part;
+          } else if (!foundId && isValidNaverId(part)) {
+            foundId = part;
           }
+        }
+
+        const validId = foundId || nick;
+        if (nick && !isDateString(nick) && !seenNickOrId.has(nick)) {
+          seenNickOrId.add(nick);
+          seenNickOrId.add(validId);
+          neighbors.push({
+            id: validId,
+            nickname: nick,
+            group: foundGroup,
+            addedDate: foundDate
+          });
           continue;
         }
       }
 
-      // 3. 네이버 블로그 URL 형태: blog.naver.com/아이디
-      const urlMatch = line.match(/blog\.naver\.com\/([-_a-zA-Z0-9]{4,25})/);
+      // 패턴 3: 블로그 URL 형태 (blog.naver.com/아이디)
+      const urlMatch = line.match(/blog\.naver\.com\/([-_a-zA-Z0-9]{3,25})/);
       if (urlMatch) {
         const id = urlMatch[1];
-        if (!seenIds.has(id)) {
-          seenIds.add(id);
+        if (isValidNaverId(id) && !seenNickOrId.has(id)) {
+          seenNickOrId.add(id);
           neighbors.push({ id, nickname: id });
         }
         continue;
       }
 
-      // 4. 단일 아이디 형태 (영어/숫자 4~20글자)
-      const singleWord = line.replace(/[^a-zA-Z0-9_-]/g, '');
-      if (singleWord.length >= 4 && singleWord.length <= 20 && !line.includes(' ')) {
-        if (!seenIds.has(singleWord)) {
-          seenIds.add(singleWord);
-          neighbors.push({ id: singleWord, nickname: singleWord });
+      // 패턴 4: 일반 텍스트 라인 (닉네임 단독 또는 공백 포함 닉네임)
+      const cleaned = cleanNickname(line);
+      // 순수 숫자(날짜, 전화번호)나 시스템 단어는 제외
+      if (cleaned.length >= 2 && !isDateString(cleaned) && !/^\d+$/.test(cleaned.replace(/[-_]/g, ''))) {
+        const isBlacklisted = ['기본그룹', '새글소식', '열린이웃', '이웃관리'].includes(cleaned);
+        if (!isBlacklisted && !seenNickOrId.has(cleaned)) {
+          seenNickOrId.add(cleaned);
+          neighbors.push({ id: cleaned, nickname: cleaned });
         }
       }
     }
@@ -675,8 +746,10 @@ export default function NeighborAnalyticsPage() {
                         />
                         <div>
                           <span className="font-bold text-slate-800 mr-2">{item.nickname}</span>
-                          <span className="text-slate-400 text-[11px]">@{item.id}</span>
-                          {item.group && (
+                          {item.id && item.id !== item.nickname && isValidNaverId(item.id) && (
+                            <span className="text-slate-400 text-[11px]">@{item.id}</span>
+                          )}
+                          {item.group && item.group !== '기본그룹' && (
                             <span className="ml-2 bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px]">
                               {item.group}
                             </span>
@@ -741,7 +814,9 @@ export default function NeighborAnalyticsPage() {
                           </td>
                           <td className="py-3.5 px-3 font-bold text-slate-800">
                             {c.nickname}
-                            <span className="text-xs text-slate-400 font-normal ml-1.5">(@{c.id})</span>
+                            {c.id && c.id !== c.nickname && isValidNaverId(c.id) && (
+                              <span className="text-xs text-slate-400 font-normal ml-1.5">(@{c.id})</span>
+                            )}
                           </td>
                           <td className="py-3.5 px-3 text-center">
                             <span
