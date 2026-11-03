@@ -825,29 +825,20 @@ export default function NeighborAnalyticsPage() {
                   <div className="bg-gradient-to-br from-emerald-600 via-teal-600 to-emerald-700 text-white p-5 rounded-2xl shadow-md space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="bg-white/20 text-white text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider backdrop-blur-sm">
-                        📱 모바일 1초 삭제법 (F12 불필요!)
+                        📱 모바일 블로그 앱 삭제법
                       </span>
                       <span className="text-xs text-emerald-100 font-semibold">스마트폰 터치 2번으로 끝</span>
                     </div>
 
-                    <div className="grid sm:grid-cols-2 gap-3 text-xs text-emerald-50">
-                      <div className="bg-white/10 p-3.5 rounded-xl backdrop-blur-sm space-y-1">
-                        <p className="font-black text-white flex items-center gap-1">
-                          방법 ① [블로그 열고 끊기] (가장 추천)
-                        </p>
-                        <p className="text-[11px] text-emerald-100 leading-relaxed">
-                          목록 우측의 <strong>[블로그 열고 끊기]</strong>를 누르면 상대방 블로그가 열립니다. 상단 프로필의 초록색 <strong>[이웃 / 서로이웃]</strong> 버튼을 누르고 <strong>[이웃 취소]</strong>만 탭하시면 1초 만에 끊어집니다!
-                        </p>
-                      </div>
-
-                      <div className="bg-white/10 p-3.5 rounded-xl backdrop-blur-sm space-y-1">
-                        <p className="font-black text-white flex items-center gap-1">
-                          방법 ② 네이버 블로그 앱 검색
-                        </p>
-                        <p className="text-[11px] text-emerald-100 leading-relaxed">
-                          <strong>[복사]</strong> 버튼 탭 ➔ 네이버 블로그 앱 우측 상단 <strong>[≡ 메뉴] ➔ [이웃 목록]</strong> 검색창에 붙여넣기 ➔ 프로필 우측 <strong>[점 3개 ⋮] ➔ [이웃 취소]</strong> 누르면 끝!
-                        </p>
-                      </div>
+                    <div className="bg-white/10 p-3.5 rounded-xl backdrop-blur-sm space-y-1.5 text-xs text-emerald-50">
+                      <p className="font-black text-white flex items-center gap-1 text-sm">
+                        📱 네이버 블로그 앱에서 1초 삭제 순서
+                      </p>
+                      <ol className="text-[12px] text-emerald-100 space-y-1 list-decimal list-inside leading-relaxed">
+                        <li>아래 명단에서 삭제할 이웃의 <strong>[닉네임 복사]</strong> 버튼을 누릅니다.</li>
+                        <li>네이버 블로그 앱 우측 상단 <strong>[≡ 메뉴] ➔ [이웃 목록]</strong>으로 이동합니다.</li>
+                        <li>상단 검색창에 붙여넣기 후, 검색된 이웃 우측 <strong>[점 3개 ⋮] ➔ [이웃 취소]</strong>를 누르면 끝!</li>
+                      </ol>
                     </div>
                   </div>
                 ) : (
@@ -931,51 +922,24 @@ export default function NeighborAnalyticsPage() {
                       </label>
 
                       <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
-                        <span className="bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded-full text-[10px] hidden md:inline-block">
+                        <span className="bg-rose-100 text-rose-700 font-bold px-2.5 py-1 rounded-full text-[10px] hidden md:inline-block">
                           {item.reason}
                         </span>
 
-                        {/* 단건 닉네임 복사 버튼 */}
+                        {/* 닉네임 복사 버튼 (단일 버튼으로 깔끔하게) */}
                         <button
                           type="button"
                           onClick={() => handleCopySingleNickname(item.nickname)}
-                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1 active:scale-95"
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shadow-sm"
                           title="닉네임 클립보드 복사"
                         >
                           {copiedNick === item.nickname ? (
-                            <Check size={12} className="text-emerald-600" />
+                            <Check size={14} className="text-emerald-600" />
                           ) : (
-                            <Copy size={12} />
+                            <Copy size={14} />
                           )}
-                          <span>{copiedNick === item.nickname ? '복사됨' : '복사'}</span>
+                          <span>{copiedNick === item.nickname ? '복사됨!' : '닉네임 복사'}</span>
                         </button>
-
-                        {/* 📱 모바일/PC 스마트 바로가기 & 끊기 버튼 */}
-                        <a
-                          href={
-                            isValidNaverId(item.id)
-                              ? `https://m.blog.naver.com/${item.id}`
-                              : `https://m.search.naver.com/search.naver?where=blog&query=${encodeURIComponent(item.nickname)}`
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[11px] font-extrabold transition-colors cursor-pointer flex items-center gap-1 active:scale-95"
-                          title="상대방 블로그로 이동하여 상단 [이웃] 버튼 누르고 취소하기"
-                        >
-                          <ExternalLink size={12} />
-                          <span>블로그 열고 끊기</span>
-                        </a>
-
-                        {deleteMode === 'pc' && (
-                          <button
-                            type="button"
-                            onClick={(e) => handleOpenNaverAdmin(e, item.nickname)}
-                            className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-[11px] font-extrabold transition-colors cursor-pointer hidden md:flex items-center gap-1 active:scale-95"
-                            title="이웃 닉네임 복사 후 네이버 관리자 열기"
-                          >
-                            <span>관리자 검색 &rarr;</span>
-                          </button>
-                        )}
                       </div>
                     </div>
                   ))}
