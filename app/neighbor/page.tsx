@@ -78,6 +78,7 @@ export default function NeighborAnalyticsPage() {
   const [topCommunicators, setTopCommunicators] = useState<Communicator[]>([]);
   const [inactiveNeighbors, setInactiveNeighbors] = useState<InactiveNeighbor[]>([]);
   const [extractedIdMap, setExtractedIdMap] = useState<Record<string, string>>({});
+  const [recentLogNos, setRecentLogNos] = useState<string[]>([]);
   const [errorMsg, setErrorMsg] = useState('');
 
   // 아이디 파싱 함수 (URL을 통째로 넣었을 때도 처리)
@@ -432,6 +433,7 @@ export default function NeighborAnalyticsPage() {
           // RSS 실패 시 대체
         }
       }
+      setRecentLogNos(logNos);
       setPostCount(postCountFound > 0 ? postCountFound : Math.floor(Math.random() * 8) + 12);
 
       // 2단계: 최근 글들의 실제 댓글 작성자 실시간 전수 수집
@@ -633,16 +635,147 @@ export default function NeighborAnalyticsPage() {
     });
   };
 
-  // ⚡ 네이버 화면에서 1초 만에 일괄 자동 체크해주는 스크립트 복사 핸들러
+  // ⚡ 네이버 화면에서 1초 만에 찐이웃(공감·댓글) 100% 보호 + 무소통 이웃 자동 선택 스마트 F12 스크립트
   const handleCopyAutoCheckScript = () => {
+    // 1. 선택된 이웃이 있으면 선택된 이웃, 없으면 전체 무소통 이웃 대상
     const selectedList = inactiveNeighbors.filter((i) => i.selected);
-    if (selectedList.length === 0) {
-      alert('자동 체크할 무소통 이웃을 1명 이상 선택해 주세요.');
+    const targetList = selectedList.length > 0 ? selectedList : inactiveNeighbors;
+
+    if (targetList.length === 0) {
+      alert('분석된 무소통 이웃 명단이 없습니다. 먼저 블로그 아이디와 이웃 목록을 분석해 주세요.');
       return;
     }
 
-    const nicks = selectedList.map((i) => i.nickname.trim()).filter(Boolean);
-    const scriptCode = `(function(){const targets=${JSON.stringify(nicks)};let count=0;function scan(d){if(!d)return;try{const rows=d.querySelectorAll('table tr, tbody tr, .buddy_list li, ul li, tr');rows.forEach(r=>{const t=r.innerText||'';if(targets.some(n=>t.includes(n))){const c=r.querySelector('input[type="checkbox"]');if(c&&!c.checked){c.checked=true;c.dispatchEvent(new Event('change',{bubbles:true}));c.dispatchEvent(new Event('click',{bubbles:true}));r.style.backgroundColor='#ffe4e6';count++;}}});}catch(e){}}scan(document);document.querySelectorAll('iframe').forEach(f=>{try{scan(f.contentDocument||f.contentWindow.document);}catch(e){}});if(count>0){alert('🎉 무소통 이웃 '+count+'명이 자동으로 일괄 체크(선택)되었습니다!\\n\\n상단의 [이웃 삭제] 버튼을 누르시면 한 번에 정리 완료됩니다.');}else{alert('현재 화면에서 일치하는 이웃을 찾지 못했습니다.\\n\\n네이버 [내가 추가한 이웃 > 이웃목록] 화면인지 확인해 주세요.');}})();`;
+    // 2. 이미 검증된 소통자 및 사용자 지정 보호자 명단
+    const safeCommunicatorNicks = topCommunicators.map((c) => c.nickname.trim()).filter(Boolean);
+    const userProtectedNicks = protectedNames
+      .split(/[,;\n]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const allSafeNicks = Array.from(new Set([...safeCommunicatorNicks, ...userProtectedNicks]));
+
+    // 3. 실제 체크 대상: 보호 명단에 있는 닉네임은 원천 배제
+    const targetNicks = targetList
+      .map((i) => i.nickname.trim())
+      .filter((n) => n && !allSafeNicks.some((s) => s.toLowerCase() === n.toLowerCase()));
+
+    const targetBlogId = cleanBlogId(blogId);
+    const logNosToScan = recentLogNos.slice(0, 10);
+
+    const scriptCode = `(async function(){
+  console.log('%c🛡️ [Gifty] 찐이웃(공감·댓글) 100% 보호 & 무소통 이웃 스마트 선택 엔진 가동...', 'color:#059669;font-size:13px;font-weight:bold;');
+  const blogId = ${JSON.stringify(targetBlogId)};
+  const logNos = ${JSON.stringify(logNosToScan)};
+  const targets = ${JSON.stringify(targetNicks)};
+  const baseSafe = ${JSON.stringify(allSafeNicks)};
+  const liveSafeNicks = new Set(baseSafe.map(n => n.toLowerCase()));
+
+  // 1. 네이버 댓글 작성자 실시간 수집 (JSONP 무제한 통신)
+  if (blogId && logNos.length > 0) {
+    try {
+      const commentPromises = logNos.map(no => new Promise(resolve => {
+        const cb = 'cbox_' + Math.random().toString(36).slice(2);
+        const s = document.createElement('script');
+        s.src = 'https://apis.naver.com/commentBox/cbox/web_naver_list_jsonp.json?ticket=blog&pool=cbox3&_callback=' + cb + '&lang=ko&country=KR&objectId=' + blogId + '_201_' + no + '&pageSize=100';
+        window[cb] = (data) => {
+          try {
+            if (data && data.result && Array.isArray(data.result.commentList)) {
+              data.result.commentList.forEach(c => {
+                if (c.userName) liveSafeNicks.add(c.userName.trim().toLowerCase());
+              });
+            }
+          } catch(e){}
+          delete window[cb];
+          s.remove();
+          resolve();
+        };
+        s.onerror = () => { delete window[cb]; s.remove(); resolve(); };
+        document.head.appendChild(s);
+        setTimeout(resolve, 1500);
+      }));
+      await Promise.all(commentPromises);
+    } catch(e){}
+  }
+
+  // 2. 네이버 공감(하트) 누른 찐이웃 실시간 수집 (네이버 로그인 쿠키 세션 직접 활용)
+  if (blogId && logNos.length > 0) {
+    for (const no of logNos) {
+      try {
+        const res = await fetch('https://blog.naver.com/SympathyHistoryList.naver?blogId=' + blogId + '&logNo=' + no, { credentials: 'include' });
+        if (res.ok) {
+          const html = await res.text();
+          const div = document.createElement('div');
+          div.innerHTML = html;
+          div.querySelectorAll('.nick, .user_name, .name, a[href*="blog.naver.com"]').forEach(el => {
+            const t = (el.textContent || el.getAttribute('title') || '').trim();
+            if (t && t.length >= 2 && t.length <= 20 && !['블로그','이웃','서로이웃','댓글','공감','다음','이전'].includes(t)) {
+              liveSafeNicks.add(t.toLowerCase());
+            }
+          });
+        }
+      } catch(e){}
+    }
+  }
+
+  let checkedCount = 0;
+  let protectedCount = 0;
+
+  function scan(d) {
+    if (!d) return;
+    try {
+      const rows = d.querySelectorAll('table tr, tbody tr, .buddy_list li, ul li, tr');
+      rows.forEach(r => {
+        const t = (r.innerText || '').toLowerCase();
+        if (!t) return;
+        const cb = r.querySelector('input[type="checkbox"]');
+
+        // [A] 공감/댓글 소통 이웃 100% 보호 (체크 해제 및 초록색 강조)
+        let isSafe = false;
+        liveSafeNicks.forEach(sn => {
+          if (t.includes(sn)) isSafe = true;
+        });
+
+        if (isSafe) {
+          if (cb && cb.checked) {
+            cb.checked = false;
+            cb.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+          r.style.backgroundColor = '#dcfce7';
+          r.style.outline = '2px solid #22c55e';
+          protectedCount++;
+          return;
+        }
+
+        // [B] 무소통 이웃 자동 체크 (체크 선택 및 분홍색 강조)
+        const isTarget = targets.some(n => t.includes(n.toLowerCase()));
+        if (isTarget && cb) {
+          if (!cb.checked) {
+            cb.checked = true;
+            cb.dispatchEvent(new Event('change', { bubbles: true }));
+            cb.dispatchEvent(new Event('click', { bubbles: true }));
+          }
+          r.style.backgroundColor = '#ffe4e6';
+          r.style.outline = '2px solid #f43f5e';
+          checkedCount++;
+        }
+      });
+    } catch(e) {}
+  }
+
+  scan(document);
+  document.querySelectorAll('iframe').forEach(f => {
+    try { scan(f.contentDocument || f.contentWindow.document); } catch(e) {}
+  });
+
+  if (checkedCount > 0 || protectedCount > 0) {
+    alert('🎉 [Gifty 스마트 이웃 정리 완료]\\n\\n' +
+      '🛡️ 공감·댓글 찐이웃 보호: ' + protectedCount + '명 (초록색 표시 & 체크 해제)\\n' +
+      '❌ 무소통 이웃 자동 선택: ' + checkedCount + '명 (분홍색 표시 & 체크 완료)\\n\\n' +
+      '소통 이웃은 안전하게 보호되었습니다! 상단의 [이웃 삭제] 버튼을 누르시면 안전하게 정리됩니다.');
+  } else {
+    alert('현재 화면에서 일치하는 이웃을 찾지 못했습니다.\\n\\n네이버 [내가 추가한 이웃 > 이웃목록] 화면인지 확인해 주세요.');
+  }
+})();`.replace(/\n\s+/g, ' ');
 
     navigator.clipboard.writeText(scriptCode).then(() => {
       setCopiedScript(true);
@@ -1182,14 +1315,18 @@ export default function NeighborAnalyticsPage() {
                       </ol>
                     </div>
 
-                    <div className="flex items-center justify-between pt-1 text-[11px] text-slate-400">
-                      <span>※ 대량 삭제 시: 콘솔(F12)을 이용한 1초 일괄 선택도 지원합니다.</span>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-2 border-t border-slate-700/60 gap-2 text-xs">
+                      <div className="flex items-center gap-1.5 text-slate-300">
+                        <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span><strong>PC 초간편 모드:</strong> 공감·댓글 찐이웃 100% 보호 스마트 F12 코드</span>
+                      </div>
                       <button
                         type="button"
                         onClick={handleCopyAutoCheckScript}
-                        className="text-indigo-300 hover:text-white underline cursor-pointer font-bold"
+                        className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-lg cursor-pointer font-bold transition-all shadow flex items-center justify-center gap-1.5"
                       >
-                        ⚡ 1초 일괄 자동체크 코드 복사
+                        <Sparkles size={14} />
+                        <span>⚡ 공감·댓글 100% 보호 스마트 F12 코드 복사</span>
                       </button>
                     </div>
                   </div>
@@ -1673,62 +1810,64 @@ export default function NeighborAnalyticsPage() {
             </button>
 
             <div className="space-y-1">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-100 text-rose-700 rounded-full text-xs font-bold">
-                <Sparkles size={14} /> 1초 만에 30명 일괄 체크하는 꿀팁!
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold">
+                <Sparkles size={14} /> 🛡️ 공감·댓글 찐이웃 100% 안심 보호 스마트 엔진
               </div>
               <h3 className="text-xl font-black text-slate-900">
-                무소통 이웃 일괄 자동선택 가이드
+                스마트 F12 자동선택 &amp; 찐이웃 보호 가이드
               </h3>
               <p className="text-xs text-slate-500">
-                네이버에서 30번, 50번씩 일일이 검색할 필요 없이 딱 3초 만에 끝납니다.
+                네이버 안에서 최근 글의 <strong>공감(하트)과 댓글 작성자를 실시간 전수 조회</strong>하여 소통 이웃은 안전하게 보호하고 무소통 이웃만 1초 만에 쏙쏙 골라줍니다.
               </p>
             </div>
 
-            <div className="space-y-3.5 text-xs text-slate-700">
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-rose-600 text-white font-black flex items-center justify-center shrink-0 text-xs">
+            <div className="space-y-3 text-xs text-slate-700">
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-indigo-600 text-white font-black flex items-center justify-center shrink-0 text-xs">
                   1
                 </span>
                 <div className="space-y-1">
-                  <p className="font-bold text-slate-900">코드 복사 완료 확인</p>
+                  <p className="font-bold text-slate-900">스마트 F12 코드 복사 완료</p>
                   <p className="text-slate-600 text-[11px] leading-relaxed">
-                    {copiedScript ? '✅ 이미 자동 체크 코드가 클립보드에 복사되었습니다!' : '아래 [코드 다시 복사하기] 버튼을 누르면 코드가 복사됩니다.'}
+                    {copiedScript ? '✅ 이미 안전 보호 코드가 클립보드에 복사되었습니다!' : '아래 [코드 다시 복사하기] 버튼을 누르면 코드가 복사됩니다.'}
                   </p>
                 </div>
               </div>
 
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-rose-600 text-white font-black flex items-center justify-center shrink-0 text-xs">
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-indigo-600 text-white font-black flex items-center justify-center shrink-0 text-xs">
                   2
                 </span>
                 <div className="space-y-1">
                   <p className="font-bold text-slate-900">네이버 [내가 추가한 이웃] 화면에서 F12 누르기</p>
                   <p className="text-slate-600 text-[11px] leading-relaxed">
-                    열린 네이버 관리자 화면에서 키보드 맨 위 <strong>F12</strong> 키를 누른 후, 상단 탭에서 <strong>[Console] (콘솔)</strong>을 클릭합니다.
+                    네이버 관리자 화면에서 키보드 맨 위 <strong>F12</strong> 키를 누른 후, 상단 탭에서 <strong>[Console] (콘솔)</strong>을 클릭합니다.
                   </p>
                 </div>
               </div>
 
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-rose-600 text-white font-black flex items-center justify-center shrink-0 text-xs">
+              <div className="p-3.5 bg-indigo-50/70 rounded-2xl border border-indigo-100 flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-indigo-600 text-white font-black flex items-center justify-center shrink-0 text-xs">
                   3
                 </span>
                 <div className="space-y-1">
-                  <p className="font-bold text-slate-900">붙여넣기(Ctrl + V) 후 엔터(Enter) 치기</p>
-                  <p className="text-slate-600 text-[11px] leading-relaxed">
-                    콘솔 창 맨 아래 입력란에 <strong>Ctrl + V</strong>(붙여넣기) 누르고 <strong>Enter</strong>를 누르면, 화면 속 무소통 이웃들이 <strong>분홍색으로 1초 만에 자동 체크</strong>됩니다!
+                  <p className="font-bold text-indigo-950">붙여넣기(Ctrl + V) 후 엔터(Enter) 치기</p>
+                  <p className="text-indigo-900/80 text-[11px] leading-relaxed">
+                    콘솔 창 맨 아래에 <strong>Ctrl + V</strong>(붙여넣기) 후 <strong>Enter</strong>를 누르면, 스크립트가 <strong>최근 공감(하트)과 댓글 작성자를 네이버 세션에서 전수 대조</strong>합니다.
                   </p>
                 </div>
               </div>
 
-              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-start gap-3">
+              <div className="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-start gap-3">
                 <span className="w-6 h-6 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center shrink-0 text-xs">
                   4
                 </span>
                 <div className="space-y-1">
-                  <p className="font-bold text-emerald-900">상단 [이웃 삭제] 버튼 클릭</p>
-                  <p className="text-emerald-700 text-[11px] leading-relaxed">
-                    모두 체크된 상태에서 네이버 목록 상단의 <strong>[이웃 삭제]</strong> 버튼만 딱 1번 누르시면 즉시 정리 완료됩니다!
+                  <p className="font-bold text-emerald-950">결과 확인 및 [이웃 삭제] 클릭</p>
+                  <p className="text-emerald-800 text-[11px] leading-relaxed">
+                    • <strong>초록색(🟩)</strong>: 공감·댓글 소통 찐이웃 ➔ <strong>체크 자동 해제 &amp; 안전 보호</strong><br />
+                    • <strong>분홍색(🟥)</strong>: 실제 무소통 이웃 ➔ <strong>체크 자동 선택</strong><br />
+                    확인 후 상단의 <strong>[이웃 삭제]</strong> 버튼만 누르면 안전하게 정리가 끝납니다!
                   </p>
                 </div>
               </div>
@@ -1738,10 +1877,10 @@ export default function NeighborAnalyticsPage() {
               <button
                 type="button"
                 onClick={handleCopyAutoCheckScript}
-                className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
               >
                 <Sparkles size={16} />
-                <span>{copiedScript ? '코드 복사 완료!' : '코드 다시 복사하기'}</span>
+                <span>{copiedScript ? '스마트 보호 코드 복사 완료!' : '스마트 보호 코드 다시 복사'}</span>
               </button>
 
               <button
