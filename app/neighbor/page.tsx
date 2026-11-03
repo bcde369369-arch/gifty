@@ -102,14 +102,18 @@ export default function NeighborAnalyticsPage() {
     return false;
   };
 
-  // 닉네임 정제 함수: "배병직 세무사 | 배병직 세무사 | 위너스(Winners)" -> "배병직 세무사"
+  // 닉네임 정제 함수: "♥ 배병직 세무사 | 위너스(Winners)" -> "배병직 세무사"
   const cleanNickname = (raw: string): string => {
     let s = raw.trim();
-    // 파이프(|)로 닉네임과 블로그명이 나뉘어 있을 때, 무조건 첫 번째 파트가 실제 닉네임!
+    // 0. 이웃순서 화면의 앞머리 하트(♥, ❤) 및 특수 불릿 기호 제거
+    s = s.replace(/^[♥❤★☆*•·-]\s*/, '').trim();
+    // 1. 파이프(|)로 닉네임과 블로그명이 나뉘어 있을 때, 무조건 첫 번째 파트가 실제 닉네임!
     if (s.includes('|')) {
       const parts = s.split('|').map((p) => p.trim()).filter(Boolean);
       if (parts.length > 0) s = parts[0];
     }
+    // 하트 재차 제거
+    s = s.replace(/^[♥❤★☆*•·-]\s*/, '').trim();
     // 괄호 안에 있는 아이디 제거 (예: "배병직 세무사 (Winners)" -> "배병직 세무사")
     s = s.replace(/\s*\([^)]*\)$/, '').trim();
     // 2회 연속 단어 중복 제거
@@ -459,14 +463,14 @@ export default function NeighborAnalyticsPage() {
                 아래 ①번에 내 아이디 입력 후 위 <strong>[네이버 이웃관리 바로열기]</strong>를 누릅니다.
               </li>
               <li>
-                네이버 창 좌측 메뉴의 <strong>[내가 추가한 이웃]</strong>을 누르고, 화면의 이웃 목록 표를 마우스로 쭉 드래그하여 <strong>복사(Ctrl+C)</strong>합니다.
+                열린 네이버 창 상단의 <strong>[이웃순서]</strong> 탭을 클릭합니다. (원하는 그룹 클릭 가능!)
               </li>
               <li>
-                우리 사이트 아래 ②번에 <strong>붙여넣기(Ctrl+V)</strong> 후 <strong>[소통 지표 진단]</strong>을 누르세요!
+                우측 박스의 이웃 목록을 마우스로 쭉 드래그하여 <strong>복사(Ctrl+C)</strong> 후 아래 ②번에 <strong>붙여넣기(Ctrl+V)</strong>하세요!
               </li>
             </ol>
             <div className="mt-2.5 pt-2 border-t border-emerald-100 text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
-              💡 팁: &apos;서로이웃&apos;만 정리하고 싶으시면, 네이버 화면 상단의 [서로이웃] 탭을 누른 후 복사하시면 됩니다!
+              ✨ 꿀팁: [이웃순서] 탭에서는 날짜나 버튼 없이 순수하게 이웃 닉네임만 모여있어 1초 만에 가장 깔끔하게 복사됩니다!
             </div>
           </div>
 
@@ -506,7 +510,7 @@ export default function NeighborAnalyticsPage() {
                 value={rawPastedText}
                 onChange={(e) => setRawPastedText(e.target.value)}
                 rows={5}
-                placeholder="네이버 블로그 관리자 [이웃 관리 > 내가 추가한 이웃] 화면에서 마우스로 긁어 복사한 내용을 여기에 붙여넣어 주세요! (Ctrl + V)"
+                placeholder="네이버 블로그 관리자 [내가 추가한 이웃 > 이웃순서] 화면에서 마우스로 드래그 복사한 이웃 목록을 여기에 붙여넣어 주세요! (Ctrl + V)"
                 className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all placeholder:text-slate-400"
               ></textarea>
             </div>
