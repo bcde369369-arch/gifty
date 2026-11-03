@@ -447,8 +447,9 @@ export default function CommunityPage() {
               Gifty<span className="text-indigo-600">.</span>
             </span>
           </Link>
-          <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
+          <div className="hidden md:flex items-center gap-7 text-sm font-semibold text-slate-600">
             <Link href="/" className="hover:text-indigo-600 transition-colors">홈</Link>
+            <Link href="/neighbor" className="hover:text-emerald-700 transition-colors text-emerald-600 font-extrabold flex items-center gap-1">이웃 소통 지표 📊</Link>
             <Link href="/community" className="text-indigo-600 font-extrabold flex items-center gap-1">
               커뮤니티 💬 <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
             </Link>
@@ -468,6 +469,7 @@ export default function CommunityPage() {
         {isMobileMenuOpen && (
           <div className="md:hidden bg-white border-b border-slate-100 shadow-md w-full flex flex-col p-4 gap-2 text-sm font-bold absolute top-16 left-0 z-50">
             <Link href="/" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl hover:bg-slate-50">홈</Link>
+            <Link href="/neighbor" className="text-emerald-600 hover:bg-emerald-50 p-3 rounded-xl font-black">이웃 소통 지표 📊</Link>
             <Link href="/community" className="text-indigo-600 bg-indigo-50 p-3 rounded-xl">커뮤니티 💬</Link>
             <Link href="/experience-diary" className="text-blue-600 hover:bg-blue-50 p-3 rounded-xl">체험단 다이어리 📓</Link>
             <Link href="/sticker" className="text-pink-600 hover:bg-pink-50 p-3 rounded-xl">블로그 스티커 🎨</Link>
