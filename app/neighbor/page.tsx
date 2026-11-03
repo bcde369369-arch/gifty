@@ -313,6 +313,46 @@ export default function NeighborAnalyticsPage() {
     });
   };
 
+  // 네이버 복사 텍스트의 정렬 이상(가나다순/등록일순) 감지 함수
+  const checkSortAnomaly = (neighbors: ParsedNeighbor[], rawText: string) => {
+    if (neighbors.length < 8) return { isDangerous: false, message: '' };
+
+    // 1. 별명 가나다순(오름차순) 정렬 감지
+    let alphaCount = 0;
+    for (let i = 0; i < neighbors.length - 1; i++) {
+      if (neighbors[i].nickname.localeCompare(neighbors[i + 1].nickname, 'ko') <= 0) {
+        alphaCount++;
+      }
+    }
+    const alphaRatio = alphaCount / (neighbors.length - 1);
+    if (alphaRatio >= 0.78) {
+      return {
+        isDangerous: true,
+        message:
+          "🚨 [소통 이웃 보호 긴급 경고]\n\n현재 복사하신 이웃 목록이 '별명 가나다순'으로 정렬되어 있습니다!\n\n가나다순으로 분석할 경우, 'ㅎ'이나 'ㅃ'으로 시작하는 소중한 소통 찐이웃(예: 뽀민이)이 단순 이름 순서 때문에 무소통으로 잘못 분류될 수 있습니다.\n\n네이버 [이웃순서] 탭에서 정렬 방식을 반드시 [새글순(자동)]으로 변경하신 후 다시 복사해 주세요!"
+      };
+    }
+
+    // 2. 이웃 등록일순(날짜 정렬) 감지
+    const dates = rawText.match(/\b\d{2,4}\.\d{1,2}\.\d{1,2}\b/g);
+    if (dates && dates.length >= 8) {
+      let descCount = 0;
+      for (let i = 0; i < dates.length - 1; i++) {
+        if (dates[i] >= dates[i + 1]) descCount++;
+      }
+      const descRatio = descCount / (dates.length - 1);
+      if (descRatio >= 0.78) {
+        return {
+          isDangerous: true,
+          message:
+            "🚨 [소통 이웃 보호 긴급 경고]\n\n현재 복사하신 목록이 '이웃 등록일(추가일순)'으로 정렬되어 있습니다!\n\n등록일순으로 분석하면 오래전부터 나와 함께해 온 오랜 찐이웃이 맨 아래로 밀려 무소통으로 잘못 분류될 수 있습니다.\n\n네이버 [이웃순서] 탭에서 정렬 방식을 반드시 [새글순(자동)]으로 변경하신 후 다시 복사해 주세요!"
+        };
+      }
+    }
+
+    return { isDangerous: false, message: '' };
+  };
+
   // 예시 샘플 데이터 채워넣기 (테스트용)
   const handleLoadSample = () => {
     setBlogId('sample_blogger');
@@ -342,6 +382,17 @@ export default function NeighborAnalyticsPage() {
     if (parsedList.length === 0) {
       alert('입력된 텍스트에서 이웃 명단을 찾을 수 없습니다. 네이버 이웃 관리자 화면에서 목록을 드래그하여 복사 후 붙여넣어 주세요.');
       return;
+    }
+
+    // 정렬 이상 검사: 가나다순/등록일순이면 찐이웃 보호를 위해 즉시 알림
+    const anomaly = checkSortAnomaly(parsedList, rawPastedText);
+    if (anomaly.isDangerous) {
+      const confirmContinue = window.confirm(
+        `${anomaly.message}\n\n[취소]를 눌러 네이버에서 '새글순(자동)'으로 다시 복사해 오시는 것을 강력히 권장합니다.\n\n(그래도 현재 순서 그대로 진행하시겠습니까?)`
+      );
+      if (!confirmContinue) {
+        return;
+      }
     }
 
     setIsAnalyzing(true);
@@ -480,7 +531,7 @@ export default function NeighborAnalyticsPage() {
         reason: logNos.length > 0 
           ? `최근 글 댓글 소통 0회 & 새글 장기 미발행` 
           : `새글순 기준 장기 미활동 (하위 ${Math.round(cutoffRatio * 100)}%)`,
-        selected: true
+        selected: false // ★ 소통 이웃이 실수로 일괄 삭제되는 것을 100% 방지하기 위해 기본 선택 해제
       }));
       setInactiveNeighbors(formattedInactives);
 
@@ -1201,6 +1252,23 @@ export default function NeighborAnalyticsPage() {
                   )}
                 </div>
 
+                {/* 🛡️ 찐이웃 0% 오탐 안심 알림 배너 */}
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-950 p-3.5 rounded-2xl text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck size={18} className="text-emerald-600 shrink-0" />
+                    <span className="font-semibold text-emerald-900 leading-relaxed">
+                      내 블로그 댓글 작성자는 <strong>100% 자동 보호</strong>되었습니다. 실수로 삭제되는 일이 없도록 기본 선택이 해제되어 있으니, <strong>정리할 이웃만 체크</strong>해 주세요.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleSelectAll(!inactiveNeighbors.every((i) => i.selected))}
+                    className="shrink-0 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[11px] shadow-sm transition-all text-center"
+                  >
+                    {inactiveNeighbors.length > 0 && inactiveNeighbors.every((i) => i.selected) ? '선택 모두 해제' : '정리 대상 전체 선택'}
+                  </button>
+                </div>
+
                 {/* Table Header Controls */}
                 <div className="flex items-center justify-between text-xs font-bold text-slate-600 px-2">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -1210,7 +1278,7 @@ export default function NeighborAnalyticsPage() {
                       onChange={(e) => handleToggleSelectAll(e.target.checked)}
                       className="w-4 h-4 text-emerald-600 rounded"
                     />
-                    <span>전체 선택 ({inactiveNeighbors.filter((i) => i.selected).length}/{inactiveNeighbors.length})</span>
+                    <span>선택된 이웃 ({inactiveNeighbors.filter((i) => i.selected).length}/{inactiveNeighbors.length})</span>
                   </label>
                   <span className="text-slate-400">진단 사유</span>
                 </div>
