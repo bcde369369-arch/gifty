@@ -614,15 +614,16 @@ export default function NeighborAnalyticsPage() {
 
   const handleCopyInactiveList = () => {
     const selectedList = inactiveNeighbors.filter((i) => i.selected);
-    if (selectedList.length === 0) {
-      alert('복사할 이웃을 1명 이상 선택해 주세요.');
+    const targetList = selectedList.length > 0 ? selectedList : inactiveNeighbors;
+    if (targetList.length === 0) {
+      alert('복사할 무소통 이웃 명단이 없습니다. 먼저 분석을 진행해 주세요.');
       return;
     }
-    const text = selectedList.map((i) => i.nickname).join('\n');
+    const text = targetList.map((i) => i.nickname).join('\n');
     navigator.clipboard.writeText(text).then(() => {
       setCopiedId(true);
       setTimeout(() => setCopiedId(false), 2000);
-      alert(`${selectedList.length}명의 실제 무소통 이웃 닉네임이 클립보드에 복사되었습니다!`);
+      alert(`${targetList.length}명의 실제 무소통 이웃 닉네임이 클립보드에 복사되었습니다!`);
     });
   };
 
@@ -1222,11 +1223,12 @@ export default function NeighborAnalyticsPage() {
 
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <button
+                      type="button"
                       onClick={handleCopyInactiveList}
-                      className="flex-1 sm:flex-none px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
+                      className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      {copiedId ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                      <span>선택 명단 텍스트 복사</span>
+                      {copiedId ? <Check size={14} /> : <Copy size={14} />}
+                      <span>📋 선택된 이웃 ({inactiveNeighbors.filter((i) => i.selected).length}명) 복사</span>
                     </button>
 
                     <a
@@ -1390,33 +1392,54 @@ export default function NeighborAnalyticsPage() {
                 </div>
 
                 {/* 🛡️ 찐이웃 0% 오탐 안심 알림 배너 */}
-                <div className="bg-emerald-50 border border-emerald-200 text-emerald-950 p-3.5 rounded-2xl text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-950 p-4 rounded-2xl text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
                   <div className="flex items-center gap-2">
-                    <ShieldCheck size={18} className="text-emerald-600 shrink-0" />
+                    <ShieldCheck size={20} className="text-emerald-600 shrink-0" />
                     <span className="font-semibold text-emerald-900 leading-relaxed">
-                      내 블로그 댓글 작성자는 <strong>100% 자동 보호</strong>되었습니다. 실수로 삭제되는 일이 없도록 기본 선택이 해제되어 있으니, <strong>정리할 이웃만 체크</strong>해 주세요.
+                      내 블로그 댓글 작성자는 <strong>100% 자동 보호</strong>되었습니다. 남겨둘 이웃이 있다면 체크를 해제하시고, 정리할 이웃을 확인해 주세요.
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleToggleSelectAll(!inactiveNeighbors.every((i) => i.selected))}
-                    className="shrink-0 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[11px] shadow-sm transition-all text-center"
-                  >
-                    {inactiveNeighbors.length > 0 && inactiveNeighbors.every((i) => i.selected) ? '선택 모두 해제' : '정리 대상 전체 선택'}
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleSelectAll(!inactiveNeighbors.every((i) => i.selected))}
+                      className="px-3 py-2 bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-800 font-bold rounded-xl text-[11px] shadow-sm transition-all text-center cursor-pointer"
+                    >
+                      {inactiveNeighbors.length > 0 && inactiveNeighbors.every((i) => i.selected) ? '선택 모두 해제' : '정리 대상 전체 선택'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCopyInactiveList}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black rounded-xl text-[11px] shadow-sm transition-all text-center flex items-center gap-1.5 cursor-pointer"
+                    >
+                      {copiedId ? <Check size={13} /> : <Copy size={13} />}
+                      <span>선택된 {inactiveNeighbors.filter((i) => i.selected).length}명 복사</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Table Header Controls */}
-                <div className="flex items-center justify-between text-xs font-bold text-slate-600 px-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={inactiveNeighbors.length > 0 && inactiveNeighbors.every((i) => i.selected)}
-                      onChange={(e) => handleToggleSelectAll(e.target.checked)}
-                      className="w-4 h-4 text-emerald-600 rounded"
-                    />
-                    <span>선택된 이웃 ({inactiveNeighbors.filter((i) => i.selected).length}/{inactiveNeighbors.length})</span>
-                  </label>
+                <div className="flex items-center justify-between text-xs font-bold text-slate-600 px-2 py-1">
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={inactiveNeighbors.length > 0 && inactiveNeighbors.every((i) => i.selected)}
+                        onChange={(e) => handleToggleSelectAll(e.target.checked)}
+                        className="w-4 h-4 text-emerald-600 rounded"
+                      />
+                      <span>선택된 이웃 ({inactiveNeighbors.filter((i) => i.selected).length}/{inactiveNeighbors.length})</span>
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={handleCopyInactiveList}
+                      className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 active:scale-95 cursor-pointer"
+                    >
+                      <Copy size={12} />
+                      <span>선택 복사 ({inactiveNeighbors.filter((i) => i.selected).length}명)</span>
+                    </button>
+                  </div>
                   <span className="text-slate-400">진단 사유</span>
                 </div>
 
@@ -1495,6 +1518,31 @@ export default function NeighborAnalyticsPage() {
                       검색된 이웃이 없습니다. (무소통 정리 대상에 포함되지 않아 안전합니다! 🎉)
                     </div>
                   )}
+                </div>
+
+                {/* 📋 하단 일괄 작업 바 (스크롤 내려왔을 때 바로 복사할 수 있도록) */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="text-xs text-slate-600 font-medium">
+                    총 <strong className="text-slate-900 font-bold">{inactiveNeighbors.length}명</strong> 중 <strong className="text-emerald-700 font-bold">{inactiveNeighbors.filter((i) => i.selected).length}명</strong>이 선택되었습니다.
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={handleCopyInactiveList}
+                      className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      {copiedId ? <Check size={15} /> : <Copy size={15} />}
+                      <span>📋 선택된 이웃 {inactiveNeighbors.filter((i) => i.selected).length}명 일괄 복사</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCopyAutoCheckScript}
+                      className="flex-1 sm:flex-none px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Sparkles size={15} />
+                      <span>⚡ 스마트 F12 코드 복사</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
