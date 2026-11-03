@@ -358,9 +358,19 @@ export default function NeighborAnalyticsPage() {
   };
 
   const targetIdClean = cleanBlogId(blogId);
-  const naverAdminUrl = targetIdClean
-    ? `https://admin.blog.naver.com/${targetIdClean}/buddy/relation`
-    : 'https://admin.blog.naver.com';
+
+  // 네이버 공식 관리자 페이지 안전 열기 핸들러
+  const handleOpenNaverAdmin = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    if (!targetIdClean) {
+      alert('먼저 ①번 입력창에 네이버 블로그 아이디를 입력해 주세요!\n(아이디를 입력하시면 본인의 네이버 관리자 페이지로 즉시 연결됩니다)');
+      const inputEl = document.getElementById('blogIdInput');
+      if (inputEl) inputEl.focus();
+      return;
+    }
+    // 네이버 공식 블로그 관리자 홈
+    window.open(`https://admin.blog.naver.com/${targetIdClean}`, '_blank');
+  };
 
   return (
     <main className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-emerald-200">
@@ -436,26 +446,25 @@ export default function NeighborAnalyticsPage() {
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 size={16} className="text-emerald-600" /> 실제 이웃 분석 3단계 (초간단)
               </span>
-              <a
-                href={naverAdminUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-extrabold bg-emerald-50 px-2.5 py-1 rounded-lg"
+              <button
+                type="button"
+                onClick={handleOpenNaverAdmin}
+                className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-extrabold bg-emerald-50 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
               >
-                <span>네이버 이웃관리 바로열기</span>
+                <span>네이버 관리자 바로열기</span>
                 <ExternalLink size={12} />
-              </a>
+              </button>
             </div>
 
             <ol className="text-xs text-slate-600 space-y-2 list-decimal list-inside leading-relaxed font-medium">
               <li>
-                위 <strong>[네이버 이웃관리 바로열기]</strong>를 눌러 네이버 관리자 창을 엽니다.
+                아래 ①번에 내 아이디 입력 후 위 <strong>[네이버 관리자 바로열기]</strong>를 누릅니다.
               </li>
               <li>
-                이웃 목록 화면에서 마우스로 드래그하여 이웃들을 <strong>복사(Ctrl+C)</strong>합니다.
+                네이버 화면 좌측 메뉴에서 <strong>[열린이웃 ➔ 이웃·그룹 관리]</strong>를 클릭합니다.
               </li>
               <li>
-                아래 상자에 <strong>붙여넣기(Ctrl+V)</strong> 후 <strong>[소통 지표 진단]</strong>을 누르세요!
+                이웃 목록 표를 마우스로 쭉 드래그하여 <strong>복사(Ctrl+C)</strong> 후 아래 ②번에 <strong>붙여넣기(Ctrl+V)</strong>하세요!
               </li>
             </ol>
           </div>
@@ -464,11 +473,12 @@ export default function NeighborAnalyticsPage() {
           <form onSubmit={handleAnalyze} className="mt-6 max-w-2xl mx-auto bg-white p-4 sm:p-5 rounded-3xl shadow-xl border border-slate-200 text-left space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                ① 내 블로그 아이디 (선택)
+                ① 내 블로그 아이디 (필수)
               </label>
               <div className="relative flex items-center">
                 <Search className="absolute left-3.5 text-slate-400" size={16} />
                 <input
+                  id="blogIdInput"
                   type="text"
                   value={blogId}
                   onChange={(e) => setBlogId(e.target.value)}
@@ -694,15 +704,14 @@ export default function NeighborAnalyticsPage() {
                       <span>선택 명단 복사</span>
                     </button>
 
-                    <a
-                      href={naverAdminUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 sm:flex-none px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-extrabold transition-all shadow-md flex items-center justify-center gap-1.5 active:scale-95"
+                    <button
+                      type="button"
+                      onClick={handleOpenNaverAdmin}
+                      className="flex-1 sm:flex-none px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-extrabold transition-all shadow-md flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
                     >
                       <span>🚀 네이버 이웃 관리자 바로가기</span>
                       <ExternalLink size={14} />
-                    </a>
+                    </button>
                   </div>
                 </div>
 
@@ -761,15 +770,14 @@ export default function NeighborAnalyticsPage() {
                         <span className="bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded-full text-[10px]">
                           {item.reason}
                         </span>
-                        <a
-                          href={naverAdminUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-slate-400 hover:text-rose-600 font-bold"
+                        <button
+                          type="button"
+                          onClick={handleOpenNaverAdmin}
+                          className="text-slate-400 hover:text-rose-600 font-bold cursor-pointer"
                           title="네이버 관리자에서 검색 및 삭제"
                         >
                           관리 &rarr;
-                        </a>
+                        </button>
                       </div>
                     </div>
                   ))}
