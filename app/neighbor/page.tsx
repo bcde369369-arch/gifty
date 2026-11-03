@@ -84,11 +84,13 @@ export default function NeighborAnalyticsPage() {
   const isSystemNoise = (text: string): boolean => {
     const s = text.trim();
     if (!s) return true;
-    // 1. 날짜 패턴 (예: 26.11.03. 또는 2026.11.03.)
-    if (/^\d{2,4}\.\d{1,2}\.\d{1,2}\.?$/.test(s)) return true;
-    // 2. 순수 숫자
-    if (/^\d+$/.test(s.replace(/[-_.]/g, ''))) return true;
-    // 3. 네이버 관리자 UI 단어 (버튼, 상태, 그룹명 등)
+    // 1. 날짜 패턴이 포함된 경우 (예: "26.11.03." 또는 "26.11.03. 26.10.31.")
+    if (/\d{2,4}\.\d{1,2}\.\d{1,2}/.test(s)) return true;
+    // 2. 한글 또는 영문 알파벳이 단 1글자도 없는 경우 (숫자, 마침표, 기호만 있는 줄)
+    if (!/[a-zA-Z가-힣]/.test(s)) return true;
+    // 3. 순수 숫자
+    if (/^\d+$/.test(s.replace(/[-_.\s]/g, ''))) return true;
+    // 4. 네이버 관리자 UI 단어 (버튼, 상태, 그룹명 등)
     const noiseWords = [
       '새그룹', '기본그룹', '서로이웃', '♥서로이웃', '이웃', 'on', 'off',
       '새글소식', '소식받기', '전체선택', '그룹변경', '이웃삭제', '스팸 차단 관리',
@@ -139,6 +141,8 @@ export default function NeighborAnalyticsPage() {
     const addNeighbor = (nick: string, rawId?: string, group?: string) => {
       const cleanedNick = cleanNickname(nick);
       if (!cleanedNick || isSystemNoise(cleanedNick) || cleanedNick.length < 2) return;
+      // 추가 안전장치: 닉네임에 한글 또는 영문 알파벳이 반드시 포함되어야 함 (날짜, 기호 방지)
+      if (!/[a-zA-Z가-힣]/.test(cleanedNick)) return;
       if (seenNicks.has(cleanedNick)) return;
 
       seenNicks.add(cleanedNick);
