@@ -21,7 +21,12 @@ import {
   X,
   RefreshCw,
   Sparkle,
-  ClipboardPaste
+  ClipboardPaste,
+  Bookmark,
+  Download,
+  Laptop,
+  Smartphone,
+  Lock
 } from 'lucide-react';
 import CoupangSupportCard from '@/components/CoupangSupportCard';
 
@@ -64,9 +69,10 @@ export default function NeighborAnalyticsPage() {
   const [progressStep, setProgressStep] = useState(0);
   const [hasResult, setHasResult] = useState(false);
   const [activeTab, setActiveTab] = useState<'inactive' | 'top' | 'summary' | 'guide'>('inactive');
-  const [deleteMode, setDeleteMode] = useState<'mobile' | 'pc'>('mobile');
+  const [deleteMode, setDeleteMode] = useState<'bookmarklet' | 'extension' | 'f12' | 'mobile'>('bookmarklet');
   const [copiedId, setCopiedId] = useState(false);
   const [copiedScript, setCopiedScript] = useState(false);
+  const [copiedBookmarklet, setCopiedBookmarklet] = useState(false);
   const [copiedNick, setCopiedNick] = useState<string | null>(null);
   const [showScriptGuide, setShowScriptGuide] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -637,6 +643,88 @@ export default function NeighborAnalyticsPage() {
       setCopiedNick(nick);
       setTimeout(() => setCopiedNick(null), 2000);
       alert(`'${nick}' 닉네임이 복사되었습니다!\n\n네이버 블로그 앱의 [이웃 목록] 검색창에 붙여넣기 하시면 1초 만에 찾아서 삭제하실 수 있습니다.`);
+    });
+  };
+
+  // 🥇 1초 북마크릿 URL 동적 생성 핸들러
+  const generateBookmarkletUrl = () => {
+    const selectedList = inactiveNeighbors.filter((i) => i.selected);
+    const targetList = selectedList.length > 0 ? selectedList : inactiveNeighbors;
+    const safeCommunicatorNicks = topCommunicators.map((c) => c.nickname.trim()).filter(Boolean);
+    const userProtectedNicks = protectedNames.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean);
+    const allSafeNicks = Array.from(new Set([...safeCommunicatorNicks, ...userProtectedNicks]));
+    const targetNicks = targetList.map((i) => i.nickname.trim()).filter((n) => n && !allSafeNicks.some((s) => s.toLowerCase() === n.toLowerCase()));
+
+    const code = `(function(){
+      var targets = ${JSON.stringify(targetNicks)};
+      var safes = ${JSON.stringify(allSafeNicks)};
+      function scan(d){
+        if(!d) return 0;
+        try {
+          var rows = d.querySelectorAll('table tr, tbody tr, .buddy_list li, ul li');
+          var matched = 0, prot = 0;
+          rows.forEach(function(r){
+            var t = (r.innerText||'').toLowerCase();
+            var cb = r.querySelector('input[type="checkbox"]');
+            if(!cb || !t) return;
+            var isSafe = safes.some(function(s){ return s && t.indexOf(s.toLowerCase()) > -1; });
+            if(isSafe){
+              if(cb.checked){ cb.checked = false; cb.dispatchEvent(new Event('change',{bubbles:true})); }
+              r.style.backgroundColor = '#dcfce7';
+              r.style.outline = '2px solid #22c55e';
+              prot++;
+              return;
+            }
+            var isTarget = targets.some(function(tg){ return tg && t.indexOf(tg.toLowerCase()) > -1; });
+            if(isTarget){
+              if(!cb.checked){
+                cb.checked = true;
+                cb.dispatchEvent(new Event('change',{bubbles:true}));
+                cb.dispatchEvent(new Event('click',{bubbles:true}));
+              }
+              r.style.backgroundColor = '#ffe4e6';
+              r.style.outline = '2px solid #f43f5e';
+              matched++;
+            }
+          });
+          if(matched > 0 || prot > 0){
+            alert('🎉 [Gifty 1초 이웃정리 완료]\\n\\n🛡️ 찐이웃 보호: ' + prot + '명 (초록색 표시 & 체크 해제)\\n❌ 무소통 이웃 선택: ' + matched + '명 (분홍색 표시 & 체크 완료)\\n\\n상단 [이웃 삭제] 버튼을 누르면 정리가 완료됩니다!');
+            return matched + prot;
+          }
+        } catch(e){}
+        return 0;
+      }
+      if(scan(document) > 0) return;
+      var f = document.querySelectorAll('iframe');
+      for(var i=0; i<f.length; i++){
+        try { if(scan(f[i].contentDocument || f[i].contentWindow.document) > 0) return; } catch(e){}
+      }
+      for(var j=0; j<f.length; j++){
+        if(f[j].src && (f[j].src.indexOf('Buddy') > -1 || f[j].src.indexOf('buddy') > -1)){
+          if(confirm('💡 [안내] 네이버 단독 전체화면으로 이동합니다.\\n\\n이동 후 상단 북마크 [🧹 Gifty 이웃정리]를 한 번만 더 눌러주세요!')){
+            location.href = f[j].src;
+            return;
+          }
+        }
+      }
+      alert('이웃 관리 표를 찾지 못했습니다.\\n\\n네이버 [내가 추가한 이웃 > 이웃목록] 화면인지 확인해 주세요.');
+    })()`.replace(/\s+/g, ' ');
+
+    return `javascript:${encodeURIComponent(code)}`;
+  };
+
+  const handleCopyBookmarklet = () => {
+    const url = generateBookmarkletUrl();
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedBookmarklet(true);
+      setTimeout(() => setCopiedBookmarklet(false), 2500);
+      alert(
+        '✅ 1초 북마크릿 코드가 복사되었습니다!\n\n' +
+        '📌 [북마크 등록 방법]\n' +
+        '1. 브라우저 북마크(Ctrl + D)를 눌러 아무 페이지나 북마크를 추가합니다.\n' +
+        '2. 북마크 수정에서 URL(주소)에 방금 복사된 코드를 붙여넣기(Ctrl + V) 하시면 끝!\n\n' +
+        '이제 네이버 이웃 관리 창에서 해당 북마크를 클릭하기만 하면 1초 만에 자동 정리됩니다.'
+      );
     });
   };
 
@@ -1264,70 +1352,249 @@ export default function NeighborAnalyticsPage() {
                   </div>
                 </div>
 
-                {/* 💻 PC vs 📱 모바일 삭제 안내 토글 */}
-                <div className="bg-slate-100 p-1 rounded-2xl flex items-center text-xs font-black">
+                {/* 🛡️ 스캠 의심 제로 3無 안심 보안 보증 배너 */}
+                <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-indigo-950 text-white p-4 sm:p-5 rounded-2xl shadow-sm border border-emerald-500/20 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg">
+                        <ShieldCheck size={18} />
+                      </span>
+                      <h4 className="font-extrabold text-sm text-white flex items-center gap-1.5">
+                        <span>Gifty 안심 보안 3無 보증</span>
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">100% 클린 인증</span>
+                      </h4>
+                    </div>
+                    <span className="text-[11px] text-emerald-300/80 font-medium">안심하고 사용하셔도 됩니다</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                    <div className="bg-white/5 p-2.5 rounded-xl border border-white/5 flex items-start gap-2">
+                      <span className="text-emerald-400 font-bold">①</span>
+                      <div>
+                        <p className="font-bold text-white text-[11px]">네이버 비번 요구 0%</p>
+                        <p className="text-[10px] text-slate-300">로그인 정보를 일체 묻지 않으며 알 수도 없습니다.</p>
+                      </div>
+                    </div>
+                    <div className="bg-white/5 p-2.5 rounded-xl border border-white/5 flex items-start gap-2">
+                      <span className="text-emerald-400 font-bold">②</span>
+                      <div>
+                        <p className="font-bold text-white text-[11px]">실행파일(.exe) 설치 0%</p>
+                        <p className="text-[10px] text-slate-300">악성코드/바이러스 걱정 없이 브라우저 내에서만 동작합니다.</p>
+                      </div>
+                    </div>
+                    <div className="bg-white/5 p-2.5 rounded-xl border border-white/5 flex items-start gap-2">
+                      <span className="text-emerald-400 font-bold">③</span>
+                      <div>
+                        <p className="font-bold text-white text-[11px]">외부 서버 유출 0%</p>
+                        <p className="text-[10px] text-slate-300">모든 분석과 체크는 내 브라우저 로컬에서 안전하게 처리됩니다.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 🎛️ 삭제 도구 모드 선택 탭 */}
+                <div className="bg-slate-100 p-1.5 rounded-2xl grid grid-cols-2 lg:grid-cols-4 gap-1 text-xs font-black">
                   <button
                     type="button"
-                    onClick={() => setDeleteMode('pc')}
-                    className={`flex-1 py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                      deleteMode === 'pc'
-                        ? 'bg-white text-indigo-700 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-700'
+                    onClick={() => setDeleteMode('bookmarklet')}
+                    className={`py-2.5 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      deleteMode === 'bookmarklet'
+                        ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-200'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <span>💻 PC 정석 삭제법 (검색 ➔ 체크박스 ➔ 삭제)</span>
+                    <Bookmark size={14} className={deleteMode === 'bookmarklet' ? 'text-emerald-600' : 'text-slate-400'} />
+                    <span>🥇 1초 북마크릿 (추천)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteMode('extension')}
+                    className={`py-2.5 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      deleteMode === 'extension'
+                        ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-indigo-200'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Download size={14} className={deleteMode === 'extension' ? 'text-indigo-600' : 'text-slate-400'} />
+                    <span>🥈 크롬 확장 프로그램</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteMode('f12')}
+                    className={`py-2.5 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      deleteMode === 'f12'
+                        ? 'bg-white text-purple-700 shadow-sm ring-1 ring-purple-200'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Laptop size={14} className={deleteMode === 'f12' ? 'text-purple-600' : 'text-slate-400'} />
+                    <span>🥉 스마트 F12 코드</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setDeleteMode('mobile')}
-                    className={`flex-1 py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    className={`py-2.5 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                       deleteMode === 'mobile'
-                        ? 'bg-white text-emerald-700 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-700'
+                        ? 'bg-white text-amber-700 shadow-sm ring-1 ring-amber-200'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <span>📱 스마트폰 모바일 삭제법 (2가지 방법)</span>
+                    <Smartphone size={14} className={deleteMode === 'mobile' ? 'text-amber-600' : 'text-slate-400'} />
+                    <span>📱 스마트폰 모바일</span>
                   </button>
                 </div>
 
-                {deleteMode === 'pc' ? (
-                  /* 💻 PC 초간편 정석 삭제 배너 */
+                {/* 🥇 1. 북마크릿 패널 */}
+                {deleteMode === 'bookmarklet' && (
+                  <div className="bg-gradient-to-br from-emerald-900 via-teal-950 to-slate-900 text-white p-5 rounded-2xl shadow-md space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="bg-emerald-500/30 text-emerald-300 text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-emerald-400/30 flex items-center gap-1">
+                        <Bookmark size={12} /> 1초 북마크릿 (F12 불필요 · 원클릭)
+                      </span>
+                      <span className="text-xs text-emerald-200 font-semibold">즐겨찾기 버튼 하나로 끝</span>
+                    </div>
+
+                    <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm space-y-3 text-xs">
+                      <p className="font-black text-white text-sm flex items-center gap-1.5">
+                        <Sparkles size={16} className="text-emerald-400" /> 사용 방법 (단 2단계!)
+                      </p>
+                      
+                      <div className="space-y-3 text-[12px] text-slate-200 leading-relaxed">
+                        <div className="flex items-start gap-2.5 bg-black/20 p-3 rounded-xl border border-white/10">
+                          <span className="w-5 h-5 rounded-full bg-emerald-500 text-white font-black flex items-center justify-center shrink-0 text-xs">1</span>
+                          <div className="space-y-1">
+                            <p className="font-bold text-white">아래 초록색 버튼을 마우스로 잡고 브라우저 상단 [북마크(즐겨찾기) 바]로 끌어다 놓으세요:</p>
+                            <div className="pt-2 flex flex-wrap items-center gap-2">
+                              <a
+                                href={generateBookmarkletUrl()}
+                                draggable
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  alert("이 버튼을 마우스로 꾹 누른 채 브라우저 맨 위 [북마크(즐겨찾기) 바]로 끌어다 놓아주세요!\n\n(또는 옆의 [코드 복사]를 눌러 북마크 주소에 붙여넣으셔도 됩니다.)");
+                                }}
+                                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black text-xs rounded-xl shadow-lg border border-white/30 cursor-grab active:cursor-grabbing transform active:scale-95 transition-all"
+                                title="이 버튼을 북마크 바에 드래그하세요"
+                              >
+                                <Bookmark size={15} />
+                                <span>⭐ 🧹 Gifty 이웃안심정리 (북마크바로 드래그!)</span>
+                              </a>
+                              <button
+                                type="button"
+                                onClick={handleCopyBookmarklet}
+                                className="px-3 py-2.5 bg-white/10 hover:bg-white/20 text-emerald-200 rounded-xl font-bold text-xs border border-white/20 transition-all flex items-center gap-1"
+                              >
+                                {copiedBookmarklet ? <Check size={14} /> : <Copy size={14} />}
+                                <span>{copiedBookmarklet ? '복사 완료!' : '북마크릿 코드 복사'}</span>
+                              </button>
+                            </div>
+                            <p className="text-[11px] text-emerald-200/70 pt-1">
+                              * 북마크 바가 보이지 않는다면 키보드 <strong>Ctrl + Shift + B</strong> (맥: Cmd + Shift + B)를 누르면 북마크 바가 나타납니다.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-2.5 bg-black/20 p-3 rounded-xl border border-white/10">
+                          <span className="w-5 h-5 rounded-full bg-emerald-500 text-white font-black flex items-center justify-center shrink-0 text-xs">2</span>
+                          <div className="space-y-1">
+                            <p className="font-bold text-white">네이버 [내가 추가한 이웃] 화면에서 방금 추가한 북마크를 딸깍 클릭합니다!</p>
+                            <p className="text-[11px] text-slate-300">
+                              • <strong>초록색(🟩)</strong>: 공감·댓글 찐이웃 ➔ <strong>체크 자동 해제 &amp; 안전 보호</strong><br />
+                              • <strong>분홍색(🟥)</strong>: 무소통 이웃 ➔ <strong>체크 자동 선택</strong><br />
+                              확인 후 네이버 상단 <strong>[이웃 삭제]</strong> 버튼만 누르면 정리가 끝납니다!
+                            </p>
+                            <div className="pt-2">
+                              <a
+                                href={naverAdminUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg shadow transition-all"
+                              >
+                                <span>👉 네이버 이웃관리 창 바로열기</span>
+                                <ExternalLink size={12} />
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 🥈 2. 크롬 확장 프로그램 패널 */}
+                {deleteMode === 'extension' && (
+                  <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 text-white p-5 rounded-2xl shadow-md space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="bg-indigo-500/30 text-indigo-300 text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-indigo-400/30 flex items-center gap-1">
+                        <Download size={12} /> 크롬 확장 프로그램 (공식 도구형)
+                      </span>
+                      <span className="text-xs text-indigo-200 font-semibold">네이버 화면에 정리 버튼 자동 생성</span>
+                    </div>
+
+                    <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm space-y-3 text-xs">
+                      <p className="font-black text-white text-sm flex items-center gap-1.5">
+                        <Sparkles size={16} className="text-indigo-400" /> 최초 1회 설치 방법 (1분 소요)
+                      </p>
+
+                      <div className="space-y-2.5 text-[12px] text-slate-200 leading-relaxed">
+                        <div className="p-3 bg-black/20 rounded-xl border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                          <div>
+                            <p className="font-bold text-white">1. Gifty 확장 프로그램 패키지 다운로드</p>
+                            <p className="text-[11px] text-slate-300">다운로드 후 압축을 풀어주세요.</p>
+                          </div>
+                          <a
+                            href="/downloads/gifty-neighbor-cleaner.zip"
+                            download="gifty-neighbor-cleaner.zip"
+                            className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-black text-xs rounded-xl shadow transition-all flex items-center gap-1.5 shrink-0"
+                          >
+                            <Download size={14} />
+                            <span>📥 확장 프로그램 다운로드 (.zip)</span>
+                          </a>
+                        </div>
+
+                        <div className="p-3 bg-black/20 rounded-xl border border-white/10 space-y-1">
+                          <p className="font-bold text-white">2. 크롬 브라우저에 등록하기</p>
+                          <p className="text-[11px] text-slate-300">
+                            크롬 주소창에 <code className="bg-white/20 px-1 py-0.5 rounded text-white font-mono">chrome://extensions</code> 입력 ➔ 우측 상단 <strong>[개발자 모드]</strong> 켜기 ➔ 좌측 상단 <strong>[압축해제된 확장 프로그램을 로드합니다]</strong> 클릭 후 압축 푼 폴더 선택!
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-black/20 rounded-xl border border-white/10 space-y-1">
+                          <p className="font-bold text-white">3. 네이버 이웃 관리 창 접속</p>
+                          <p className="text-[11px] text-slate-300">
+                            네이버 [내가 추가한 이웃] 창에 들어가면 우측 하단에 <strong>[⚡ 1초 무소통 정리]</strong> 전용 버튼이 자동으로 뜹니다. 버튼을 누르고 상단 [이웃 삭제]를 누르면 끝!
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 🥉 3. 스마트 F12 코드 패널 */}
+                {deleteMode === 'f12' && (
                   <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-5 rounded-2xl shadow-md space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="bg-indigo-500/30 text-indigo-300 text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-indigo-400/30">
-                        💻 PC 정석 삭제법
+                      <span className="bg-indigo-500/30 text-indigo-300 text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-indigo-400/30 flex items-center gap-1">
+                        <Laptop size={12} /> PC 스마트 F12 모드 (개발자용)
                       </span>
-                      <span className="text-xs text-indigo-200 font-semibold">검색 ➔ 체크 ➔ 삭제 3단계</span>
+                      <span className="text-xs text-indigo-200 font-semibold">콘솔창 실행 방식</span>
                     </div>
 
                     <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm space-y-2 text-xs">
                       <p className="font-black text-white text-sm flex items-center gap-1.5">
-                        <CheckCircle2 size={16} className="text-emerald-400" /> 네이버 검색 후 체크박스 선택 ➔ 삭제
+                        <CheckCircle2 size={16} className="text-emerald-400" /> F12 콘솔 실행 순서
                       </p>
-                      <ol className="text-[12px] text-slate-200 space-y-2.5 list-decimal list-inside leading-relaxed">
-                        <li>아래 명단에서 삭제할 이웃의 <strong>[닉네임 복사]</strong> 버튼을 누릅니다.</li>
+                      <ol className="text-[12px] text-slate-200 space-y-2 list-decimal list-inside leading-relaxed">
+                        <li>네이버 [내가 추가한 이웃] 창에서 키보드 맨 위 <strong>F12</strong>를 누릅니다.</li>
                         <li>
-                          아래 버튼을 눌러 네이버 [내가 추가한 이웃] 화면으로 이동 후 검색창에 <strong>붙여넣기(Ctrl+V)</strong> 후 검색합니다:
-                          <div className="my-2">
-                            <a
-                              href={naverAdminUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-xs rounded-lg shadow transition-all"
-                            >
-                              <span>👉 네이버 이웃관리 바로열기 (새 탭)</span>
-                              <ExternalLink size={12} />
-                            </a>
-                          </div>
+                          콘솔(Console) 창 상단의 <strong>[top ▾]</strong> 버튼을 눌러 <strong>[mainFrame]</strong>으로 변경합니다.
                         </li>
-                        <li>검색된 이웃 앞의 <strong>네모 체크박스 [v]</strong>를 선택하고 상단 <strong>[이웃 삭제]</strong>를 누르면 끝!</li>
+                        <li>아래 [스마트 F12 코드 복사]를 누른 뒤 콘솔창에 <strong>붙여넣기(Ctrl+V)</strong> 후 <strong>Enter</strong>를 누르면 끝!</li>
                       </ol>
                     </div>
 
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-2 border-t border-slate-700/60 gap-2 text-xs">
                       <div className="flex items-center gap-1.5 text-slate-300">
                         <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        <span><strong>PC 초간편 모드:</strong> 공감·댓글 찐이웃 100% 보호 스마트 F12 코드</span>
+                        <span><strong>주의:</strong> 콘솔 상단 [top ▾] ➔ [mainFrame] 선택 필수</span>
                       </div>
                       <button
                         type="button"
@@ -1339,23 +1606,25 @@ export default function NeighborAnalyticsPage() {
                       </button>
                     </div>
                   </div>
-                ) : (
-                  /* 📱 모바일 2가지 삭제 배너 */
-                  <div className="bg-gradient-to-br from-emerald-600 via-teal-600 to-emerald-700 text-white p-5 rounded-2xl shadow-md space-y-3.5">
+                )}
+
+                {/* 📱 4. 모바일 패널 */}
+                {deleteMode === 'mobile' && (
+                  <div className="bg-gradient-to-br from-amber-900 via-orange-950 to-slate-900 text-white p-5 rounded-2xl shadow-md space-y-3.5">
                     <div className="flex items-center justify-between">
-                      <span className="bg-white/20 text-white text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider backdrop-blur-sm">
-                        📱 모바일 스마트 삭제 (2가지 중 선택)
+                      <span className="bg-white/20 text-white text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider backdrop-blur-sm flex items-center gap-1">
+                        <Smartphone size={12} /> 모바일 스마트 삭제 (2가지 중 선택)
                       </span>
-                      <span className="text-xs text-emerald-100 font-semibold">스마트폰 터치로 끝</span>
+                      <span className="text-xs text-amber-200 font-semibold">스마트폰 터치로 끝</span>
                     </div>
 
                     <div className="grid sm:grid-cols-2 gap-3 text-xs">
                       {/* 방법 A: 브라우저 PC버전 */}
-                      <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm space-y-1.5 text-emerald-50 border border-white/10">
+                      <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm space-y-1.5 text-amber-50 border border-white/10">
                         <p className="font-black text-white text-[13px] flex items-center gap-1">
                           <span>🌐 방법 A. 브라우저 PC버전 (체크박스 삭제)</span>
                         </p>
-                        <p className="text-[11px] text-emerald-100 leading-relaxed">
+                        <p className="text-[11px] text-amber-100 leading-relaxed">
                           1. 위 <strong>[네이버 이웃 삭제창 열기]</strong>를 누릅니다.<br />
                           2. 스마트폰 브라우저 메뉴(⋮)에서 <strong>[PC버전 보기]</strong>를 켭니다.<br />
                           3. 복사한 닉네임 검색 ➔ 체크박스[v] ➔ [삭제] 터치!
@@ -1363,11 +1632,11 @@ export default function NeighborAnalyticsPage() {
                       </div>
 
                       {/* 방법 B: 블로그 앱 */}
-                      <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm space-y-1.5 text-emerald-50 border border-white/10">
+                      <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm space-y-1.5 text-amber-50 border border-white/10">
                         <p className="font-black text-white text-[13px] flex items-center gap-1">
                           <span>📱 방법 B. 네이버 블로그 앱에서 삭제</span>
                         </p>
-                        <p className="text-[11px] text-emerald-100 leading-relaxed">
+                        <p className="text-[11px] text-amber-100 leading-relaxed">
                           1. 아래 명단에서 <strong>[닉네임 복사]</strong>를 누릅니다.<br />
                           2. 블로그 앱 우측 상단 <strong>[≡ 메뉴] ➔ [이웃 목록]</strong> 검색창에 붙여넣습니다.<br />
                           3. 검색된 이웃 우측 <strong>[점 3개 ⋮] ➔ [이웃 취소]</strong>를 누르면 끝!
@@ -1532,14 +1801,25 @@ export default function NeighborAnalyticsPage() {
                   <div className="text-xs text-slate-600 font-medium">
                     총 <strong className="text-slate-900 font-bold">{inactiveNeighbors.length}명</strong> 중 <strong className="text-emerald-700 font-bold">{inactiveNeighbors.filter((i) => i.selected).length}명</strong>이 선택되었습니다.
                   </div>
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteMode('bookmarklet');
+                        window.scrollTo({ top: 900, behavior: 'smooth' });
+                      }}
+                      className="flex-1 sm:flex-none px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Bookmark size={15} />
+                      <span>🥇 1초 북마크릿</span>
+                    </button>
                     <button
                       type="button"
                       onClick={handleCopyInactiveList}
-                      className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-800 hover:bg-slate-900 active:scale-95 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       {copiedId ? <Check size={15} /> : <Copy size={15} />}
-                      <span>📋 선택된 이웃 {inactiveNeighbors.filter((i) => i.selected).length}명 일괄 복사</span>
+                      <span>📋 선택 {inactiveNeighbors.filter((i) => i.selected).length}명 복사</span>
                     </button>
                     <button
                       type="button"
@@ -1547,7 +1827,7 @@ export default function NeighborAnalyticsPage() {
                       className="flex-1 sm:flex-none px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Sparkles size={15} />
-                      <span>⚡ 스마트 F12 코드 복사</span>
+                      <span>⚡ 스마트 F12 코드</span>
                     </button>
                   </div>
                 </div>
