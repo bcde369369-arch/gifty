@@ -364,8 +364,8 @@ export default function NeighborAnalyticsPage() {
       navigator.clipboard.writeText(neighborNicknameToCopy);
     }
 
-    // 네이버 공식 [내가 추가한 이웃] 관리자 직접 URL
-    const directManageUrl = `https://admin.blog.naver.com/BuddyMeManage.nhn?blogId=${targetIdClean}`;
+    // 네이버 공식 [내가 추가한 이웃] 관리자 직접 URL (BuddyManage.nhn = 내가 추가한 이웃 관리)
+    const directManageUrl = `https://admin.blog.naver.com/BuddyManage.nhn?blogId=${targetIdClean}`;
     window.open(directManageUrl, '_blank');
   };
 
