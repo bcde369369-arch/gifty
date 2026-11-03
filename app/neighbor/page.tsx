@@ -80,15 +80,37 @@ export default function NeighborAnalyticsPage() {
     return cleaned.replace(/[^a-zA-Z0-9_-]/g, '');
   };
 
-  // 닉네임 중복 정제 함수 (예: "옥정더퍼스트부동산옥정더퍼스트부동산" -> "옥정더퍼스트부동산", "배병직 세무사|배병직 세무사 | 위너스" -> "배병직 세무사")
+  // 시스템 단어 또는 날짜인지 판별하는 엄격한 필터
+  const isSystemNoise = (text: string): boolean => {
+    const s = text.trim();
+    if (!s) return true;
+    // 1. 날짜 패턴 (예: 26.11.03. 또는 2026.11.03.)
+    if (/^\d{2,4}\.\d{1,2}\.\d{1,2}\.?$/.test(s)) return true;
+    // 2. 순수 숫자
+    if (/^\d+$/.test(s.replace(/[-_.]/g, ''))) return true;
+    // 3. 네이버 관리자 UI 단어 (버튼, 상태, 그룹명 등)
+    const noiseWords = [
+      '새그룹', '기본그룹', '서로이웃', '♥서로이웃', '이웃', 'on', 'off',
+      '새글소식', '소식받기', '전체선택', '그룹변경', '이웃삭제', '스팸 차단 관리',
+      '차단 설정', '차단된 글목록', '댓글·안부글 권한', '이웃 관리', '내가 추가한 이웃',
+      '나를 추가한 이웃', '서로이웃 신청', '공지사항', '블로그 이용 tip', '블로그 스마트봇',
+      '소개글', '별명', '블로그', '관리'
+    ];
+    if (noiseWords.includes(s.toLowerCase())) return true;
+    return false;
+  };
+
+  // 닉네임 정제 함수: "배병직 세무사 | 배병직 세무사 | 위너스(Winners)" -> "배병직 세무사"
   const cleanNickname = (raw: string): string => {
     let s = raw.trim();
-    // 1. 파이프(|) 구분 시 첫 번째 닉네임만 취함
+    // 파이프(|)로 닉네임과 블로그명이 나뉘어 있을 때, 무조건 첫 번째 파트가 실제 닉네임!
     if (s.includes('|')) {
       const parts = s.split('|').map((p) => p.trim()).filter(Boolean);
       if (parts.length > 0) s = parts[0];
     }
-    // 2. 동일한 단어가 두 번 연속 붙은 경우 정제
+    // 괄호 안에 있는 아이디 제거 (예: "배병직 세무사 (Winners)" -> "배병직 세무사")
+    s = s.replace(/\s*\([^)]*\)$/, '').trim();
+    // 2회 연속 단어 중복 제거
     const len = s.length;
     if (len >= 4 && len % 2 === 0) {
       const half = len / 2;
@@ -99,114 +121,77 @@ export default function NeighborAnalyticsPage() {
     return s.trim();
   };
 
-  // 유효한 네이버 아이디인지 검증 (날짜, 전화번호, 시스템 단어 제외)
+  // 유효한 네이버 영문/숫자 아이디 검증
   const isValidNaverId = (id: string): boolean => {
     if (!id) return false;
     const cleaned = id.replace(/[^a-zA-Z0-9_-]/g, '');
     if (cleaned.length < 3 || cleaned.length > 25) return false;
-    // 순수 숫자(날짜 261031, 전화번호 등)는 네이버 아이디가 아님!
-    if (/^\d+$/.test(cleaned)) return false;
-    // 시스템 UI 단어 제외
-    const blacklist = [
-      '기본그룹', '이웃그룹', '새글소식', '이웃', '서로이웃', '열린이웃',
-      '전체선택', '그룹변경', '이웃삭제', '소식받기', 'on', 'off', 'admin', 'manage',
-      '내가 추가한 이웃', '나를 추가한 이웃', '서로이웃 신청', '스팸 차단 관리', '이웃 관리'
-    ];
-    if (blacklist.includes(cleaned.toLowerCase())) return false;
+    if (/^\d+$/.test(cleaned)) return false; // 순수 숫자는 제외
+    if (isSystemNoise(cleaned)) return false;
     return true;
   };
 
-  // 날짜 형식인지 체크 (예: 26.11.02. 또는 2024.11.02.)
-  const isDateString = (str: string): boolean => {
-    return /^\d{2,4}\.\d{1,2}\.\d{1,2}\.?$/.test(str.trim());
-  };
-
-  // 네이버 관리자 텍스트 지능형 파서
+  // 🎯 네이버 이웃 관리자 전용 정밀 복합 파서
   const parseNaverBuddyText = (text: string): ParsedNeighbor[] => {
-    const rawLines = text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
     const neighbors: ParsedNeighbor[] = [];
-    const seenNickOrId = new Set<string>();
+    const seenNicks = new Set<string>();
 
-    for (const line of rawLines) {
-      // 날짜 한 줄 단독인 경우 무조건 스킵 (이웃이 아님)
-      if (isDateString(line)) continue;
+    const addNeighbor = (nick: string, rawId?: string, group?: string) => {
+      const cleanedNick = cleanNickname(nick);
+      if (!cleanedNick || isSystemNoise(cleanedNick) || cleanedNick.length < 2) return;
+      if (seenNicks.has(cleanedNick)) return;
 
-      // 시스템 버튼/메뉴 줄 스킵
-      if (/^(새글소식|소식받기|ON|OFF|전체선택|그룹변경|이웃삭제|열린이웃|이웃\/서로이웃 관리|내가 추가한 이웃|나를 추가한 이웃|서로이웃 신청|이웃 관리)$/i.test(line)) {
-        continue;
-      }
+      seenNicks.add(cleanedNick);
 
-      // 패턴 1: "닉네임 (아이디)" 형태
-      const parenMatch = line.match(/^([^(]+)\s*\(([-_a-zA-Z0-9]{3,25})\)/);
-      if (parenMatch) {
-        const rawNick = parenMatch[1].trim();
-        const potentialId = parenMatch[2].trim();
-        const nick = cleanNickname(rawNick);
-        const validId = isValidNaverId(potentialId) ? potentialId : nick;
-        if (!seenNickOrId.has(nick) && !seenNickOrId.has(validId)) {
-          seenNickOrId.add(nick);
-          seenNickOrId.add(validId);
-          neighbors.push({ id: validId, nickname: nick });
+      let validId = '';
+      if (rawId) {
+        const idCandidate = rawId.replace(/[^a-zA-Z0-9_-]/g, '');
+        if (isValidNaverId(idCandidate)) {
+          validId = idCandidate;
         }
-        continue;
       }
 
-      // 패턴 2: 탭(\t) 구분 테이블 행 (네이버 관리자 표 복사 시 가장 흔함)
-      const tabParts = line.split(/[\t]+/).map((p) => p.trim()).filter((p) => p.length > 0);
-      if (tabParts.length >= 2) {
-        const rawNick = tabParts[0];
-        const nick = cleanNickname(rawNick);
+      neighbors.push({
+        id: validId || cleanedNick,
+        nickname: cleanedNick,
+        group: group || '서로이웃'
+      });
+    };
+
+    // 1단계: 탭(\t) 구분 테이블 행 우선 처리 (가장 흔함)
+    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+    for (const line of lines) {
+      // 파이프(|)가 포함된 라인은 네이버 [닉네임 | 블로그제목] 형태
+      if (line.includes('|')) {
+        const tabParts = line.split(/[\t]+/).map((p) => p.trim()).filter(Boolean);
+        // 탭으로 나뉜 경우 파이프가 있는 파트 찾기
+        const pipePart = tabParts.find((p) => p.includes('|')) || line;
         
-        // 날짜나 시스템 단어가 아닌 유효한 ID 파트 탐색
-        let foundId = '';
-        let foundGroup = '기본그룹';
-        let foundDate = '';
+        // 괄호 안의 영문 아이디 추출 시도: 예) 위너스(Winners)
+        const idMatch = pipePart.match(/\(([a-zA-Z0-9_-]{3,25})\)/);
+        const extractedId = idMatch ? idMatch[1] : undefined;
 
-        for (let i = 1; i < tabParts.length; i++) {
-          const part = tabParts[i];
-          if (isDateString(part)) {
-            foundDate = part;
-          } else if (part.includes('그룹')) {
-            foundGroup = part;
-          } else if (!foundId && isValidNaverId(part)) {
-            foundId = part;
-          }
-        }
+        // 그룹명 추출 (새그룹, 기본그룹, 서로이웃 등)
+        const groupPart = tabParts.find((p) => p.includes('그룹') || p.includes('이웃'));
 
-        const validId = foundId || nick;
-        if (nick && !isDateString(nick) && !seenNickOrId.has(nick)) {
-          seenNickOrId.add(nick);
-          seenNickOrId.add(validId);
-          neighbors.push({
-            id: validId,
-            nickname: nick,
-            group: foundGroup,
-            addedDate: foundDate
-          });
+        addNeighbor(pipePart, extractedId, groupPart);
+        continue;
+      }
+
+      // 탭으로 나뉘어 있으나 파이프가 없는 행
+      const tabParts = line.split(/[\t]+/).map((p) => p.trim()).filter(Boolean);
+      if (tabParts.length >= 2) {
+        const candidateNick = tabParts.find((p) => !isSystemNoise(p));
+        if (candidateNick) {
+          const candidateId = tabParts.find((p) => p !== candidateNick && isValidNaverId(p));
+          addNeighbor(candidateNick, candidateId);
           continue;
         }
       }
 
-      // 패턴 3: 블로그 URL 형태 (blog.naver.com/아이디)
-      const urlMatch = line.match(/blog\.naver\.com\/([-_a-zA-Z0-9]{3,25})/);
-      if (urlMatch) {
-        const id = urlMatch[1];
-        if (isValidNaverId(id) && !seenNickOrId.has(id)) {
-          seenNickOrId.add(id);
-          neighbors.push({ id, nickname: id });
-        }
-        continue;
-      }
-
-      // 패턴 4: 일반 텍스트 라인 (닉네임 단독 또는 공백 포함 닉네임)
-      const cleaned = cleanNickname(line);
-      // 순수 숫자(날짜, 전화번호)나 시스템 단어는 제외
-      if (cleaned.length >= 2 && !isDateString(cleaned) && !/^\d+$/.test(cleaned.replace(/[-_]/g, ''))) {
-        const isBlacklisted = ['기본그룹', '새글소식', '열린이웃', '이웃관리'].includes(cleaned);
-        if (!isBlacklisted && !seenNickOrId.has(cleaned)) {
-          seenNickOrId.add(cleaned);
-          neighbors.push({ id: cleaned, nickname: cleaned });
-        }
+      // 2단계: 줄바꿈된 텍스트 중 단독 닉네임 라인 처리
+      if (!isSystemNoise(line)) {
+        addNeighbor(line);
       }
     }
 
@@ -350,11 +335,11 @@ export default function NeighborAnalyticsPage() {
       alert('복사할 이웃을 1명 이상 선택해 주세요.');
       return;
     }
-    const text = selectedList.map((i) => `${i.nickname} (${i.id})`).join('\n');
+    const text = selectedList.map((i) => i.nickname).join('\n');
     navigator.clipboard.writeText(text).then(() => {
       setCopiedId(true);
       setTimeout(() => setCopiedId(false), 2000);
-      alert(`${selectedList.length}명의 실제 무소통 이웃 명단이 클립보드에 복사되었습니다!`);
+      alert(`${selectedList.length}명의 실제 무소통 이웃 닉네임이 클립보드에 복사되었습니다!`);
     });
   };
 
@@ -364,13 +349,13 @@ export default function NeighborAnalyticsPage() {
   const handleOpenNaverAdmin = (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
     if (!targetIdClean) {
-      alert('먼저 ①번 입력창에 네이버 블로그 아이디를 입력해 주세요!\n(아이디를 입력하시면 본인의 네이버 관리자 페이지로 즉시 연결됩니다)');
+      alert('먼저 ①번 입력창에 네이버 블로그 아이디를 입력해 주세요!\n(아이디를 입력하시면 본인의 네이버 이웃 관리자 페이지로 즉시 연결됩니다)');
       const inputEl = document.getElementById('blogIdInput');
       if (inputEl) inputEl.focus();
       return;
     }
-    // 네이버 공식 블로그 관리자 홈
-    window.open(`https://admin.blog.naver.com/${targetIdClean}`, '_blank');
+    // 네이버 공식 블로그 이웃 관리 페이지로 바로 진입
+    window.open(`https://admin.blog.naver.com/${targetIdClean}/buddy/relation`, '_blank');
   };
 
   return (
