@@ -109,7 +109,8 @@ export default function NeighborAnalyticsPage() {
     // 시스템 UI 단어 제외
     const blacklist = [
       '기본그룹', '이웃그룹', '새글소식', '이웃', '서로이웃', '열린이웃',
-      '전체선택', '그룹변경', '이웃삭제', '소식받기', 'on', 'off', 'admin', 'manage'
+      '전체선택', '그룹변경', '이웃삭제', '소식받기', 'on', 'off', 'admin', 'manage',
+      '내가 추가한 이웃', '나를 추가한 이웃', '서로이웃 신청', '스팸 차단 관리', '이웃 관리'
     ];
     if (blacklist.includes(cleaned.toLowerCase())) return false;
     return true;
@@ -131,7 +132,7 @@ export default function NeighborAnalyticsPage() {
       if (isDateString(line)) continue;
 
       // 시스템 버튼/메뉴 줄 스킵
-      if (/^(새글소식|소식받기|ON|OFF|전체선택|그룹변경|이웃삭제|열린이웃|이웃\/서로이웃 관리)$/i.test(line)) {
+      if (/^(새글소식|소식받기|ON|OFF|전체선택|그룹변경|이웃삭제|열린이웃|이웃\/서로이웃 관리|내가 추가한 이웃|나를 추가한 이웃|서로이웃 신청|이웃 관리)$/i.test(line)) {
         continue;
       }
 
@@ -461,12 +462,15 @@ export default function NeighborAnalyticsPage() {
                 아래 ①번에 내 아이디 입력 후 위 <strong>[네이버 관리자 바로열기]</strong>를 누릅니다.
               </li>
               <li>
-                네이버 화면 좌측 메뉴에서 <strong>[열린이웃 ➔ 이웃·그룹 관리]</strong>를 클릭합니다.
+                네이버 화면 좌측 메뉴에서 <strong>[이웃 관리 ➔ 내가 추가한 이웃]</strong>을 클릭합니다.
               </li>
               <li>
-                이웃 목록 표를 마우스로 쭉 드래그하여 <strong>복사(Ctrl+C)</strong> 후 아래 ②번에 <strong>붙여넣기(Ctrl+V)</strong>하세요!
+                우측에 뜬 이웃 목록 표를 마우스로 쭉 드래그하여 <strong>복사(Ctrl+C)</strong> 후 아래 ②번에 <strong>붙여넣기(Ctrl+V)</strong>하세요!
               </li>
             </ol>
+            <div className="mt-2.5 pt-2 border-t border-emerald-100 text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
+              💡 팁: &apos;서로이웃&apos;만 정리하고 싶으시면, 네이버 화면 상단의 [서로이웃] 탭을 누른 후 복사하시면 됩니다!
+            </div>
           </div>
 
           {/* Input Form */}
@@ -505,7 +509,7 @@ export default function NeighborAnalyticsPage() {
                 value={rawPastedText}
                 onChange={(e) => setRawPastedText(e.target.value)}
                 rows={5}
-                placeholder="네이버 블로그 관리자 [열린이웃 > 이웃/서로이웃 관리] 화면에서 복사한 내용을 여기에 붙여넣어 주세요! (Ctrl + V)"
+                placeholder="네이버 블로그 관리자 [이웃 관리 > 내가 추가한 이웃] 화면에서 마우스로 긁어 복사한 내용을 여기에 붙여넣어 주세요! (Ctrl + V)"
                 className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all placeholder:text-slate-400"
               ></textarea>
             </div>
