@@ -794,8 +794,19 @@ export default function NeighborAnalyticsPage() {
                   </div>
                 </div>
 
-                {/* 📱 모바일 vs 💻 PC 삭제 모드 토글 스위치 */}
+                {/* 💻 PC vs 📱 모바일 삭제 안내 토글 */}
                 <div className="bg-slate-100 p-1 rounded-2xl flex items-center text-xs font-black">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteMode('pc')}
+                    className={`flex-1 py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      deleteMode === 'pc'
+                        ? 'bg-white text-indigo-700 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    <span>💻 PC 삭제 방법 (검색 ➔ 체크박스 ➔ 삭제)</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => setDeleteMode('mobile')}
@@ -805,77 +816,61 @@ export default function NeighborAnalyticsPage() {
                         : 'text-slate-500 hover:text-slate-700'
                     }`}
                   >
-                    <span>📱 스마트폰 / 모바일 삭제 (추천)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDeleteMode('pc')}
-                    className={`flex-1 py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                      deleteMode === 'pc'
-                        ? 'bg-white text-rose-600 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-700'
-                    }`}
-                  >
-                    <span>💻 PC 일괄 자동 삭제 (F12)</span>
+                    <span>📱 모바일 블로그 앱 삭제 방법</span>
                   </button>
                 </div>
 
-                {deleteMode === 'mobile' ? (
-                  /* 📱 모바일 초간편 1초 삭제 가이드 배너 */
+                {deleteMode === 'pc' ? (
+                  /* 💻 PC 초간편 정석 삭제 배너 */
+                  <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-5 rounded-2xl shadow-md space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="bg-indigo-500/30 text-indigo-300 text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-indigo-400/30">
+                        💻 PC 정석 삭제법
+                      </span>
+                      <span className="text-xs text-indigo-200 font-semibold">검색 ➔ 체크 ➔ 삭제 3단계</span>
+                    </div>
+
+                    <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm space-y-2 text-xs">
+                      <p className="font-black text-white text-sm flex items-center gap-1.5">
+                        <CheckCircle2 size={16} className="text-emerald-400" /> 네이버 검색 후 체크박스 선택 ➔ 삭제
+                      </p>
+                      <ol className="text-[12px] text-slate-200 space-y-1.5 list-decimal list-inside leading-relaxed">
+                        <li>아래 명단에서 삭제할 이웃의 <strong>[닉네임 복사]</strong> 버튼을 누릅니다.</li>
+                        <li>네이버 <strong>[내가 추가한 이웃]</strong> 화면 검색창에 <strong>붙여넣기(Ctrl+V)</strong> 후 검색합니다.</li>
+                        <li>검색된 이웃 앞의 <strong>네모 체크박스 [v]</strong>를 선택하고 상단 <strong>[이웃 삭제]</strong>를 누르면 끝!</li>
+                      </ol>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1 text-[11px] text-slate-400">
+                      <span>※ 대량 삭제 시: 콘솔(F12)을 이용한 1초 일괄 선택도 지원합니다.</span>
+                      <button
+                        type="button"
+                        onClick={handleCopyAutoCheckScript}
+                        className="text-indigo-300 hover:text-white underline cursor-pointer font-bold"
+                      >
+                        ⚡ 1초 일괄 자동체크 코드 복사
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* 📱 모바일 초간편 블로그 앱 삭제 배너 */
                   <div className="bg-gradient-to-br from-emerald-600 via-teal-600 to-emerald-700 text-white p-5 rounded-2xl shadow-md space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="bg-white/20 text-white text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider backdrop-blur-sm">
                         📱 모바일 블로그 앱 삭제법
                       </span>
-                      <span className="text-xs text-emerald-100 font-semibold">스마트폰 터치 2번으로 끝</span>
+                      <span className="text-xs text-emerald-100 font-semibold">스마트폰 터치 3번으로 끝</span>
                     </div>
 
-                    <div className="bg-white/10 p-3.5 rounded-xl backdrop-blur-sm space-y-1.5 text-xs text-emerald-50">
-                      <p className="font-black text-white flex items-center gap-1 text-sm">
-                        📱 네이버 블로그 앱에서 1초 삭제 순서
+                    <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm space-y-2 text-xs text-emerald-50">
+                      <p className="font-black text-white text-sm flex items-center gap-1.5">
+                        <CheckCircle2 size={16} className="text-emerald-300" /> 네이버 블로그 앱에서 1초 삭제 순서
                       </p>
-                      <ol className="text-[12px] text-emerald-100 space-y-1 list-decimal list-inside leading-relaxed">
+                      <ol className="text-[12px] text-emerald-100 space-y-1.5 list-decimal list-inside leading-relaxed">
                         <li>아래 명단에서 삭제할 이웃의 <strong>[닉네임 복사]</strong> 버튼을 누릅니다.</li>
                         <li>네이버 블로그 앱 우측 상단 <strong>[≡ 메뉴] ➔ [이웃 목록]</strong>으로 이동합니다.</li>
                         <li>상단 검색창에 붙여넣기 후, 검색된 이웃 우측 <strong>[점 3개 ⋮] ➔ [이웃 취소]</strong>를 누르면 끝!</li>
                       </ol>
-                    </div>
-                  </div>
-                ) : (
-                  /* 💻 PC 1초 일괄 자동체크 마법사 배너 */
-                  <div className="bg-gradient-to-br from-rose-500 via-pink-600 to-rose-700 text-white p-5 rounded-2xl shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
-                    <div className="space-y-1 text-center md:text-left">
-                      <div className="flex items-center justify-center md:justify-start gap-2">
-                        <span className="bg-white/20 text-white text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider backdrop-blur-sm">
-                          PC 전용 꿀팁
-                        </span>
-                        <h4 className="text-base font-black flex items-center gap-1.5">
-                          ⚡ 1초 일괄 자동체크 마법사
-                        </h4>
-                      </div>
-                      <p className="text-xs text-rose-100 leading-relaxed">
-                        네이버에서 30번 검색할 필요 없습니다! <strong>코드 복사 후 네이버 콘솔(F12)에 붙여넣기</strong>하면 화면 속 무소통 이웃이 1초 만에 한 번에 자동 체크(선택)됩니다.
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
-                      <button
-                        type="button"
-                        onClick={handleCopyAutoCheckScript}
-                        className="flex-1 md:flex-none px-4 py-2.5 bg-white text-rose-600 hover:bg-rose-50 font-black rounded-xl text-xs transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
-                      >
-                        {copiedScript ? <Check size={16} className="text-emerald-600" /> : <Sparkles size={16} />}
-                        <span>{copiedScript ? '코드 복사 완료!' : '🪄 1초 자동체크 코드 복사'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setShowScriptGuide(true)}
-                        className="px-3.5 py-2.5 bg-rose-800/60 hover:bg-rose-800 text-white font-bold rounded-xl text-xs transition-colors border border-white/20 flex items-center gap-1 cursor-pointer"
-                      >
-                        <HelpCircle size={15} />
-                        <span>사용법 보기</span>
-                      </button>
                     </div>
                   </div>
                 )}
