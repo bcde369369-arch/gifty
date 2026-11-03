@@ -478,7 +478,7 @@ export default function AdminDashboard() {
               {/* 카테고리별 순위 리스트 */}
               <div className="space-y-2.5">
                 {isLoadingStats ? (
-                  Array.from({ length: 6 }).map((_, i) => (
+                  Array.from({ length: 7 }).map((_, i) => (
                     <div key={i} className="h-14 bg-slate-200/70 animate-pulse rounded-xl" />
                   ))
                 ) : (

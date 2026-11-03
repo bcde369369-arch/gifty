@@ -38,6 +38,14 @@ export const TRACKED_PAGES: Omit<PageStatItem, 'todayViews' | 'totalViews' | 'to
     badgeBg: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   },
   {
+    id: 'neighbor',
+    path: '/neighbor',
+    name: '이웃 소통 지표 (무소통 이웃 삭제)',
+    emoji: '📊',
+    color: 'from-emerald-500 to-teal-500',
+    badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  },
+  {
     id: 'community',
     path: '/community',
     name: '블로그 커뮤니티',
@@ -81,12 +89,13 @@ export const TRACKED_PAGES: Omit<PageStatItem, 'todayViews' | 'totalViews' | 'to
 
 // 기본 카테고리별 자연스러운 점유율 가중치 (CounterAPI 개별 카운터가 없을 때 합리적으로 분배)
 const DEFAULT_PAGE_WEIGHTS: Record<string, number> = {
-  home: 42,
-  community: 22,
-  diary: 14,
-  sticker: 10,
-  removebg: 8,
-  guide: 4,
+  home: 35,
+  neighbor: 25,
+  community: 15,
+  diary: 10,
+  sticker: 7,
+  removebg: 5,
+  guide: 3,
 };
 
 const LOCAL_CACHE_KEY = 'gifty_visitor_stats_cache_v3';
@@ -161,6 +170,7 @@ export async function testCounterApiConnection(
 /** 현재 경로(pathname)를 추적 대상 페이지 ID로 매핑 */
 export function resolvePageId(pathname: string): string | null {
   if (!pathname || pathname.startsWith('/admin')) return null;
+  if (pathname.startsWith('/neighbor')) return 'neighbor';
   if (pathname.startsWith('/community')) return 'community';
   if (pathname.startsWith('/experience-diary')) return 'diary';
   if (pathname.startsWith('/sticker')) return 'sticker';
