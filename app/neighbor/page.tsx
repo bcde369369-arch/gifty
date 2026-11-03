@@ -349,8 +349,8 @@ export default function NeighborAnalyticsPage() {
 
   const targetIdClean = cleanBlogId(blogId);
 
-  // 네이버 공식 관리자 페이지 안전 열기 핸들러
-  const handleOpenNaverAdmin = (e?: React.MouseEvent) => {
+  // 네이버 공식 [내가 추가한 이웃] 관리 페이지 안전 열기 핸들러
+  const handleOpenNaverAdmin = (e?: React.MouseEvent, neighborNicknameToCopy?: string) => {
     if (e) e.preventDefault();
     if (!targetIdClean) {
       alert('먼저 ①번 입력창에 네이버 블로그 아이디를 입력해 주세요!\n(아이디를 입력하시면 본인의 네이버 이웃 관리자 페이지로 즉시 연결됩니다)');
@@ -358,8 +358,15 @@ export default function NeighborAnalyticsPage() {
       if (inputEl) inputEl.focus();
       return;
     }
-    // 네이버 공식 블로그 이웃 관리 페이지로 바로 진입
-    window.open(`https://admin.blog.naver.com/${targetIdClean}/buddy/relation`, '_blank');
+
+    // 만약 특정 이웃 행에서 눌렀다면 해당 이웃 닉네임을 자동으로 클립보드에 복사해 줌!
+    if (neighborNicknameToCopy) {
+      navigator.clipboard.writeText(neighborNicknameToCopy);
+    }
+
+    // 네이버 공식 [내가 추가한 이웃] 관리자 직접 URL
+    const directManageUrl = `https://admin.blog.naver.com/BuddyMeManage.nhn?blogId=${targetIdClean}`;
+    window.open(directManageUrl, '_blank');
   };
 
   return (
@@ -441,20 +448,20 @@ export default function NeighborAnalyticsPage() {
                 onClick={handleOpenNaverAdmin}
                 className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-extrabold bg-emerald-50 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
               >
-                <span>네이버 관리자 바로열기</span>
+                <span>네이버 [내가 추가한 이웃] 바로열기</span>
                 <ExternalLink size={12} />
               </button>
             </div>
 
             <ol className="text-xs text-slate-600 space-y-2 list-decimal list-inside leading-relaxed font-medium">
               <li>
-                아래 ①번에 내 아이디 입력 후 위 <strong>[네이버 관리자 바로열기]</strong>를 누릅니다.
+                아래 ①번에 내 아이디 입력 후 위 <strong>[네이버 [내가 추가한 이웃] 바로열기]</strong>를 누릅니다.
               </li>
               <li>
-                네이버 화면 좌측 메뉴에서 <strong>[이웃 관리 ➔ 내가 추가한 이웃]</strong>을 클릭합니다.
+                새 창으로 열린 화면에서 이웃 목록 표를 마우스로 쭉 드래그하여 <strong>복사(Ctrl+C)</strong>합니다.
               </li>
               <li>
-                우측에 뜬 이웃 목록 표를 마우스로 쭉 드래그하여 <strong>복사(Ctrl+C)</strong> 후 아래 ②번에 <strong>붙여넣기(Ctrl+V)</strong>하세요!
+                우리 사이트 아래 ②번에 <strong>붙여넣기(Ctrl+V)</strong> 후 <strong>[소통 지표 진단]</strong>을 누르세요!
               </li>
             </ol>
             <div className="mt-2.5 pt-2 border-t border-emerald-100 text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
@@ -699,10 +706,10 @@ export default function NeighborAnalyticsPage() {
 
                     <button
                       type="button"
-                      onClick={handleOpenNaverAdmin}
+                      onClick={(e) => handleOpenNaverAdmin(e)}
                       className="flex-1 sm:flex-none px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-extrabold transition-all shadow-md flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
                     >
-                      <span>🚀 네이버 이웃 관리자 바로가기</span>
+                      <span>🚀 네이버 [내가 추가한 이웃] 열기</span>
                       <ExternalLink size={14} />
                     </button>
                   </div>
@@ -713,7 +720,7 @@ export default function NeighborAnalyticsPage() {
                   <div className="flex items-center gap-2 text-rose-800 font-semibold text-center sm:text-left">
                     <AlertCircle size={18} className="text-rose-600 shrink-0" />
                     <span>
-                      위 <strong>[선택 명단 복사]</strong>를 누른 후 <strong>[네이버 이웃 관리자 바로가기]</strong>를 열어 검색창에 붙여넣으면 1초 만에 안전하게 정리하실 수 있습니다!
+                      각 이웃 우측의 <strong>[복사 후 검색 ➔]</strong>을 누르면 닉네임이 자동 복사되며 네이버 관리자가 열립니다! 네이버 검색창에 <strong>붙여넣기(Ctrl+V)</strong> 후 엔터를 치면 1초 만에 바로 체크 삭제하실 수 있습니다.
                     </span>
                   </div>
                 </div>
@@ -765,11 +772,11 @@ export default function NeighborAnalyticsPage() {
                         </span>
                         <button
                           type="button"
-                          onClick={handleOpenNaverAdmin}
-                          className="text-slate-400 hover:text-rose-600 font-bold cursor-pointer"
-                          title="네이버 관리자에서 검색 및 삭제"
+                          onClick={(e) => handleOpenNaverAdmin(e, item.nickname)}
+                          className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-[11px] font-extrabold transition-colors cursor-pointer flex items-center gap-1"
+                          title="이웃 닉네임 복사 후 네이버 관리자 열기"
                         >
-                          관리 &rarr;
+                          <span>복사 후 검색 &rarr;</span>
                         </button>
                       </div>
                     </div>
