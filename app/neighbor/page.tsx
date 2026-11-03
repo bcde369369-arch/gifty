@@ -417,31 +417,20 @@ export default function NeighborAnalyticsPage() {
   };
 
   const targetIdClean = cleanBlogId(blogId);
+  const naverAdminUrl = targetIdClean
+    ? `https://admin.blog.naver.com/${targetIdClean}/buddy/relation`
+    : 'https://admin.blog.naver.com/';
 
   // 네이버 공식 이웃 관리 페이지 안전 열기 핸들러
   const handleOpenNaverAdmin = (
     e?: React.MouseEvent,
-    mode: 'copy' | 'delete' = 'delete',
     neighborNicknameToCopy?: string
   ) => {
-    if (e) e.preventDefault();
-
-    // 타겟 아이디가 없는 경우라도 네이버 기본 admin 페이지 열기 지원
-    const targetUrl = targetIdClean
-      ? `https://admin.blog.naver.com/${targetIdClean}/buddy/relation`
-      : 'https://admin.blog.naver.com/';
-
-    // 만약 특정 이웃 행에서 눌렀다면 해당 이웃 닉네임을 자동으로 클립보드에 복사해 줌!
     if (neighborNicknameToCopy) {
       navigator.clipboard.writeText(neighborNicknameToCopy);
-      alert(`'${neighborNicknameToCopy}' 닉네임이 복사되었습니다!\n\n열린 네이버 창에서 [내가 추가한 이웃] 검색창에 붙여넣기(Ctrl+V) 후, 체크박스를 선택하고 [이웃 삭제]를 누르시면 됩니다.\n\n📱 모바일 팁: 스마트폰 브라우저 메뉴(⋮)에서 [PC버전 보기]를 켜시면 모바일에서도 체크박스로 삭제가 가능합니다!`);
-    } else if (mode === 'copy') {
-      alert(`네이버 관리자 창이 새 탭으로 열립니다!\n\n열린 네이버 화면 상단의 3번째 탭인 [이웃순서]를 클릭하시면 그룹별 이웃 명단을 가장 편하게 복사하실 수 있습니다.\n\n📱 모바일 팁: 스마트폰 브라우저 메뉴(⋮)에서 [PC버전 보기]를 켜시면 모바일에서도 전체 표를 확인하실 수 있습니다.`);
-    } else {
-      alert(`네이버 이웃 삭제 페이지([내가 추가한 이웃])로 이동합니다!\n\n1. 복사한 무소통 이웃 닉네임을 검색창에 붙여넣고 검색합니다.\n2. 체크박스[v]를 선택하고 상단 [이웃 삭제]를 누르면 끝!\n\n📱 모바일 팁: 스마트폰 브라우저 메뉴(⋮)에서 [PC버전 보기]를 켜시면 스마트폰에서도 PC처럼 체크박스로 삭제가 가능합니다!`);
     }
-
-    window.open(targetUrl, '_blank');
+    // 팝업 차단 방지: window.open을 곧바로 실행
+    window.open(naverAdminUrl, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -542,14 +531,15 @@ export default function NeighborAnalyticsPage() {
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 size={16} className="text-emerald-600" /> 실제 이웃 분석 3단계 (초간단)
               </span>
-              <button
-                type="button"
-                onClick={(e) => handleOpenNaverAdmin(e, 'copy')}
-                className="inline-flex items-center gap-1.5 text-emerald-700 hover:text-emerald-800 font-black bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer text-xs"
+              <a
+                href={naverAdminUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-emerald-800 hover:text-emerald-900 font-black bg-emerald-100/80 hover:bg-emerald-200 border border-emerald-300 px-3.5 py-1.5 rounded-xl transition-all shadow-sm active:scale-95 text-xs"
               >
-                <span>🔗 네이버 이웃관리(PC화면) 바로열기</span>
+                <span>🔗 네이버 이웃관리 바로열기</span>
                 <ExternalLink size={13} />
-              </button>
+              </a>
             </div>
 
             <ol className="text-xs text-slate-600 space-y-2.5 list-decimal list-inside leading-relaxed font-medium">
@@ -825,14 +815,15 @@ export default function NeighborAnalyticsPage() {
                       <span>선택 명단 텍스트 복사</span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={(e) => handleOpenNaverAdmin(e, 'delete')}
-                      className="flex-1 sm:flex-none px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                    <a
+                      href={naverAdminUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 sm:flex-none px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-1.5"
                     >
-                      <span>🚀 네이버 이웃 삭제창 열기 (PC화면)</span>
+                      <span>🔗 네이버 이웃관리 바로열기</span>
                       <ExternalLink size={14} />
-                    </button>
+                    </a>
                   </div>
                 </div>
 
@@ -840,9 +831,9 @@ export default function NeighborAnalyticsPage() {
                 <div className="bg-amber-50 border border-amber-200/90 text-amber-950 p-4 rounded-2xl text-xs flex items-start gap-3 shadow-sm">
                   <span className="text-xl leading-none">💡</span>
                   <div className="leading-relaxed space-y-1">
-                    <strong className="font-black text-amber-950 text-sm">무소통 이웃 삭제 핵심 팁:</strong>
+                    <strong className="font-black text-amber-950 text-sm">무소통 이웃 삭제 안내:</strong>
                     <p className="text-[12px] text-amber-900 font-medium">
-                      위 <strong>[🚀 네이버 이웃 삭제창 열기 (PC화면)]</strong>을 누르면 네이버 [내가 추가한 이웃] 화면이 바로 열립니다.
+                      위 <strong>[🔗 네이버 이웃관리 바로열기]</strong>를 누르면 네이버 [내가 추가한 이웃] 화면이 새 탭으로 즉시 열립니다.
                     </p>
                     <p className="text-[11px] text-amber-800">
                       📱 <strong>스마트폰 이용자:</strong> 열린 네이버 화면에서 브라우저 메뉴(우측 상단 ⋮ 또는 사파리 &apos;가A&apos;) ➔ <strong>[PC버전으로 보기]</strong>를 켜시면 스마트폰에서도 체크박스[v]로 한 번에 시원하게 삭제하실 수 있습니다!
@@ -890,9 +881,22 @@ export default function NeighborAnalyticsPage() {
                       <p className="font-black text-white text-sm flex items-center gap-1.5">
                         <CheckCircle2 size={16} className="text-emerald-400" /> 네이버 검색 후 체크박스 선택 ➔ 삭제
                       </p>
-                      <ol className="text-[12px] text-slate-200 space-y-1.5 list-decimal list-inside leading-relaxed">
+                      <ol className="text-[12px] text-slate-200 space-y-2.5 list-decimal list-inside leading-relaxed">
                         <li>아래 명단에서 삭제할 이웃의 <strong>[닉네임 복사]</strong> 버튼을 누릅니다.</li>
-                        <li>위 <strong>[🚀 네이버 이웃 삭제창 열기]</strong>를 눌러 네이버 화면 검색창에 <strong>붙여넣기(Ctrl+V)</strong> 후 검색합니다.</li>
+                        <li>
+                          아래 버튼을 눌러 네이버 [내가 추가한 이웃] 화면으로 이동 후 검색창에 <strong>붙여넣기(Ctrl+V)</strong> 후 검색합니다:
+                          <div className="my-2">
+                            <a
+                              href={naverAdminUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-xs rounded-lg shadow transition-all"
+                            >
+                              <span>👉 네이버 이웃관리 바로열기 (새 탭)</span>
+                              <ExternalLink size={12} />
+                            </a>
+                          </div>
+                        </li>
                         <li>검색된 이웃 앞의 <strong>네모 체크박스 [v]</strong>를 선택하고 상단 <strong>[이웃 삭제]</strong>를 누르면 끝!</li>
                       </ol>
                     </div>
