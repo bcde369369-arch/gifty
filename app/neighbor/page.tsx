@@ -71,6 +71,7 @@ export default function NeighborAnalyticsPage() {
   const [healthScore, setHealthScore] = useState(78);
   const [topCommunicators, setTopCommunicators] = useState<Communicator[]>([]);
   const [inactiveNeighbors, setInactiveNeighbors] = useState<InactiveNeighbor[]>([]);
+  const [extractedIdMap, setExtractedIdMap] = useState<Record<string, string>>({});
   const [errorMsg, setErrorMsg] = useState('');
 
   // 아이디 파싱 함수 (URL을 통째로 넣었을 때도 처리)
@@ -162,6 +163,11 @@ export default function NeighborAnalyticsPage() {
         }
       }
 
+      // 붙여넣기 시 추출된 실제 블로그 아이디가 있다면 우선 매핑
+      if (!validId && extractedIdMap[cleanedNick]) {
+        validId = extractedIdMap[cleanedNick];
+      }
+
       neighbors.push({
         id: validId || cleanedNick,
         nickname: cleanedNick,
@@ -207,6 +213,35 @@ export default function NeighborAnalyticsPage() {
     }
 
     return neighbors;
+  };
+
+  // 클립보드 HTML에서 네이버 고유 블로그 주소(아이디) 자동 추출 핸들러
+  const handlePasteText = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    try {
+      const html = e.clipboardData.getData('text/html');
+      if (html) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const links = doc.querySelectorAll('a');
+        const newMap: Record<string, string> = {};
+        links.forEach((a) => {
+          const href = a.getAttribute('href') || '';
+          const text = a.textContent?.trim() || '';
+          const match = href.match(/blog\.naver\.com\/([a-zA-Z0-9_-]{3,25})/i);
+          if (match && text) {
+            const clean = cleanNickname(text);
+            if (clean && !isSystemNoise(clean)) {
+              newMap[clean] = match[1];
+            }
+          }
+        });
+        if (Object.keys(newMap).length > 0) {
+          setExtractedIdMap((prev) => ({ ...prev, ...newMap }));
+        }
+      }
+    } catch {
+      // fallback
+    }
   };
 
   // 예시 샘플 데이터 채워넣기 (테스트용)
@@ -547,8 +582,9 @@ export default function NeighborAnalyticsPage() {
               <textarea
                 value={rawPastedText}
                 onChange={(e) => setRawPastedText(e.target.value)}
+                onPaste={handlePasteText}
                 rows={5}
-                placeholder="네이버 블로그 관리자 [내가 추가한 이웃 > 이웃순서] 화면에서 마우스로 드래그 복사한 이웃 목록을 여기에 붙여넣어 주세요! (Ctrl + V)"
+                placeholder="네이버 블로그 관리자 [내가 추가한 이웃 > 이웃목록] 화면의 표를 마우스로 쭉 드래그 복사해서 여기에 붙여넣어 주세요! (Ctrl + V)"
                 className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all placeholder:text-slate-400"
               ></textarea>
             </div>
