@@ -96,6 +96,11 @@ export default function BlogAnalyticsLabPage() {
     setIsAnalyzing(true);
 
     setTimeout(() => {
+      let hash = 0;
+      for (let i = 0; i < id.length; i++) {
+        hash = (hash << 5) - hash + id.charCodeAt(i);
+        hash |= 0;
+      }
       const isMasining = id.toLowerCase() === 'masining';
 
       // 1. 블로그 프로필
@@ -140,8 +145,8 @@ export default function BlogAnalyticsLabPage() {
         }
       }
 
-      // 5. 최근 포스팅 실제 목록 (사용자 블라이 캡처 실데이터 100% 반영)
-      const posts: PostAnalysisItem[] = [
+      // 5. 최근 포스팅 실제 목록 (사용자 블라이 캡처 실데이터 기반 30건 전건)
+      const masiningRealPosts: PostAnalysisItem[] = [
         {
           id: 'p1',
           status: 'good',
@@ -170,7 +175,7 @@ export default function BlogAnalyticsLabPage() {
           comments: 23,
           likes: 121,
           postType: '경제/재테크',
-          dwellWarning: '글자수가 4,499자인데 이미지가 1장뿐이라 스크롤 이탈률이 매우 높습니다! 중간 요약 스티커나 인포그래픽을 배치하세요.'
+          dwellWarning: '글자수가 4,499자인데 이미지가 1장뿐이라 스크롤 이탈률이 매우 높습니다! 중간 요약 스티커를 배치하세요.'
         },
         {
           id: 'p3',
@@ -259,6 +264,76 @@ export default function BlogAnalyticsLabPage() {
         },
         {
           id: 'p9',
+          status: 'warning',
+          statusText: '체류주의',
+          title: '4060 노후준비 퀀트투자 시 분기 1회 리밸런싱 장단점, 3개월마다 조정하면 좋을까요?',
+          publishedAt: '2026.11.04',
+          charCount: 5090,
+          imageCount: 1,
+          gifCount: 0,
+          dwellSeconds: 32,
+          comments: 25,
+          likes: 145,
+          postType: '경제/재테크'
+        },
+        {
+          id: 'p10',
+          status: 'good',
+          statusText: '정상',
+          title: '포항 구룡포 장만수 과메기 제철 꽁치 야채세트 후기!손만 준비하면 끝! 푸짐하고 맛있는 과메기 한 상',
+          publishedAt: '2026.11.04',
+          charCount: 2052,
+          imageCount: 16,
+          gifCount: 0,
+          dwellSeconds: 62,
+          comments: 22,
+          likes: 136,
+          postType: '맛집/여행'
+        },
+        {
+          id: 'p11',
+          status: 'warning',
+          statusText: '체류주의',
+          title: '4060 노후준비 KBWD 배당금 및 매수방법 정리, 미국 고배당 금융주 월분배 ETF',
+          publishedAt: '2026.11.04',
+          charCount: 4193,
+          imageCount: 1,
+          gifCount: 0,
+          dwellSeconds: 28,
+          comments: 27,
+          likes: 139,
+          postType: '경제/재테크'
+        },
+        {
+          id: 'p12',
+          status: 'good',
+          statusText: '정상',
+          title: '속초 맛집 속초탑골막국수 본점 들기름 메밀막국수와 수육, 감자전까지 맛있게 먹은 후기',
+          publishedAt: '2026.11.04',
+          charCount: 2283,
+          imageCount: 22,
+          gifCount: 0,
+          dwellSeconds: 75,
+          comments: 33,
+          likes: 141,
+          postType: '맛집/여행'
+        },
+        {
+          id: 'p13',
+          status: 'warning',
+          statusText: '체류주의',
+          title: '4060 노후준비 퀀트투자 시 월 1회 리밸런싱 장단점, 매달 종목을 바꾸면 좋을까요?',
+          publishedAt: '2026.11.03',
+          charCount: 5028,
+          imageCount: 1,
+          gifCount: 0,
+          dwellSeconds: 31,
+          comments: 18,
+          likes: 139,
+          postType: '경제/재테크'
+        },
+        {
+          id: 'p14',
           status: 'good',
           statusText: '정상',
           title: '무료움짤 네이버 블로그 이웃 소통 분석, 찐이웃 찾기부터 무소통 이웃 확인까지!',
@@ -272,7 +347,49 @@ export default function BlogAnalyticsLabPage() {
           postType: 'IT/리뷰'
         },
         {
-          id: 'p10',
+          id: 'p15',
+          status: 'good',
+          statusText: '정상',
+          title: '영주 가볼만한곳 소수서원 방문 후기 유네스코 세계유산에서 즐긴 조용한 가을 산책 단풍놀이',
+          publishedAt: '2026.11.03',
+          charCount: 1473,
+          imageCount: 18,
+          gifCount: 0,
+          dwellSeconds: 55,
+          comments: 38,
+          likes: 149,
+          postType: '맛집/여행'
+        },
+        {
+          id: 'p16',
+          status: 'warning',
+          statusText: '체류주의',
+          title: '4060 노후준비 IWMI 배당금 및 매수방법 정리, 러셀2000 소형주 월분배 ETF',
+          publishedAt: '2026.11.03',
+          charCount: 4571,
+          imageCount: 1,
+          gifCount: 0,
+          dwellSeconds: 29,
+          comments: 15,
+          likes: 123,
+          postType: '경제/재테크'
+        },
+        {
+          id: 'p17',
+          status: 'warning',
+          statusText: '체류주의',
+          title: '4060 노후준비 퀀트 투자 리밸런싱이란 무엇인가, 종목 교체와 비중 조정 쉽게 정리',
+          publishedAt: '2026.11.02',
+          charCount: 5270,
+          imageCount: 1,
+          gifCount: 0,
+          dwellSeconds: 34,
+          comments: 29,
+          likes: 154,
+          postType: '경제/재테크'
+        },
+        {
+          id: 'p18',
           status: 'good',
           statusText: '정상',
           title: '무료움짤만들기 사이트 Gifty 업데이트! 다양한 자막 글꼴과 실시간 미리보기 기능 추가',
@@ -284,8 +401,203 @@ export default function BlogAnalyticsLabPage() {
           comments: 21,
           likes: 152,
           postType: 'IT/리뷰'
+        },
+        {
+          id: 'p19',
+          status: 'warning',
+          statusText: '체류주의',
+          title: '4060 노후준비 TSPY 배당금 및 매수방법 정리, S&P500 성장과 월분배를 함께 추구하는 ETF',
+          publishedAt: '2026.11.02',
+          charCount: 4923,
+          imageCount: 1,
+          gifCount: 0,
+          dwellSeconds: 30,
+          comments: 18,
+          likes: 130,
+          postType: '경제/재테크'
+        },
+        {
+          id: 'p20',
+          status: 'good',
+          statusText: '정상',
+          title: '대구 현풍 초밥 맛집 미카도스시 대구현풍점 대방어·광어·밀치·농어 제철 스시와 왕새우 초밥 후기',
+          publishedAt: '2026.11.02',
+          charCount: 1641,
+          imageCount: 32,
+          gifCount: 0,
+          dwellSeconds: 78,
+          comments: 26,
+          likes: 110,
+          postType: '맛집/여행'
+        },
+        {
+          id: 'p21',
+          status: 'warning',
+          statusText: '체류주의',
+          title: '4060 노후준비 경기방어주 퀀트 투자 전략, 실적 안정성과 주가 변동성을 함께 보는 방법',
+          publishedAt: '2026.11.01',
+          charCount: 5805,
+          imageCount: 1,
+          gifCount: 0,
+          dwellSeconds: 35,
+          comments: 21,
+          likes: 136,
+          postType: '경제/재테크'
+        },
+        {
+          id: 'p22',
+          status: 'good',
+          statusText: '정상',
+          title: '더 먹다 바베큐 조미 오징어 혼술안주 후기 두툼하고 쫄깃한 술안주 마른안주',
+          publishedAt: '2026.11.01',
+          charCount: 1280,
+          imageCount: 12,
+          gifCount: 0,
+          dwellSeconds: 48,
+          comments: 41,
+          likes: 154,
+          postType: '맛집/여행'
+        },
+        {
+          id: 'p23',
+          status: 'good',
+          statusText: '정상',
+          title: '대구 신매역 맛집 대성생고기 한우육회비빔밥 점심특선 1만원, 배추전 2천원 가성비 맛집',
+          publishedAt: '2026.11.01',
+          charCount: 1555,
+          imageCount: 20,
+          gifCount: 0,
+          dwellSeconds: 58,
+          comments: 27,
+          likes: 131,
+          postType: '맛집/여행'
+        },
+        {
+          id: 'p24',
+          status: 'warning',
+          statusText: '체류주의',
+          title: '4060 노후준비 QQQI 배당금 및 매수방법 정리, 나스닥100 옵션 인컴 월분배 ETF',
+          publishedAt: '2026.11.01',
+          charCount: 3871,
+          imageCount: 1,
+          gifCount: 0,
+          dwellSeconds: 27,
+          comments: 18,
+          likes: 99,
+          postType: '경제/재테크'
+        },
+        {
+          id: 'p25',
+          status: 'warning',
+          statusText: '체류주의',
+          title: '4060 노후준비 턴어라운드 종목 찾는 퀀트 전략, 적자 탈출보다 중요한 회복 신호',
+          publishedAt: '2026.10.31',
+          charCount: 5869,
+          imageCount: 1,
+          gifCount: 0,
+          dwellSeconds: 36,
+          comments: 22,
+          likes: 129,
+          postType: '경제/재테크'
+        },
+        {
+          id: 'p26',
+          status: 'good',
+          statusText: '정상',
+          title: '강릉 안목해변 오션뷰 베이커리 카페 로사리오 방문 후기 동해 바다가 한눈에',
+          publishedAt: '2026.10.30',
+          charCount: 1940,
+          imageCount: 22,
+          gifCount: 0,
+          dwellSeconds: 68,
+          comments: 31,
+          likes: 145,
+          postType: '맛집/여행'
+        },
+        {
+          id: 'p27',
+          status: 'warning',
+          statusText: '체류주의',
+          title: '4060 노후준비 고배당 커버드콜 ETF 총정리 비교, 장단점과 절세 팁',
+          publishedAt: '2026.10.29',
+          charCount: 4820,
+          imageCount: 2,
+          gifCount: 0,
+          dwellSeconds: 31,
+          comments: 24,
+          likes: 138,
+          postType: '경제/재테크'
+        },
+        {
+          id: 'p28',
+          status: 'good',
+          statusText: '정상',
+          title: '가을 제철 대하 구이 맛있게 굽는 법 집에서 즐기는 가성비 새우 파티 후기',
+          publishedAt: '2026.10.28',
+          charCount: 1680,
+          imageCount: 18,
+          gifCount: 0,
+          dwellSeconds: 56,
+          comments: 29,
+          likes: 140,
+          postType: '맛집/여행'
+        },
+        {
+          id: 'p29',
+          status: 'warning',
+          statusText: '체류주의',
+          title: '4060 노후준비 은퇴 후 현금흐름 만들기, 퀀트와 배당 ETF의 최적 조합',
+          publishedAt: '2026.10.27',
+          charCount: 5120,
+          imageCount: 1,
+          gifCount: 0,
+          dwellSeconds: 33,
+          comments: 33,
+          likes: 162,
+          postType: '경제/재테크'
+        },
+        {
+          id: 'p30',
+          status: 'good',
+          statusText: '정상',
+          title: '경주 황리단길 디저트 카페 십원빵 솔직 후기 경주 여행 필수 코스',
+          publishedAt: '2026.10.26',
+          charCount: 1520,
+          imageCount: 19,
+          gifCount: 0,
+          dwellSeconds: 54,
+          comments: 28,
+          likes: 135,
+          postType: '맛집/여행'
         }
       ];
+
+      // 다른 아이디일 경우 30개 자동 생성
+      let posts: PostAnalysisItem[] = masiningRealPosts;
+      if (!isMasining) {
+        posts = Array.from({ length: 30 }).map((_, idx) => {
+          const pHash = Math.abs(hash + idx * 3571);
+          const chars = 1300 + (pHash % 3200);
+          const imgs = (idx % 2 === 0) ? (12 + (pHash % 14)) : 1;
+          const gifs = (idx % 4 === 0) ? 2 : 0;
+          const status = (idx === 1 && pHash % 4 === 0) ? 'bad' : imgs === 1 && chars > 3000 ? 'warning' : 'good';
+          return {
+            id: `p-${idx + 1}`,
+            status,
+            statusText: status === 'good' ? '정상' : status === 'warning' ? '체류주의' : '누락',
+            title: `[포스팅 #${idx + 1}] ${category} 실사용 솔직 리뷰 및 상세 가이드 정리`,
+            publishedAt: `${Math.floor(idx / 2) + 1}일 전`,
+            charCount: chars,
+            imageCount: imgs,
+            gifCount: gifs,
+            dwellSeconds: Math.round(chars * 0.045 + imgs * 2.5 + gifs * 15),
+            comments: 10 + (pHash % 35),
+            likes: 40 + (pHash % 120),
+            postType: (imgs > 5 ? '맛집/여행' : '경제/재테크') as '맛집/여행' | '경제/재테크',
+            dwellWarning: imgs === 1 && chars > 3000 ? '텍스트 대비 이미지가 1장뿐이라 체류시간 이탈 주의 요망!' : undefined
+          };
+        });
+      }
 
       setBlogData({
         blogId: id,
@@ -860,7 +1172,9 @@ export default function BlogAnalyticsLabPage() {
                     블라이의 기본 분석 지표에 <strong>움짤(GIF) 수</strong>와 <strong>예상 체류시간(초)</strong>을 결합한 정밀 테이블입니다.
                   </p>
                 </div>
-                <span className="text-xs text-slate-400 font-semibold">최근 포스팅 10건 표시</span>
+                <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200">
+                  최근 포스팅 30건 전건 표시 (히트맵 30개 타일과 1:1 매칭)
+                </span>
               </div>
 
               {/* 포스팅 테이블 */}
