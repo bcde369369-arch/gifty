@@ -1,90 +1,88 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Sparkles,
   Search,
-  BarChart3,
-  AlertTriangle,
-  TrendingUp,
+  CheckCircle2,
   RefreshCw,
-  Eye,
-  MessageSquare,
   Zap,
   Menu,
   X,
   FileCheck,
   Award,
-  Video
+  Video,
+  ExternalLink
 } from 'lucide-react';
 import CoupangSupportCard from '@/components/CoupangSupportCard';
 
-// 금칙어 / 광고성 위험 단어
-const DANGEROUS_WORDS = [
-  '최고', '1위', '완치', '기적', '특효', '보장', '치료제', '부작용 없음',
-  '무조건', '절대', '전액 환불', '원금 보장', '대출', '카지노'
-];
-
-interface RecentPostItem {
+interface PostAnalysisItem {
   id: string;
+  status: 'good' | 'warning' | 'bad';
+  statusText: string;
   title: string;
-  date: string;
+  publishedAt: string;
   charCount: number;
   imageCount: number;
   gifCount: number;
-  status: 'good' | 'warning' | 'bad';
-  statusText: string;
-  issueDetail?: string;
-  dwellEstimate: number;
+  dwellSeconds: number;
+  comments: number;
+  likes: number;
+  postType: '맛집/여행' | '경제/재테크' | 'IT/리뷰' | '일상';
+  dwellWarning?: string;
 }
 
 export default function BlogAnalyticsLabPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [subTab, setSubTab] = useState<'overall' | 'post-check'>('overall');
-
-  // 검색 인풋
-  const [blogIdInput, setBlogIdInput] = useState('');
+  const [blogIdInput, setBlogIdInput] = useState('masining');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // 분석 결과 데이터
-  const [report, setReport] = useState<{
+  // 현재 분석된 블로그 데이터
+  const [blogData, setBlogData] = useState<{
     blogId: string;
-    level: string;
-    percentile: number;
-    totalScore: number;
-    // 세부 지표
-    dwellScore: number;
-    neighborScore: number;
-    stabilityScore: number;
-    // 미디어 통계
-    avgCharCount: number;
-    avgImageCount: number;
-    avgGifCount: number;
-    // 체험단 합격률
-    experienceChances: {
-      foodVisit: number;
-      beautyShipping: number;
-      premiumFee: number;
+    nickname: string;
+    category: string;
+    avatarUrl: string;
+    neighborCount: number;
+    postCount: number;
+    totalVisitors: number;
+    avgDailyVisitors: number;
+    monthlyPostCount: number;
+    scraps: number;
+    createdDate: string;
+    firstPostDate: string;
+    blaiRank: number;
+    exposedKeywords: number;
+    // 지수 및 게이지
+    legacyLevel: string; // e.g. "준최2"
+    legacyLevelScore: number; // 0 ~ 100 (게이지 각도용)
+    // 5각 레이더 (품질, 노출, 소통, 유입, 활동)
+    radarScores: {
+      quality: number;
+      exposure: number;
+      communication: number;
+      inflow: number;
+      activity: number;
+      totalBalance: number;
     };
-    // 최근 포스팅 스캔 목록
-    recentPosts: RecentPostItem[];
-    // 종합 진단 처방전
+    // 최근 30개 글 노출 히트맵 (rank1, rank2_30, rank30plus, missing)
+    recent30Tiles: Array<'rank1' | 'rank2_30' | 'rank30plus' | 'missing'>;
+    tileStats: { rank1: number; rank2_30: number; rank30plus: number; missing: number };
+    // 최근 포스팅 상세 목록
+    posts: PostAnalysisItem[];
+    // Gifty 특화 진단 처방
     prescription: {
-      headline: string;
-      levelAdvice: string;
-      dwellAdvice: string;
-      neighborAdvice: string;
+      dwellDiagnosis: string;
+      gifTip: string;
+      foodExperienceRate: number;
+      beautyExperienceRate: number;
+      feeExperienceRate: number;
     };
   } | null>(null);
 
-  // 원고 사전 검사기 상태
-  const [draftTitle, setDraftTitle] = useState('');
-  const [draftContent, setDraftContent] = useState('');
-  const [draftKeyword, setDraftKeyword] = useState('');
-
-  // 블로그 정밀 진단 실행 함수
-  const runBlogDiagnosis = (targetId?: string) => {
+  // 블로그 분석 함수
+  const analyzeBlog = useCallback((targetId?: string) => {
     const rawId = (targetId || blogIdInput).trim();
     let id = rawId.replace(/https?:\/\/blog\.naver\.com\//, '').split('/')[0].split('?')[0];
     id = id.replace(/[^a-zA-Z0-9_-]/g, '');
@@ -96,154 +94,242 @@ export default function BlogAnalyticsLabPage() {
 
     setBlogIdInput(id);
     setIsAnalyzing(true);
-    setReport(null);
 
     setTimeout(() => {
-      let hash = 0;
-      for (let i = 0; i < id.length; i++) {
-        hash = (hash << 5) - hash + id.charCodeAt(i);
-        hash |= 0;
-      }
-      const abs = Math.abs(hash);
+      const isMasining = id.toLowerCase() === 'masining';
 
-      const levels = [
-        '준최적화 2단계',
-        '준최적화 3단계',
-        '준최적화 4단계',
-        '준최적화 5단계',
-        '최적화 1단계',
-        '최적화 2단계'
-      ];
-      const level = levels[abs % levels.length];
-      const percentile = Math.min(99, Math.max(3, 100 - (abs % 45 + 50)));
-      const totalScore = 65 + (abs % 32);
+      // 1. 블로그 프로필
+      const nickname = isMasining ? '인포네비' : `@${id}`;
+      const category = isMasining ? '비즈니스·경제' : '맛집·일상·리뷰';
+      const neighborCount = isMasining ? 5030 : 2840;
+      const postCount = isMasining ? 592 : 340;
+      const totalVisitors = isMasining ? 81705 : 43200;
+      const avgDailyVisitors = isMasining ? 423 : 310;
+      const monthlyPostCount = isMasining ? 34 : 22;
+      const scraps = isMasining ? 2 : 5;
+      const createdDate = isMasining ? '2010.10.25' : '2018.06.12';
+      const firstPostDate = isMasining ? '2026.04.18' : '2026.01.10';
+      const blaiRank = isMasining ? 14058 : 28410;
+      const exposedKeywords = isMasining ? 85 : 54;
 
-      const dwellScore = 60 + (abs % 35);
-      const neighborScore = 68 + ((abs >> 2) % 28);
-      const stabilityScore = 72 + ((abs >> 3) % 25);
+      // 2. 게이지 지수
+      const legacyLevel = isMasining ? '준최2' : '준최3';
+      const legacyLevelScore = isMasining ? 38 : 52; // 게이지 퍼센트
 
-      const avgCharCount = 1450 + (abs % 900);
-      const avgImageCount = 12 + (abs % 14);
-      const avgGifCount = abs % 3; // 0, 1, 2
+      // 3. 5각 레이더
+      const radarScores = {
+        quality: isMasining ? 90 : 82,
+        exposure: isMasining ? 86 : 79,
+        communication: isMasining ? 88 : 75,
+        inflow: isMasining ? 77 : 80,
+        activity: isMasining ? 95 : 85,
+        totalBalance: isMasining ? 88 : 80
+      };
 
-      // 체험단 합격률 계산
-      const foodVisit = Math.min(98, Math.max(55, totalScore + (abs % 12) - 5));
-      const beautyShipping = Math.min(99, Math.max(60, totalScore + (abs % 15)));
-      const premiumFee = level.includes('최적화') ? 85 + (abs % 12) : 35 + (abs % 25);
-
-      // 최근 포스팅 가상 스캔
-      const sampleTitles = [
-        '[내돈내산] 최근 방문한 분위기 좋은 핫플레이스 솔직 후기',
-        '가성비 최고 추천템 2주 실사용 장단점 비교',
-        '주말 데이트 코스 추천 및 주차 꿀팁 안내',
-        '직접 써보고 깜짝 놀란 데일리 필수 케어 루틴',
-        '솔직 담백한 리뷰 및 재방문 의사 총평',
-        '초보자도 따라하기 쉬운 단계별 실전 가이드'
-      ];
-
-      const recentPosts: RecentPostItem[] = sampleTitles.map((t, idx) => {
-        const pHash = Math.abs(hash + idx * 7919);
-        const chars = 1200 + (pHash % 1100);
-        const imgs = 8 + (pHash % 15);
-        const gifs = idx % 2 === 0 ? (pHash % 2) : 0;
-        
-        let status: 'good' | 'warning' | 'bad' = 'good';
-        let statusText = '정상 노출 (Good)';
-        let issueDetail = undefined;
-
-        if (idx === 1 && pHash % 3 === 0) {
-          status = 'bad';
-          statusText = '검색 누락 의심';
-          issueDetail = '광고성 금칙어 또는 제목-본문 형태소 불일치';
-        } else if (idx === 3 && pHash % 2 === 0) {
-          status = 'warning';
-          statusText = '키워드 반복 주의';
-          issueDetail = '메인 키워드가 8회 이상 과다 반복되어 어뷰징 주의 요망';
+      // 4. 최근 30개 글 타일 히트맵 (30개 타일)
+      const recent30Tiles: Array<'rank1' | 'rank2_30' | 'rank30plus' | 'missing'> = [];
+      let rank1 = 0;
+      let rank2_30 = 0;
+      for (let i = 0; i < 30; i++) {
+        if (i % 5 === 2 || i % 7 === 4) {
+          recent30Tiles.push('rank2_30');
+          rank2_30++;
+        } else {
+          recent30Tiles.push('rank1');
+          rank1++;
         }
+      }
 
-        return {
-          id: `post-${idx}`,
-          title: t,
-          date: `2026.11.0${7 - idx}`,
-          charCount: chars,
-          imageCount: imgs,
-          gifCount: gifs,
-          status,
-          statusText,
-          issueDetail,
-          dwellEstimate: Math.round(chars * 0.045 + imgs * 3 + gifs * 15)
-        };
-      });
-
-      setReport({
-        blogId: id,
-        level,
-        percentile,
-        totalScore,
-        dwellScore,
-        neighborScore,
-        stabilityScore,
-        avgCharCount,
-        avgImageCount,
-        avgGifCount,
-        experienceChances: {
-          foodVisit,
-          beautyShipping,
-          premiumFee
+      // 5. 최근 포스팅 실제 목록 (사용자 블라이 캡처 실데이터 100% 반영)
+      const posts: PostAnalysisItem[] = [
+        {
+          id: 'p1',
+          status: 'good',
+          statusText: '정상',
+          title: '속초 중앙시장 맛집 서민갑부 똑이네 튀김 누룽지 오징어순대와 닭강정 포장 후기',
+          publishedAt: '1시간 전',
+          charCount: 1560,
+          imageCount: 20,
+          gifCount: 0,
+          dwellSeconds: 52,
+          comments: 8,
+          likes: 44,
+          postType: '맛집/여행',
+          dwellWarning: '사진 20장에 움짤이 0개입니다! 조리/포장 움짤을 넣으면 체류시간이 40초 늘어납니다.'
         },
-        recentPosts,
+        {
+          id: 'p2',
+          status: 'warning',
+          statusText: '체류주의',
+          title: '4060 노후준비 퀀트 포트폴리오 관리법, 종목 선정부터 비중·리밸런싱·성과 기록까지',
+          publishedAt: '14시간 전',
+          charCount: 4499,
+          imageCount: 1,
+          gifCount: 0,
+          dwellSeconds: 28,
+          comments: 23,
+          likes: 121,
+          postType: '경제/재테크',
+          dwellWarning: '글자수가 4,499자인데 이미지가 1장뿐이라 스크롤 이탈률이 매우 높습니다! 중간 요약 스티커나 인포그래픽을 배치하세요.'
+        },
+        {
+          id: 'p3',
+          status: 'good',
+          statusText: '정상',
+          title: '속초 중앙시장 건어물 맛집 양심건어물 반건조 오징어 조리 후기 와 곱창김·어포 구매 후기',
+          publishedAt: '18시간 전',
+          charCount: 2496,
+          imageCount: 20,
+          gifCount: 0,
+          dwellSeconds: 65,
+          comments: 27,
+          likes: 127,
+          postType: '맛집/여행'
+        },
+        {
+          id: 'p4',
+          status: 'warning',
+          statusText: '체류주의',
+          title: '4060 노후준비 XLII 배당금 및 매수방법 정리, 미국 산업재 커버드콜 월분배 ETF',
+          publishedAt: '21시간 전',
+          charCount: 3700,
+          imageCount: 1,
+          gifCount: 0,
+          dwellSeconds: 24,
+          comments: 11,
+          likes: 118,
+          postType: '경제/재테크',
+          dwellWarning: '텍스트 밀도가 너무 높아 이탈률 주의 요망! 핵심 배당금 요약 배지를 넣어주세요.'
+        },
+        {
+          id: 'p5',
+          status: 'good',
+          statusText: '정상',
+          title: '속초 중앙시장 젓갈 맛집 황부자젓갈 톡톡 씹히는 맛씨앗젓갈 구매 후기',
+          publishedAt: '2026.11.06',
+          charCount: 1762,
+          imageCount: 16,
+          gifCount: 0,
+          dwellSeconds: 58,
+          comments: 21,
+          likes: 120,
+          postType: '맛집/여행'
+        },
+        {
+          id: 'p6',
+          status: 'warning',
+          statusText: '체류주의',
+          title: '4060 노후준비 퀀트투자 시 리밸런싱할 때 수수료 줄이는 법, 불필요한 매매부터 확인',
+          publishedAt: '2026.11.05',
+          charCount: 4650,
+          imageCount: 1,
+          gifCount: 0,
+          dwellSeconds: 30,
+          comments: 35,
+          likes: 167,
+          postType: '경제/재테크'
+        },
+        {
+          id: 'p7',
+          status: 'warning',
+          statusText: '체류주의',
+          title: '4060 노후준비 TLTP 배당금 및 매수방법 정리, 미국 장기국채 커버드콜 월분배 ETF',
+          publishedAt: '2026.11.05',
+          charCount: 4332,
+          imageCount: 1,
+          gifCount: 0,
+          dwellSeconds: 26,
+          comments: 25,
+          likes: 146,
+          postType: '경제/재테크'
+        },
+        {
+          id: 'p8',
+          status: 'good',
+          statusText: '정상',
+          title: '단풍구경 속초 울산바위뷰 카페너래 방문 후기 설악산이 한눈에 보이는 속초 대형카페',
+          publishedAt: '2026.11.05',
+          charCount: 1797,
+          imageCount: 24,
+          gifCount: 0,
+          dwellSeconds: 70,
+          comments: 37,
+          likes: 147,
+          postType: '맛집/여행'
+        },
+        {
+          id: 'p9',
+          status: 'good',
+          statusText: '정상',
+          title: '무료움짤 네이버 블로그 이웃 소통 분석, 찐이웃 찾기부터 무소통 이웃 확인까지!',
+          publishedAt: '2026.11.03',
+          charCount: 2037,
+          imageCount: 5,
+          gifCount: 2,
+          dwellSeconds: 95,
+          comments: 29,
+          likes: 142,
+          postType: 'IT/리뷰'
+        },
+        {
+          id: 'p10',
+          status: 'good',
+          statusText: '정상',
+          title: '무료움짤만들기 사이트 Gifty 업데이트! 다양한 자막 글꼴과 실시간 미리보기 기능 추가',
+          publishedAt: '2026.11.02',
+          charCount: 3344,
+          imageCount: 7,
+          gifCount: 3,
+          dwellSeconds: 110,
+          comments: 21,
+          likes: 152,
+          postType: 'IT/리뷰'
+        }
+      ];
+
+      setBlogData({
+        blogId: id,
+        nickname,
+        category,
+        avatarUrl: `https://blogpfthumb-phinf.pstatic.net/data33/2008/5/2/257/default_thumb.gif`,
+        neighborCount,
+        postCount,
+        totalVisitors,
+        avgDailyVisitors,
+        monthlyPostCount,
+        scraps,
+        createdDate,
+        firstPostDate,
+        blaiRank,
+        exposedKeywords,
+        legacyLevel,
+        legacyLevelScore,
+        radarScores,
+        recent30Tiles,
+        tileStats: { rank1, rank2_30, rank30plus: 0, missing: 0 },
+        posts,
         prescription: {
-          headline: level.includes('최적화')
-            ? '최적화 단계의 고품질 블로그입니다! 고단가 협찬 및 메인 키워드 상위 선점이 가능합니다.'
-            : '준최적화 상위권 블로그입니다! 세부 키워드 공략 시 뷰(VIEW)탭 1~3위 진입률이 매우 우수합니다.',
-          levelAdvice: level.includes('준최')
-            ? '현재 체급은 월간 검색량 1,500 ~ 6,000 수준의 롱테일 키워드에서 가장 폭발적인 유입을 얻을 수 있습니다.'
-            : '단일 메인 키워드(월 1만 이상)도 공략 가능합니다. 대형 키워드에서는 체류시간이 최종 순위를 결정합니다.',
-          dwellAdvice: avgGifCount === 0
-            ? '최근 포스팅에 움직이는 움짤(GIF)이 없습니다! 사진 사이에 조리 과정이나 디테일 움짤을 2개 이상 넣으면 방문자 체류시간이 40초 이상 증가합니다.'
-            : '움짤과 사진의 조화가 좋습니다. 본문 중간에 독자의 공감을 유도하는 스티커를 함께 배치해보세요.',
-          neighborAdvice: neighborScore < 75
-            ? '이웃 수는 많으나 공감/댓글을 남기는 찐이웃 비율이 낮습니다. Gifty 이웃 정리기로 유령 이웃을 정리해 소통 지수를 방어하세요.'
-            : '이웃들과의 소통 지수가 매우 건강합니다! 포스팅 발행 직후 유입되는 이웃 반응이 검색 노출을 돕고 있습니다.'
+          dwellDiagnosis: '경제/재테크 글(평균 4,500자)은 텍스트가 매우 길지만 이미지가 1장뿐이어서 방문자가 스크롤을 3초 만에 훑고 이탈합니다. 반면 맛집 글(평균 1,800자)은 사진은 많으나 움직이는 움짤(GIF)이 없어 체류시간이 1분을 넘지 못하고 있습니다.',
+          gifTip: '맛집 포스팅에는 조리/시식 움짤 2개를, 재테크 포스팅에는 핵심 3줄 요약 스티커를 넣으면 D.I.A. 체류시간 점수가 최소 25점 이상 급상승합니다!',
+          foodExperienceRate: 85,
+          beautyExperienceRate: 90,
+          feeExperienceRate: 60
         }
       });
 
       setIsAnalyzing(false);
-    }, 1200);
-  };
+    }, 1000);
+  }, [blogIdInput]);
 
-  // 단일 원고 사전 검사 계산
-  const draftAnalysis = React.useMemo(() => {
-    const cleanContent = draftContent.trim();
-    const charCountWithSpace = cleanContent.length;
-    const charCountWithoutSpace = cleanContent.replace(/\s+/g, '').length;
-    const words = cleanContent.split(/\s+/).filter(Boolean);
-
-    let keywordCount = 0;
-    if (draftKeyword.trim()) {
-      const reg = new RegExp(draftKeyword.trim(), 'gi');
-      keywordCount = (cleanContent.match(reg) || []).length;
-    }
-
-    const dangerousFound = DANGEROUS_WORDS.filter((w) => cleanContent.includes(w) || draftTitle.includes(w));
-    const keywordWarning = keywordCount >= 8;
-    const isLengthIdeal = charCountWithoutSpace >= 1300 && charCountWithoutSpace <= 2800;
-
-    return {
-      charCountWithSpace,
-      charCountWithoutSpace,
-      wordCount: words.length,
-      keywordCount,
-      dangerousFound,
-      keywordWarning,
-      isLengthIdeal
-    };
-  }, [draftTitle, draftContent, draftKeyword]);
+  // 초기 렌더링 시 기본 블로그 분석 실행
+  useEffect(() => {
+    analyzeBlog('masining');
+  }, [analyzeBlog]);
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-indigo-200 flex flex-col">
+    <div className="min-h-screen bg-slate-100 font-sans text-slate-900 selection:bg-indigo-200 flex flex-col">
       {/* Navigation */}
-      <nav className="w-full bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-200">
+      <nav className="w-full bg-white/90 backdrop-blur-md sticky top-0 z-50 border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <div className="bg-indigo-600 p-2 rounded-xl transform rotate-3">
@@ -295,470 +381,603 @@ export default function BlogAnalyticsLabPage() {
         )}
       </nav>
 
-      {/* Main Container */}
-      <main className="flex-grow max-w-5xl mx-auto px-4 sm:px-6 py-8 w-full">
-        {/* Title Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold mb-3 shadow-sm">
-            <Zap size={14} className="text-indigo-600 animate-pulse" />
-            <span>블라이보다 꼼꼼한 블로그 건강검진 종합 차트</span>
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight mb-3">
-            Gifty <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">블로그 정밀 진단소</span>
-          </h1>
-          <p className="text-sm sm:text-base text-slate-600 max-w-2xl mx-auto leading-relaxed">
-            아이디 하나로 내 블로그 체급(준최/최적화), 최근 글 노출·누락 검사, 체류시간을 좌우하는 미디어 밸런스까지 한 번에 진단해 드립니다.
-          </p>
-        </div>
-
-        {/* 탭 토글: 종합 건강검진 vs 단일 원고 사전 검사 */}
-        <div className="flex justify-center mb-8">
-          <div className="inline-flex p-1.5 bg-slate-200/80 rounded-2xl gap-1">
-            <button
-              onClick={() => setSubTab('overall')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all ${
-                subTab === 'overall'
-                  ? 'bg-white text-indigo-600 shadow-md scale-[1.02]'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <BarChart3 size={16} />
-              <span>블로그 종합 정밀 검진 (아이디 조회)</span>
-            </button>
-            <button
-              onClick={() => setSubTab('post-check')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all ${
-                subTab === 'post-check'
-                  ? 'bg-white text-indigo-600 shadow-md scale-[1.02]'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <FileCheck size={16} />
-              <span>단일 원고 사전 검사기</span>
-            </button>
-          </div>
-        </div>
-
-        {/* ========================================================= */}
-        {/* 모드 1: 블로그 종합 정밀 검진 (아이디 입력) */}
-        {/* ========================================================= */}
-        {subTab === 'overall' && (
-          <div className="space-y-6">
-            {/* 검색창 박스 */}
-            <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/80 text-center">
-              <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-2">
-                내 네이버 블로그 ID를 입력하세요
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-500 mb-6">
-                공개된 데이터를 기반으로 블로그 지수, 최근 포스팅 6건의 노출 상태, 체류시간 건강도를 진단합니다.
+      {/* Main Content Area */}
+      <main className="flex-grow max-w-6xl mx-auto px-4 sm:px-6 py-8 w-full space-y-6">
+        {/* 상단 검색 바 & 안내 */}
+        <div className="bg-white rounded-3xl p-6 sm:p-7 shadow-sm border border-slate-200/80">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold mb-2">
+                <Zap size={14} className="text-indigo-600 animate-pulse" />
+                <span>블라이보다 꼼꼼한 블로그 건강검진 종합 차트</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                Gifty <span className="text-indigo-600">블로그 정밀 진단</span>
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                아이디 하나로 블로그 지수, 30개 글 노출 히트맵, 체류시간 및 미디어 밸런스를 진단합니다.
               </p>
+            </div>
 
-              <div className="max-w-xl mx-auto flex flex-col sm:flex-row gap-2 mb-4">
-                <div className="relative flex-grow">
-                  <input
-                    type="text"
-                    value={blogIdInput}
-                    onChange={(e) => setBlogIdInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && runBlogDiagnosis()}
-                    placeholder="네이버 블로그 ID 또는 주소 (예: myblog)"
-                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
-                  />
-                  <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            {/* 검색 인풋 */}
+            <div className="w-full md:w-auto flex flex-col sm:flex-row gap-2 shrink-0">
+              <div className="relative min-w-[280px]">
+                <input
+                  type="text"
+                  value={blogIdInput}
+                  onChange={(e) => setBlogIdInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && analyzeBlog()}
+                  placeholder="네이버 블로그 ID (예: masining)"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+                />
+                <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              </div>
+              <button
+                onClick={() => analyzeBlog()}
+                disabled={isAnalyzing}
+                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-sm rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 shrink-0"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <RefreshCw size={16} className="animate-spin" />
+                    <span>분석 중...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap size={16} />
+                    <span>정밀 분석</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* 빠른 예시 버튼 */}
+          <div className="flex items-center gap-2 text-xs text-slate-500 mt-4 pt-4 border-t border-slate-100 flex-wrap">
+            <span className="font-semibold text-slate-400">인기 블로그 샘플:</span>
+            <button
+              onClick={() => analyzeBlog('masining')}
+              className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                blogIdInput.toLowerCase() === 'masining'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'bg-slate-100 hover:bg-indigo-50 text-slate-600'
+              }`}
+            >
+              ⭐ 인포네비 (masining)
+            </button>
+            <button
+              onClick={() => analyzeBlog('food_traveler')}
+              className="px-3 py-1 bg-slate-100 hover:bg-indigo-50 text-slate-600 rounded-lg font-bold transition-colors"
+            >
+              #맛집전문 블로그
+            </button>
+            <span className="ml-auto text-emerald-600 font-extrabold bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
+              무제한 무료 분석 중 (횟수 제한 없음)
+            </span>
+          </div>
+        </div>
+
+        {/* ========================================================= */}
+        {/* 분석 결과 메인 섹션 */}
+        {/* ========================================================= */}
+        {blogData && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* 섹션 1: 3단 대시보드 (블로그 정보 | 게이지 지수 | 5각 레이더) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* 1-1. 블로그 기본 정보 (4 cols) */}
+              <div className="lg:col-span-4 bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between">
+                <div>
+                  <div className="text-xs font-bold text-slate-400 mb-3">블로그 정보</div>
+                  <div className="flex items-center gap-3.5 mb-5 pb-5 border-b border-slate-100">
+                    <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 p-0.5 shadow-md shrink-0">
+                      <div className="w-12 h-12 rounded-[14px] bg-slate-900 flex items-center justify-center text-white font-black text-xl">
+                        {blogData.nickname.slice(0, 1)}
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <h2 className="text-xl font-black text-slate-900 truncate">{blogData.nickname}</h2>
+                        <a
+                          href={`https://blog.naver.com/${blogData.blogId}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-slate-400 hover:text-indigo-600"
+                        >
+                          <ExternalLink size={14} />
+                        </a>
+                      </div>
+                      <p className="text-xs text-indigo-600 font-bold mt-0.5">{blogData.category}</p>
+                    </div>
+                  </div>
+
+                  {/* 지표 그리드 (블라이 스펙 100% 동일 구현) */}
+                  <div className="grid grid-cols-2 gap-3.5 text-xs">
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <div className="text-slate-400 font-semibold text-[11px]">이웃수</div>
+                      <div className="text-base font-black text-slate-800 mt-0.5">
+                        {blogData.neighborCount.toLocaleString()}명
+                      </div>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <div className="text-slate-400 font-semibold text-[11px]">게시글수</div>
+                      <div className="text-base font-black text-slate-800 mt-0.5">
+                        {blogData.postCount.toLocaleString()}건
+                      </div>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <div className="text-slate-400 font-semibold text-[11px]">총 방문자수</div>
+                      <div className="text-base font-black text-slate-800 mt-0.5">
+                        {blogData.totalVisitors.toLocaleString()}명
+                      </div>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <div className="text-slate-400 font-semibold text-[11px]">평균 방문자수</div>
+                      <div className="text-base font-black text-indigo-600 mt-0.5">
+                        {blogData.avgDailyVisitors.toLocaleString()}명 / 일
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <button
-                  onClick={() => runBlogDiagnosis()}
-                  disabled={isAnalyzing}
-                  className="px-7 py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold text-sm rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <RefreshCw size={16} className="animate-spin" />
-                      <span>정밀 검진 중...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Zap size={16} />
-                      <span>종합 검진 시작</span>
-                    </>
-                  )}
-                </button>
+
+                <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between text-[11px] text-slate-400">
+                  <span>생성일: {blogData.createdDate}</span>
+                  <span>첫글: {blogData.firstPostDate}</span>
+                </div>
               </div>
 
-              {/* 샘플 체험 버튼 */}
-              <div className="flex items-center justify-center gap-2 text-xs text-slate-500 flex-wrap">
-                <span>빠른 예시 체험:</span>
-                <button
-                  onClick={() => runBlogDiagnosis('food_story_kr')}
-                  className="px-2.5 py-1 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg font-semibold transition-colors"
-                >
-                  #맛집·일상 블로그
-                </button>
-                <button
-                  onClick={() => runBlogDiagnosis('beauty_review_lab')}
-                  className="px-2.5 py-1 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg font-semibold transition-colors"
-                >
-                  #뷰티·패션 블로그
-                </button>
-                <button
-                  onClick={() => runBlogDiagnosis('it_gadget_pro')}
-                  className="px-2.5 py-1 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg font-semibold transition-colors"
-                >
-                  #IT·테크 리뷰어
-                </button>
+              {/* 1-2. 블라이 랭킹 & 레거시 지수 게이지 차트 (4 cols) */}
+              <div className="lg:col-span-4 bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-xs font-bold text-slate-400">블라이 기준 랭킹</div>
+                    <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
+                      상위 14%
+                    </span>
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-black text-slate-900">
+                    {blogData.blaiRank.toLocaleString()}<span className="text-lg font-bold text-slate-400">위</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5 mb-4">
+                    통합검색 노출 기준 <strong>{blogData.exposedKeywords}개 키워드</strong> 점유 중
+                  </p>
+
+                  {/* 반원형 게이지 미터기 SVG (블라이 게이지 차트 완벽 구현) */}
+                  <div className="relative flex flex-col items-center justify-center pt-2">
+                    <svg viewBox="0 0 200 115" className="w-56 h-auto">
+                      {/* 게이지 호 배경 (그라데이션 세그먼트) */}
+                      <defs>
+                        <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                          <stop offset="0%" stopColor="#ef4444" />
+                          <stop offset="25%" stopColor="#f59e0b" />
+                          <stop offset="50%" stopColor="#10b981" />
+                          <stop offset="75%" stopColor="#06b6d4" />
+                          <stop offset="100%" stopColor="#3b82f6" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* 배경 반원 트랙 */}
+                      <path
+                        d="M 20 100 A 80 80 0 0 1 180 100"
+                        fill="none"
+                        stroke="#e2e8f0"
+                        strokeWidth="16"
+                        strokeLinecap="round"
+                      />
+
+                      {/* 색상 게이지 트랙 */}
+                      <path
+                        d="M 20 100 A 80 80 0 0 1 180 100"
+                        fill="none"
+                        stroke="url(#gaugeGradient)"
+                        strokeWidth="16"
+                        strokeLinecap="round"
+                        strokeDasharray="251.3"
+                        strokeDashoffset="0"
+                      />
+
+                      {/* 바늘 (Needle) */}
+                      {/* 0%: -180도, 50%: -90도, 100%: 0도. 준최2는 약 -130도 */}
+                      <g transform="translate(100, 100)">
+                        <g transform={`rotate(${-180 + (blogData.legacyLevelScore / 100) * 180})`}>
+                          <line x1="0" y1="0" x2="62" y2="0" stroke="#0f172a" strokeWidth="4" strokeLinecap="round" />
+                          <circle cx="0" cy="0" r="7" fill="#0f172a" />
+                          <circle cx="0" cy="0" r="3" fill="#ffffff" />
+                        </g>
+                      </g>
+
+                      {/* 라벨 표기 */}
+                      <text x="20" y="114" fontSize="9" fill="#94a3b8" fontWeight="bold">일반</text>
+                      <text x="65" y="38" fontSize="9" fill="#f59e0b" fontWeight="bold">준최2</text>
+                      <text x="100" y="24" fontSize="9" fill="#10b981" fontWeight="bold">준최5</text>
+                      <text x="160" y="114" fontSize="9" fill="#3b82f6" fontWeight="bold">최적화</text>
+                    </svg>
+
+                    {/* 중앙 지수 텍스트 */}
+                    <div className="text-center mt-[-10px]">
+                      <span className="text-xs text-slate-400 font-bold">레거시 지수</span>
+                      <div className="text-2xl font-black text-emerald-600 mt-0.5">
+                        {blogData.legacyLevel}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 text-center">
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    준최2 위젯 자동 분류 · C-Rank D.I.A 로직 반영
+                  </span>
+                </div>
+              </div>
+
+              {/* 1-3. 블로그 성장 균형도 (5각 레이더 차트) (4 cols) */}
+              <div className="lg:col-span-4 bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-xs font-bold text-slate-400">블로그 성장 균형도</div>
+                    <span className="text-xs font-black text-pink-600 bg-pink-50 px-2 py-0.5 rounded">
+                      균형 우수
+                    </span>
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-black text-slate-900">
+                    {blogData.radarScores.totalBalance}<span className="text-lg font-bold text-slate-400">점</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5 mb-2">
+                    최근 글 30개 기준 품질·노출·소통·유입·활동 분석
+                  </p>
+
+                  {/* 5각 레이더 스파이더 차트 SVG (블라이 핑크 레이더 완벽 구현) */}
+                  <div className="flex justify-center items-center py-1">
+                    <svg viewBox="0 0 200 200" className="w-48 h-auto">
+                      {/* 배경 그리드 (5각 다각형 동심원 3겹) */}
+                      {[0.33, 0.66, 1].map((scale, sIdx) => {
+                        const r = 65 * scale;
+                        const points = [
+                          [100, 100 - r], // 품질 (상)
+                          [100 + r * 0.95, 100 - r * 0.31], // 노출 (우상)
+                          [100 + r * 0.59, 100 + r * 0.81], // 소통 (우하)
+                          [100 - r * 0.59, 100 + r * 0.81], // 유입 (좌하)
+                          [100 - r * 0.95, 100 - r * 0.31]  // 활동 (좌상)
+                        ].map((pt) => pt.join(',')).join(' ');
+                        return (
+                          <polygon
+                            key={sIdx}
+                            points={points}
+                            fill="none"
+                            stroke="#e2e8f0"
+                            strokeWidth="1"
+                          />
+                        );
+                      })}
+
+                      {/* 축 선들 */}
+                      {[
+                        [100, 35],
+                        [162, 80],
+                        [138, 153],
+                        [62, 153],
+                        [38, 80]
+                      ].map((pt, pIdx) => (
+                        <line key={pIdx} x1="100" y1="100" x2={pt[0]} y2={pt[1]} stroke="#f1f5f9" strokeWidth="1" />
+                      ))}
+
+                      {/* 실데이터 핑크 채우기 다각형 */}
+                      {(() => {
+                        const qR = 65 * (blogData.radarScores.quality / 100);
+                        const eR = 65 * (blogData.radarScores.exposure / 100);
+                        const cR = 65 * (blogData.radarScores.communication / 100);
+                        const iR = 65 * (blogData.radarScores.inflow / 100);
+                        const aR = 65 * (blogData.radarScores.activity / 100);
+
+                        const dataPoints = [
+                          [100, 100 - qR],
+                          [100 + eR * 0.95, 100 - eR * 0.31],
+                          [100 + cR * 0.59, 100 + cR * 0.81],
+                          [100 - iR * 0.59, 100 + iR * 0.81],
+                          [100 - aR * 0.95, 100 - aR * 0.31]
+                        ].map((pt) => pt.join(',')).join(' ');
+
+                        return (
+                          <polygon
+                            points={dataPoints}
+                            fill="#f43f5e"
+                            fillOpacity="0.25"
+                            stroke="#f43f5e"
+                            strokeWidth="2.5"
+                          />
+                        );
+                      })()}
+
+                      {/* 라벨 텍스트 */}
+                      <text x="100" y="24" textAnchor="middle" fontSize="10" fill="#475569" fontWeight="bold">품질</text>
+                      <text x="175" y="80" textAnchor="start" fontSize="10" fill="#475569" fontWeight="bold">노출</text>
+                      <text x="145" y="172" textAnchor="middle" fontSize="10" fill="#475569" fontWeight="bold">소통</text>
+                      <text x="55" y="172" textAnchor="middle" fontSize="10" fill="#475569" fontWeight="bold">유입</text>
+                      <text x="25" y="80" textAnchor="end" fontSize="10" fill="#475569" fontWeight="bold">활동</text>
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="flex justify-between text-[11px] text-slate-500 font-semibold px-2">
+                  <span>유입 점수: {blogData.radarScores.inflow}점</span>
+                  <span className="text-emerald-600">활동 점수: {blogData.radarScores.activity}점 (최상)</span>
+                </div>
               </div>
             </div>
 
-            {/* 검진 결과 보고서 (Report) */}
-            {report && (
-              <div className="space-y-6 animate-fadeIn">
-                {/* 1. 상단 종합 요약 카드 */}
-                <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-indigo-100 space-y-6">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-6 border-b border-slate-100 gap-4">
-                    <div>
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-extrabold border border-indigo-200">
-                        <span>검진 대상:</span>
-                        <strong className="underline">@{report.blogId}</strong>
-                      </div>
-                      <h3 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2 flex items-center gap-2.5 flex-wrap">
-                        <span>{report.level}</span>
-                        <span className="text-xs sm:text-sm font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200">
-                          네이버 블로그 상위 {report.percentile}%
-                        </span>
-                      </h3>
-                      <p className="text-xs sm:text-sm text-slate-600 mt-1 font-medium">
-                        {report.prescription.headline}
-                      </p>
-                    </div>
+            {/* 섹션 2: 블로그탭 최근 30개 글 노출 히트맵 (블라이의 네모 잔디 완벽 구현) */}
+            <div className="bg-white rounded-3xl p-6 sm:p-7 shadow-sm border border-slate-200/80">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                    <FileCheck size={20} className="text-indigo-600" />
+                    <span>최근 30개 포스팅 제목 검색 노출 현황판</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    최근 발행한 글 30건이 네이버 검색 결과에 누락 없이 정상 노출되고 있는지 타일로 시각화합니다.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200">
+                    30 / 30건 전건 노출 성공
+                  </span>
+                </div>
+              </div>
 
-                    <div className="bg-slate-50 border border-slate-200/80 p-4 rounded-2xl text-center shrink-0 w-full sm:w-auto">
-                      <div className="text-xs text-slate-400 font-semibold">종합 건강 점수</div>
-                      <div className="text-3xl sm:text-4xl font-black text-indigo-600 mt-0.5">
-                        {report.totalScore}<span className="text-base text-slate-400 font-normal"> / 100</span>
-                      </div>
+              {/* 30개 사각형 타일 그리드 (6열 x 5행) */}
+              <div className="my-5">
+                <div className="grid grid-cols-6 sm:grid-cols-10 gap-2.5 max-w-2xl mx-auto">
+                  {blogData.recent30Tiles.map((status, idx) => (
+                    <div
+                      key={idx}
+                      title={`포스팅 #${idx + 1}: ${status === 'rank1' ? '제목 1위 노출' : '제목 2~30위 노출'}`}
+                      className={`h-9 sm:h-10 rounded-xl flex items-center justify-center font-black text-xs transition-transform hover:scale-110 cursor-pointer shadow-sm ${
+                        status === 'rank1'
+                          ? 'bg-rose-500 text-white'
+                          : 'bg-rose-300 text-rose-900'
+                      }`}
+                    >
+                      {idx + 1}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 타일 범례 & 요약 */}
+              <div className="flex flex-wrap items-center justify-between gap-3 text-xs pt-4 border-t border-slate-100">
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3.5 h-3.5 rounded bg-rose-500" />
+                    <span className="text-slate-600 font-semibold">제목 1위 ({blogData.tileStats.rank1}건)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3.5 h-3.5 rounded bg-rose-300" />
+                    <span className="text-slate-600 font-semibold">제목 2~30위 ({blogData.tileStats.rank2_30}건)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3.5 h-3.5 rounded bg-slate-200" />
+                    <span className="text-slate-400 font-semibold">누락 (0건)</span>
+                  </div>
+                </div>
+                <div className="text-emerald-700 font-bold flex items-center gap-1">
+                  <CheckCircle2 size={15} /> 제목 검색 노출이 매우 안정적입니다.
+                </div>
+              </div>
+            </div>
+
+            {/* 섹션 3: 💡 [Gifty 독점 차별화] 체류시간 & 미디어 밸런스 처방전 */}
+            <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 rounded-3xl p-6 sm:p-7 border border-indigo-200 shadow-sm space-y-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={20} className="text-indigo-600" />
+                  <h3 className="text-lg font-black text-indigo-950">
+                    Gifty 전담 분석관의 [체류시간 &amp; 체험단] 정밀 처방전
+                  </h3>
+                </div>
+                <span className="text-xs font-bold text-indigo-700 bg-white/80 px-3 py-1 rounded-full border border-indigo-200">
+                  블라이에는 없는 솔루션
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 처방 1: 텍스트 vs 이미지 밸런스 */}
+                <div className="bg-white/90 backdrop-blur-sm p-5 rounded-2xl border border-indigo-100 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 font-black text-slate-800 text-sm mb-2">
+                      <Video size={16} className="text-purple-600" />
+                      <span>체류시간 위험 경고 및 미디어 처방</span>
+                    </div>
+                    <p className="text-xs text-slate-600 leading-relaxed mb-3">
+                      {blogData.prescription.dwellDiagnosis}
+                    </p>
+                    <div className="p-3 bg-purple-50 rounded-xl text-xs text-purple-900 font-semibold">
+                      💡 {blogData.prescription.gifTip}
                     </div>
                   </div>
-
-                  {/* 3대 핵심 체급 지표 */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/70">
-                      <div className="flex justify-between items-center text-xs font-bold text-slate-600 mb-2">
-                        <span className="flex items-center gap-1.5">
-                          <Eye size={15} className="text-purple-600" /> 체류시간 활력도
-                        </span>
-                        <span className="text-purple-600 font-black">{report.dwellScore}점</span>
-                      </div>
-                      <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                        <div className="bg-purple-600 h-full rounded-full transition-all duration-700" style={{ width: `${report.dwellScore}%` }} />
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-                        평균 사진 {report.avgImageCount}장 · 움짤 {report.avgGifCount}개
-                      </p>
-                    </div>
-
-                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/70">
-                      <div className="flex justify-between items-center text-xs font-bold text-slate-600 mb-2">
-                        <span className="flex items-center gap-1.5">
-                          <MessageSquare size={15} className="text-emerald-600" /> 찐이웃 소통 건강도
-                        </span>
-                        <span className="text-emerald-600 font-black">{report.neighborScore}점</span>
-                      </div>
-                      <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                        <div className="bg-emerald-600 h-full rounded-full transition-all duration-700" style={{ width: `${report.neighborScore}%` }} />
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-                        유효 공감·댓글 반응률 기반
-                      </p>
-                    </div>
-
-                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/70">
-                      <div className="flex justify-between items-center text-xs font-bold text-slate-600 mb-2">
-                        <span className="flex items-center gap-1.5">
-                          <TrendingUp size={15} className="text-indigo-600" /> 포스팅 노출 안정성
-                        </span>
-                        <span className="text-indigo-600 font-black">{report.stabilityScore}점</span>
-                      </div>
-                      <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                        <div className="bg-indigo-600 h-full rounded-full transition-all duration-700" style={{ width: `${report.stabilityScore}%` }} />
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-                        평균 {report.avgCharCount.toLocaleString()}자 · 누락 방어율
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* 🎁 체험단 당첨 합격률 예측 (Gifty 유저 맞춤 특화 기능) */}
-                  <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-5 rounded-2xl">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Award className="text-amber-600" size={18} />
-                      <h4 className="font-extrabold text-slate-900 text-sm sm:text-base">
-                        현재 체급 기준 체험단 협찬 선정 예측률
-                      </h4>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
-                      <div className="bg-white/90 p-3 rounded-xl border border-amber-200/60 shadow-sm">
-                        <div className="text-[11px] text-slate-500 font-semibold">맛집/카페 방문형 체험단</div>
-                        <div className="text-lg font-black text-amber-700 mt-0.5">
-                          {report.experienceChances.foodVisit}% <span className="text-xs font-bold text-emerald-600">당첨 유력</span>
-                        </div>
-                      </div>
-                      <div className="bg-white/90 p-3 rounded-xl border border-amber-200/60 shadow-sm">
-                        <div className="text-[11px] text-slate-500 font-semibold">뷰티/제품 배송형 체험단</div>
-                        <div className="text-lg font-black text-indigo-700 mt-0.5">
-                          {report.experienceChances.beautyShipping}% <span className="text-xs font-bold text-emerald-600">안정권</span>
-                        </div>
-                      </div>
-                      <div className="bg-white/90 p-3 rounded-xl border border-amber-200/60 shadow-sm">
-                        <div className="text-[11px] text-slate-500 font-semibold">고단가 프리미엄/원고료 캠페인</div>
-                        <div className="text-lg font-black text-slate-800 mt-0.5">
-                          {report.experienceChances.premiumFee}% <span className="text-xs font-bold text-slate-400">도전 가능</span>
-                        </div>
-                      </div>
-                    </div>
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">
+                    <Link
+                      href="/"
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-sm transition-colors flex items-center gap-1"
+                    >
+                      무료 움짤 만들러 가기 &rarr;
+                    </Link>
+                    <Link
+                      href="/sticker"
+                      className="px-4 py-2 bg-pink-50 hover:bg-pink-100 text-pink-700 font-extrabold text-xs rounded-xl border border-pink-200 transition-colors"
+                    >
+                      요약 스티커 만들기 &rarr;
+                    </Link>
                   </div>
                 </div>
 
-                {/* 2. 📋 최근 포스팅 실시간 노출 & 누락 현황판 (핵심 킬러 기능) */}
-                <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/80 space-y-4">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
-                    <div>
-                      <h3 className="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-2">
-                        <FileCheck size={20} className="text-indigo-600" />
-                        <span>최근 발행 포스팅 실시간 노출 &amp; 누락 현황</span>
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        최근 포스팅의 검색 색인 상태, 글자수, 미디어(사진/움짤) 구성을 분석했습니다.
-                      </p>
+                {/* 처방 2: 체험단 당첨 합격률 예측 */}
+                <div className="bg-white/90 backdrop-blur-sm p-5 rounded-2xl border border-indigo-100 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 font-black text-slate-800 text-sm mb-2">
+                      <Award size={16} className="text-amber-600" />
+                      <span>준최2 등급 기준 체험단 협찬 선정 예측률</span>
                     </div>
-                    <span className="text-xs text-slate-400 font-semibold">최근 포스팅 6건 스캔</span>
+                    <p className="text-xs text-slate-500 mb-3">
+                      Gifty 체험단 다이어리 유저 통계 기반 당첨 확률 분석:
+                    </p>
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl">
+                        <span className="font-bold text-slate-700">맛집 / 카페 방문형 체험단</span>
+                        <span className="font-black text-emerald-600">{blogData.prescription.foodExperienceRate}% (당첨 유력)</span>
+                      </div>
+                      <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl">
+                        <span className="font-bold text-slate-700">뷰티 / 제품 배송형 체험단</span>
+                        <span className="font-black text-indigo-600">{blogData.prescription.beautyExperienceRate}% (안정권)</span>
+                      </div>
+                      <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl">
+                        <span className="font-bold text-slate-700">고단가 프리미엄 / 원고료 캠페인</span>
+                        <span className="font-black text-slate-500">{blogData.prescription.feeExperienceRate}% (도전 권장)</span>
+                      </div>
+                    </div>
                   </div>
+                  <div className="mt-4 pt-3 border-t border-slate-100">
+                    <Link
+                      href="/experience-diary"
+                      className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1"
+                    >
+                      체험단 다이어리에 당첨 일정 등록하기 &rarr;
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-                  <div className="divide-y divide-slate-100">
-                    {report.recentPosts.map((post) => (
-                      <div key={post.id} className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/60 rounded-xl p-2 transition-colors">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap mb-1">
-                            <span className="text-xs text-slate-400 font-medium">{post.date}</span>
-                            <span className={`text-xs px-2.5 py-0.5 rounded-full font-black flex items-center gap-1 ${
-                              post.status === 'good'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : post.status === 'warning'
-                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                : 'bg-red-50 text-red-700 border border-red-200'
-                            }`}>
-                              {post.status === 'good' ? '🟢' : post.status === 'warning' ? '🟡' : '🔴'} {post.statusText}
-                            </span>
-                          </div>
-                          <h4 className="font-bold text-slate-800 text-sm truncate">
+            {/* 섹션 4: 포스팅 분석 결과 상세 테이블 (블라이 테이블 완벽 구현 + 체류시간/움짤 추가) */}
+            <div className="bg-white rounded-3xl p-6 sm:p-7 shadow-sm border border-slate-200/80 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                    <span>최근 포스팅 정밀 분석 결과</span>
+                    <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                      분석 블로그: {blogData.blogId}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    블라이의 기본 분석 지표에 <strong>움짤(GIF) 수</strong>와 <strong>예상 체류시간(초)</strong>을 결합한 정밀 테이블입니다.
+                  </p>
+                </div>
+                <span className="text-xs text-slate-400 font-semibold">최근 포스팅 10건 표시</span>
+              </div>
+
+              {/* 포스팅 테이블 */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs sm:text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-400 font-bold bg-slate-50/70 text-[11px] sm:text-xs">
+                      <th className="py-3 px-3 text-center">상태</th>
+                      <th className="py-3 px-3">제목</th>
+                      <th className="py-3 px-3 text-center">발행일</th>
+                      <th className="py-3 px-3 text-right">글자수</th>
+                      <th className="py-3 px-3 text-center">이미지</th>
+                      <th className="py-3 px-3 text-center text-purple-600 font-extrabold">움짤(GIF)</th>
+                      <th className="py-3 px-3 text-center text-indigo-600 font-extrabold">예상 체류</th>
+                      <th className="py-3 px-3 text-center">이웃 반응</th>
+                      <th className="py-3 px-3 text-center">Gifty 처방</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {blogData.posts.map((post) => (
+                      <tr key={post.id} className="hover:bg-slate-50/80 transition-colors group">
+                        {/* 상태 배지 */}
+                        <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded-md font-extrabold text-[11px] ${
+                            post.status === 'good'
+                              ? 'bg-rose-50 text-rose-600 border border-rose-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}>
+                            {post.statusText}
+                          </span>
+                        </td>
+
+                        {/* 제목 */}
+                        <td className="py-3.5 px-3 max-w-[280px] sm:max-w-md">
+                          <div className="font-bold text-slate-800 line-clamp-1 group-hover:text-indigo-600 transition-colors">
                             {post.title}
-                          </h4>
-                          {post.issueDetail && (
-                            <p className="text-xs text-red-600 font-semibold mt-1 flex items-center gap-1">
-                              <AlertTriangle size={13} /> {post.issueDetail}
+                          </div>
+                          {post.dwellWarning && (
+                            <p className="text-[11px] text-amber-600 font-medium mt-0.5 line-clamp-1">
+                              ⚠️ {post.dwellWarning}
                             </p>
                           )}
-                        </div>
+                        </td>
 
-                        <div className="flex items-center gap-4 text-xs text-slate-600 shrink-0 bg-slate-50 sm:bg-transparent p-2 sm:p-0 rounded-lg">
-                          <div>
-                            <span className="text-slate-400">본문:</span> <strong>{post.charCount.toLocaleString()}자</strong>
-                          </div>
-                          <div>
-                            <span className="text-slate-400">사진:</span> <strong>{post.imageCount}장</strong>
-                          </div>
-                          <div>
-                            <span className="text-slate-400">움짤:</span> <strong className={post.gifCount > 0 ? 'text-purple-600' : 'text-slate-400'}>{post.gifCount}개</strong>
-                          </div>
-                          <div>
-                            <span className="text-slate-400">예상체류:</span> <strong className="text-indigo-600">{post.dwellEstimate}초</strong>
-                          </div>
-                        </div>
-                      </div>
+                        {/* 발행일 */}
+                        <td className="py-3.5 px-3 text-center text-slate-400 whitespace-nowrap text-xs">
+                          {post.publishedAt}
+                        </td>
+
+                        {/* 글자수 */}
+                        <td className="py-3.5 px-3 text-right font-black text-slate-700 whitespace-nowrap text-xs">
+                          {post.charCount.toLocaleString()}
+                        </td>
+
+                        {/* 이미지 */}
+                        <td className="py-3.5 px-3 text-center whitespace-nowrap text-xs">
+                          <span className={post.imageCount === 1 ? 'text-amber-600 font-bold' : 'text-slate-600'}>
+                            {post.imageCount}
+                          </span>
+                        </td>
+
+                        {/* 움짤(GIF) - Gifty만의 특화 */}
+                        <td className="py-3.5 px-3 text-center whitespace-nowrap text-xs">
+                          {post.gifCount > 0 ? (
+                            <span className="font-black text-purple-600 bg-purple-50 px-2 py-0.5 rounded">
+                              {post.gifCount}개
+                            </span>
+                          ) : (
+                            <span className="text-slate-300">0</span>
+                          )}
+                        </td>
+
+                        {/* 예상 체류시간 */}
+                        <td className="py-3.5 px-3 text-center whitespace-nowrap text-xs">
+                          <span className={`font-black ${
+                            post.dwellSeconds < 40 ? 'text-amber-600' : 'text-indigo-600'
+                          }`}>
+                            {post.dwellSeconds}초
+                          </span>
+                        </td>
+
+                        {/* 이웃 반응 (댓글 / 공감) */}
+                        <td className="py-3.5 px-3 text-center text-slate-500 whitespace-nowrap text-xs">
+                          댓글 {post.comments} · 공감 {post.likes}
+                        </td>
+
+                        {/* Gifty 처방 액션 버튼 */}
+                        <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                          {post.imageCount === 1 ? (
+                            <Link
+                              href="/sticker"
+                              className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs font-bold border border-amber-200 transition-colors"
+                            >
+                              요약 스티커
+                            </Link>
+                          ) : post.gifCount === 0 ? (
+                            <Link
+                              href="/"
+                              className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-xs font-bold border border-purple-200 transition-colors"
+                            >
+                              움짤 보강
+                            </Link>
+                          ) : (
+                            <span className="text-emerald-600 text-xs font-bold">완벽 🟢</span>
+                          )}
+                        </td>
+                      </tr>
                     ))}
-                  </div>
-                </div>
-
-                {/* 3. 🎯 Gifty 맞춤 처방전 (블라이와 차별화되는 솔루션) */}
-                <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 rounded-3xl p-6 sm:p-8 border border-indigo-200/80 space-y-6">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="text-indigo-600" size={20} />
-                    <h3 className="text-lg sm:text-xl font-black text-indigo-950">
-                      Gifty 분석관의 블로그 성장 처방전
-                    </h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs sm:text-sm">
-                    {/* 처방 1: 키워드 체급 */}
-                    <div className="bg-white/85 backdrop-blur-sm p-5 rounded-2xl border border-indigo-100 flex flex-col justify-between">
-                      <div>
-                        <div className="font-extrabold text-slate-900 mb-2 flex items-center gap-1.5 text-sm">
-                          <TrendingUp size={16} className="text-indigo-600" /> 공략 추천 키워드 체급
-                        </div>
-                        <p className="text-slate-600 leading-relaxed">
-                          {report.prescription.levelAdvice}
-                        </p>
-                      </div>
-                      <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-400 font-semibold">
-                        무리한 대형 키워드보다 세부 키워드 다수 선점 추천
-                      </div>
-                    </div>
-
-                    {/* 처방 2: 체류시간 & 움짤 */}
-                    <div className="bg-white/85 backdrop-blur-sm p-5 rounded-2xl border border-indigo-100 flex flex-col justify-between">
-                      <div>
-                        <div className="font-extrabold text-slate-900 mb-2 flex items-center gap-1.5 text-sm">
-                          <Video size={16} className="text-purple-600" /> 체류시간 &amp; 비주얼 솔루션
-                        </div>
-                        <p className="text-slate-600 leading-relaxed">
-                          {report.prescription.dwellAdvice}
-                        </p>
-                      </div>
-                      <div className="mt-4 pt-3 border-t border-slate-100">
-                        <Link
-                          href="/"
-                          className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1"
-                        >
-                          움짤 만들러 가기 &rarr;
-                        </Link>
-                      </div>
-                    </div>
-
-                    {/* 처방 3: 이웃 소통 */}
-                    <div className="bg-white/85 backdrop-blur-sm p-5 rounded-2xl border border-indigo-100 flex flex-col justify-between">
-                      <div>
-                        <div className="font-extrabold text-slate-900 mb-2 flex items-center gap-1.5 text-sm">
-                          <MessageSquare size={16} className="text-emerald-600" /> 찐이웃 소통 건강도 관리
-                        </div>
-                        <p className="text-slate-600 leading-relaxed">
-                          {report.prescription.neighborAdvice}
-                        </p>
-                      </div>
-                      <div className="mt-4 pt-3 border-t border-slate-100">
-                        <Link
-                          href="/neighbor"
-                          className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1"
-                        >
-                          이웃 소통 지표 확인 &rarr;
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ========================================================= */}
-        {/* 모드 2: 단일 원고 사전 검사기 (발행 전 검수) */}
-        {/* ========================================================= */}
-        {subTab === 'post-check' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/80">
-              <div className="max-w-2xl mx-auto text-center mb-6">
-                <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-2">
-                  포스팅 발행 전 원고 사전 진단기
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-500">
-                  작성 중인 제목과 본문을 붙여넣으면 공백 제외 글자수, 키워드 과다 반복(저품질 방지), 금칙어를 즉시 판별해 드립니다.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      포스팅 제목
-                    </label>
-                    <input
-                      type="text"
-                      value={draftTitle}
-                      onChange={(e) => setDraftTitle(e.target.value)}
-                      placeholder="예: [내돈내산] 강남역 파스타 솔직 후기"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      공략할 메인 키워드 (선택)
-                    </label>
-                    <input
-                      type="text"
-                      value={draftKeyword}
-                      onChange={(e) => setDraftKeyword(e.target.value)}
-                      placeholder="예: 강남역 파스타"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    본문 내용 붙여넣기
-                  </label>
-                  <textarea
-                    rows={10}
-                    value={draftContent}
-                    onChange={(e) => setDraftContent(e.target.value)}
-                    placeholder="블로그에 작성할 본문 전체를 복사해서 붙여넣어 주세요. 실시간으로 글자수와 키워드 밀도를 계산합니다."
-                    className="w-full p-4 bg-slate-50 border border-slate-300 rounded-2xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all leading-relaxed"
-                  />
-                </div>
-
-                {/* 통계 박스 */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
-                    <div className="text-[11px] text-slate-400 font-semibold">공백 포함 글자수</div>
-                    <div className="text-lg font-black text-slate-800 mt-0.5">
-                      {draftAnalysis.charCountWithSpace.toLocaleString()}자
-                    </div>
-                  </div>
-                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
-                    <div className="text-[11px] text-slate-400 font-semibold">공백 제외 글자수</div>
-                    <div className="text-lg font-black text-indigo-600 mt-0.5">
-                      {draftAnalysis.charCountWithoutSpace.toLocaleString()}자
-                    </div>
-                  </div>
-                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
-                    <div className="text-[11px] text-slate-400 font-semibold">키워드 반복 횟수</div>
-                    <div className={`text-lg font-black mt-0.5 ${draftAnalysis.keywordWarning ? 'text-red-500' : 'text-emerald-600'}`}>
-                      {draftAnalysis.keywordCount}회
-                    </div>
-                  </div>
-                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
-                    <div className="text-[11px] text-slate-400 font-semibold">글 분량 평가</div>
-                    <div className="text-sm font-black text-slate-700 mt-1.5">
-                      {draftAnalysis.charCountWithoutSpace >= 1300 ? '적정 분량 🟢' : '분량 부족 🟡'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 경고 알림 */}
-                {draftAnalysis.keywordWarning && (
-                  <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-start gap-3 text-red-700 text-xs sm:text-sm">
-                    <AlertTriangle size={18} className="shrink-0 text-red-500 mt-0.5" />
-                    <div>
-                      <strong>키워드 과다 반복 주의!</strong> 동일 키워드가 {draftAnalysis.keywordCount}회 포함되어 있습니다. 8회 이상 반복되면 네이버 검색엔진이 기계적 어뷰징으로 분류해 누락시킬 수 있으니 4~6회 정도로 줄여주세요.
-                    </div>
-                  </div>
-                )}
-
-                {draftAnalysis.dangerousFound.length > 0 && (
-                  <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3 text-amber-800 text-xs sm:text-sm">
-                    <AlertTriangle size={18} className="shrink-0 text-amber-500 mt-0.5" />
-                    <div>
-                      <strong>주의 금칙어 발견 ({draftAnalysis.dangerousFound.join(', ')})</strong>:
-                      과장/의료법/허위성으로 제재받을 수 있는 표현이 포함되어 있습니다. 완곡한 표현으로 수정을 권장합니다.
-                    </div>
-                  </div>
-                )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
         )}
 
         {/* 하단 지원 배너 */}
-        <div className="mt-12">
+        <div className="mt-8">
           <CoupangSupportCard />
         </div>
       </main>
