@@ -25,8 +25,7 @@ import {
   Bookmark,
   Download,
   Laptop,
-  Smartphone,
-  Lock
+  Smartphone
 } from 'lucide-react';
 import CoupangSupportCard from '@/components/CoupangSupportCard';
 
@@ -913,8 +912,11 @@ export default function NeighborAnalyticsPage() {
             </Link>
           </div>
 
-          <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
+          <div className="hidden md:flex items-center gap-7 text-sm font-semibold text-slate-600">
             <Link href="/" className="hover:text-indigo-600 transition-colors">홈</Link>
+            <Link href="/blog-lab" className="hover:text-indigo-600 transition-colors text-indigo-600 font-extrabold flex items-center gap-1">
+              연구소(SEO) 🔬
+            </Link>
             <Link href="/neighbor" className="text-emerald-600 font-extrabold hover:text-emerald-700 transition-colors flex items-center gap-1">
               이웃 소통 지표 📊
             </Link>
@@ -941,6 +943,7 @@ export default function NeighborAnalyticsPage() {
         {isMobileMenuOpen && (
           <div className="md:hidden bg-white border-b border-slate-200 shadow-lg px-6 py-4 flex flex-col gap-3 text-sm font-bold">
             <Link href="/" className="py-2 text-slate-700">홈</Link>
+            <Link href="/blog-lab" className="py-2 text-indigo-600 font-extrabold bg-indigo-50 px-3 rounded-lg">연구소(SEO) 🔬</Link>
             <Link href="/neighbor" className="py-2 text-emerald-600 font-extrabold bg-emerald-50 px-3 rounded-lg">
               이웃 소통 지표 📊
             </Link>
@@ -954,6 +957,9 @@ export default function NeighborAnalyticsPage() {
       {/* 모바일 상단 카테고리 2줄 그리드 바 (모든 카테고리 한눈에 노출) */}
       <div className="md:hidden w-full bg-white border-b border-slate-200/80 p-2.5 shadow-sm z-40 relative">
         <div className="grid grid-cols-3 gap-1.5 text-center">
+          <Link href="/blog-lab" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-indigo-50 text-indigo-700 font-black text-[12px] rounded-xl border border-indigo-300 shadow-sm active:scale-95 transition-transform">
+            🔬 연구소(SEO)
+          </Link>
           <Link href="/neighbor" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-emerald-50 text-emerald-800 font-black text-[12px] rounded-xl border border-emerald-300 shadow-sm active:scale-95 transition-transform">
             📊 이웃 소통
           </Link>
@@ -963,11 +969,8 @@ export default function NeighborAnalyticsPage() {
           <Link href="/experience-diary" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-blue-50 text-blue-700 font-bold text-[12px] rounded-xl border border-blue-200/60 shadow-sm active:scale-95 transition-transform">
             📓 체험단
           </Link>
-          <Link href="/community" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-indigo-50 text-indigo-700 font-bold text-[12px] rounded-xl border border-indigo-200/60 shadow-sm active:scale-95 transition-transform">
+          <Link href="/community" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-slate-100 text-slate-700 font-bold text-[12px] rounded-xl border border-slate-200 shadow-sm active:scale-95 transition-transform">
             💬 커뮤니티
-          </Link>
-          <Link href="/remove-bg" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-purple-50 text-purple-700 font-bold text-[12px] rounded-xl border border-purple-200/60 shadow-sm active:scale-95 transition-transform">
-            ✂️ 누끼따기
           </Link>
           <Link href="/" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-slate-100 text-slate-700 font-bold text-[12px] rounded-xl border border-slate-200 shadow-sm active:scale-95 transition-transform">
             🏠 홈

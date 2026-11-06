@@ -77,7 +77,7 @@ export default function Home() {
         <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white px-4 py-2 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 relative">
           <span className="animate-pulse">✨</span>
           <span>
-            [신규] <strong>📊 네이버 블로그 이웃 소통 지표</strong> &amp; <strong>🎨 블로그 스티커 제작소</strong> 오픈!
+            [신규] <strong>🔬 블로그 연구소(SEO/지수 진단)</strong> &amp; <strong>📊 이웃 소통 지표</strong> 오픈!
           </span>
           <button 
             onClick={() => setShowBanner(false)}
@@ -101,8 +101,9 @@ export default function Home() {
           </div>
           <div className="hidden md:flex items-center gap-7 text-sm font-semibold text-slate-600">
             <a href="/" className="hover:text-indigo-600 transition-colors">홈</a>
+            <a href="/blog-lab" className="text-indigo-600 font-extrabold hover:text-indigo-700 transition-colors flex items-center gap-1">연구소(SEO) 🔬</a>
             <a href="/neighbor" className="hover:text-emerald-700 transition-colors text-emerald-600 font-extrabold flex items-center gap-1">이웃 소통 지표 📊</a>
-            <a href="/community" className="text-indigo-600 font-extrabold hover:text-indigo-700 transition-colors flex items-center gap-1">커뮤니티 💬</a>
+            <a href="/community" className="hover:text-indigo-600 transition-colors text-slate-600 flex items-center gap-1">커뮤니티 💬</a>
             <a href="/experience-diary" className="hover:text-indigo-600 transition-colors text-blue-600">체험단 다이어리 📓</a>
             <a href="/sticker" className="hover:text-pink-700 transition-colors text-pink-600 font-extrabold">블로그 스티커 🎨</a>
             <a href="/remove-bg" className="hover:text-indigo-600 transition-colors text-purple-600">누끼따기(AI) ✂️</a>
@@ -119,8 +120,9 @@ export default function Home() {
         {isMobileMenuOpen && (
           <div className="md:hidden bg-white border-b border-slate-100 shadow-md w-full flex flex-col p-4 gap-2 text-sm font-bold absolute top-16 left-0">
             <a href="/" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl hover:bg-slate-50">홈</a>
+            <a href="/blog-lab" className="text-indigo-600 bg-indigo-50 p-3 rounded-xl font-black">연구소(SEO) 🔬</a>
             <a href="/neighbor" className="text-emerald-600 hover:bg-emerald-50 p-3 rounded-xl font-black">이웃 소통 지표 📊</a>
-            <a href="/community" className="text-indigo-600 hover:bg-indigo-50 p-3 rounded-xl">커뮤니티 💬</a>
+            <a href="/community" className="text-slate-700 hover:bg-slate-50 p-3 rounded-xl">커뮤니티 💬</a>
             <a href="/experience-diary" className="text-blue-600 hover:bg-blue-50 p-3 rounded-xl">체험단 다이어리 📓</a>
             <a href="/sticker" className="text-pink-600 hover:bg-pink-50 p-3 rounded-xl">블로그 스티커 🎨</a>
             <a href="/remove-bg" className="text-purple-600 hover:bg-purple-50 p-3 rounded-xl">누끼따기(AI) ✂️</a>
@@ -128,10 +130,13 @@ export default function Home() {
         )}
       </nav>
 
-      {/* Mobile Quick Links (Category Bar - 모바일 2줄로 전체 카테고리 100% 노출) */}
+      {/* Mobile Quick Links (Category Bar - 모바일 전체 카테고리 노출) */}
       <div className="md:hidden w-full bg-white border-b border-slate-200/80 p-2.5 shadow-sm z-40 relative">
         <div className="grid grid-cols-3 gap-1.5 text-center">
-          <a href="/neighbor" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-emerald-50 text-emerald-800 font-black text-[12px] rounded-xl border border-emerald-300 shadow-sm active:scale-95 transition-transform">
+          <a href="/blog-lab" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-indigo-50 text-indigo-700 font-black text-[12px] rounded-xl border border-indigo-300 shadow-sm active:scale-95 transition-transform">
+            🔬 연구소(SEO)
+          </a>
+          <a href="/neighbor" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-emerald-50 text-emerald-800 font-bold text-[12px] rounded-xl border border-emerald-300 shadow-sm active:scale-95 transition-transform">
             📊 이웃 소통
           </a>
           <a href="/sticker" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-pink-50 text-pink-700 font-bold text-[12px] rounded-xl border border-pink-200/60 shadow-sm active:scale-95 transition-transform">
@@ -140,14 +145,11 @@ export default function Home() {
           <a href="/experience-diary" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-blue-50 text-blue-700 font-bold text-[12px] rounded-xl border border-blue-200/60 shadow-sm active:scale-95 transition-transform">
             📓 체험단
           </a>
-          <a href="/community" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-indigo-50 text-indigo-700 font-bold text-[12px] rounded-xl border border-indigo-200/60 shadow-sm active:scale-95 transition-transform">
+          <a href="/community" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-slate-100 text-slate-700 font-bold text-[12px] rounded-xl border border-slate-200 shadow-sm active:scale-95 transition-transform">
             💬 커뮤니티
           </a>
           <a href="/remove-bg" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-purple-50 text-purple-700 font-bold text-[12px] rounded-xl border border-purple-200/60 shadow-sm active:scale-95 transition-transform">
             ✂️ 누끼따기
-          </a>
-          <a href="/" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-slate-100 text-slate-700 font-bold text-[12px] rounded-xl border border-slate-200 shadow-sm active:scale-95 transition-transform">
-            🏠 홈
           </a>
         </div>
       </div>
