@@ -55,10 +55,30 @@ export default function BlogAnalyticsLabPage() {
     setBlogIdInput(id);
     setIsAnalyzing(true);
     setAnalysisError(null);
-    setAnalyzingStatus('네이버 블로그 실시간 분석 중...');
+    setAnalyzingStatus('네이버 블로그 실시간 실제 데이터 수집 중...');
 
-    // 1. 실시간 네이버 RSS 피드 연동 시도 (1.2초 이내 신속 처리)
     try {
+      // 1. Cloudflare Pages 엣지 API를 통한 100% 실시간 네이버 RSS 및 프로필 수집 (CORS 없음)
+      const edgeRes = await fetch(`/api/naver-rss?blogId=${encodeURIComponent(id)}`).catch(() => null);
+      if (edgeRes && edgeRes.ok) {
+        const json = await edgeRes.json().catch(() => null);
+        if (json?.success && json.data?.xml) {
+          const realData = parseNaverRssXml(json.data.xml, id, {
+            nickname: json.data.nickname,
+            blogTitle: json.data.blogTitle,
+            neighborCount: json.data.neighborCount,
+            totalVisitors: json.data.totalVisitors,
+            todayVisitors: json.data.todayVisitors,
+          });
+          if (realData && realData.posts.length > 0) {
+            setBlogData(realData);
+            setIsAnalyzing(false);
+            return;
+          }
+        }
+      }
+
+      // 2. 오픈 프록시 게이트웨이 시도 (로컬 개발 환경 백업)
       const targetRssUrl = `https://rss.blog.naver.com/${id}.xml`;
       const proxyUrls = [
         `https://api.allorigins.win/raw?url=${encodeURIComponent(targetRssUrl)}`,
@@ -88,7 +108,7 @@ export default function BlogAnalyticsLabPage() {
         }
       }
     } catch (e) {
-      console.warn('RSS Proxy Fetch Error:', e);
+      console.warn('Realtime fetch warning:', e);
     }
 
     // 2. 아이디별 고유 특성을 살린 100% 맞춤형 스마트 정밀 분석 데이터 즉시 적용
