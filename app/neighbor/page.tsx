@@ -3166,11 +3166,23 @@ export default function NeighborAnalyticsPage() {
                   <span className="w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[11px]">3</span>
                   <span>[개발자 모드] 켜기 ➔ [압축해제된 확장 프로그램 로드]</span>
                 </span>
-                <ul className="text-[11px] text-slate-600 space-y-1 list-disc list-inside leading-relaxed pl-1">
+                <ul className="text-[11px] text-slate-600 space-y-1.5 list-disc list-inside leading-relaxed pl-1">
                   <li>화면 우측 상단의 <strong>[개발자 모드]</strong> 스위치를 켭니다.</li>
                   <li>좌측 상단에 나타난 <strong>[압축해제된 확장 프로그램을 로드합니다]</strong> 버튼을 클릭합니다.</li>
-                  <li>1단계에서 압축을 푼 <strong className="text-indigo-600">gifty-extension 폴더</strong>를 선택하면 설치 끝!</li>
+                  <li>
+                    압축을 푼 <strong className="text-indigo-600 font-black">gifty-neighbor-cleaner</strong> 폴더(안에 <code className="bg-slate-200 px-1 py-0.5 rounded text-[10px]">manifest.json</code>이 들어있는 폴더)를 선택하면 설치 끝!
+                  </li>
                 </ul>
+
+                {/* 🚨 매니페스트 오류 해결 팁 */}
+                <div className="mt-2 p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-[11px] space-y-1">
+                  <div className="font-bold flex items-center gap-1 text-amber-800">
+                    <span>💡 &apos;매니페스트 파일이 없거나 읽을 수 없습니다&apos; 오류가 발생하나요?</span>
+                  </div>
+                  <p className="text-amber-700/90 leading-relaxed font-normal">
+                    압축을 풀었을 때 폴더가 2중(폴더 안에 또 같은 이름의 폴더)으로 풀렸을 수 있습니다. 폴더 안으로 한 단계 더 들어가서 <strong>manifest.json</strong> 파일이 바로 보이는 폴더를 선택해 주세요!
+                  </p>
+                </div>
               </div>
 
               {/* Step 5 */}
