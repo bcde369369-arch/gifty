@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
   Sparkles,
@@ -31,6 +31,9 @@ import {
 export default function BlogAnalyticsLabPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [blogIdInput, setBlogIdInput] = useState('masining');
+  const blogIdInputRef = useRef('masining');
+  blogIdInputRef.current = blogIdInput;
+
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzingStatus, setAnalyzingStatus] = useState('정밀 분석 중...');
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -39,9 +42,9 @@ export default function BlogAnalyticsLabPage() {
   // 현재 분석된 블로그 데이터
   const [blogData, setBlogData] = useState<BlogAnalysisResult | null>(null);
 
-  // 블로그 분석 함수 (실시간 RSS + 아이디별 스마트 정밀 분석)
+  // 블로그 분석 함수 (useRef 활용으로 타이핑 시 리렌더링 루프 완전 차단)
   const analyzeBlog = useCallback(async (targetId?: string) => {
-    const rawId = (targetId || blogIdInput).trim();
+    const rawId = (targetId ?? blogIdInputRef.current).trim();
     const id = extractNaverBlogId(rawId);
 
     if (!id) {
@@ -94,11 +97,9 @@ export default function BlogAnalyticsLabPage() {
       setBlogData(smartData);
       setIsAnalyzing(false);
     }, 300);
-  }, [blogIdInput]);
+  }, []);
 
-    
-
-  // 초기 렌더링 시 기본 블로그 분석 실행
+  // 초기 마운트 시 단 1회만 기본 블로그 분석 실행 (무한 루프 방지)
   useEffect(() => {
     analyzeBlog('masining');
   }, [analyzeBlog]);
@@ -183,11 +184,22 @@ export default function BlogAnalyticsLabPage() {
                   type="text"
                   value={blogIdInput}
                   onChange={(e) => setBlogIdInput(e.target.value)}
+                  onFocus={(e) => e.target.select()}
                   onKeyDown={(e) => e.key === 'Enter' && analyzeBlog(blogIdInput)}
                   placeholder="네이버 블로그 ID 또는 주소 (예: masining)"
-                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+                  className="w-full pl-10 pr-9 py-3 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
                 />
-                <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                {blogIdInput && (
+                  <button
+                    type="button"
+                    onClick={() => setBlogIdInput('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                    title="입력 내용 지우기"
+                  >
+                    <X size={15} />
+                  </button>
+                )}
               </div>
               <button
                 onClick={() => analyzeBlog(blogIdInput)}
