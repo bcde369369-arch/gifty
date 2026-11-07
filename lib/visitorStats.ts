@@ -46,6 +46,14 @@ export const TRACKED_PAGES: Omit<PageStatItem, 'todayViews' | 'totalViews' | 'to
     badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   },
   {
+    id: 'bloglab',
+    path: '/blog-lab',
+    name: '카테고리 연구소 (블로그 SEO 진단)',
+    emoji: '🔬',
+    color: 'from-cyan-500 to-blue-600',
+    badgeBg: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+  },
+  {
     id: 'community',
     path: '/community',
     name: '블로그 커뮤니티',
@@ -89,13 +97,14 @@ export const TRACKED_PAGES: Omit<PageStatItem, 'todayViews' | 'totalViews' | 'to
 
 // 기본 카테고리별 자연스러운 점유율 가중치 (CounterAPI 개별 카운터가 없을 때 합리적으로 분배)
 const DEFAULT_PAGE_WEIGHTS: Record<string, number> = {
-  home: 35,
-  neighbor: 25,
-  community: 15,
-  diary: 10,
-  sticker: 7,
-  removebg: 5,
-  guide: 3,
+  home: 30,
+  neighbor: 22,
+  bloglab: 18,
+  community: 12,
+  diary: 8,
+  sticker: 5,
+  removebg: 3,
+  guide: 2,
 };
 
 const LOCAL_CACHE_KEY = 'gifty_visitor_stats_cache_v3';
@@ -170,6 +179,7 @@ export async function testCounterApiConnection(
 /** 현재 경로(pathname)를 추적 대상 페이지 ID로 매핑 */
 export function resolvePageId(pathname: string): string | null {
   if (!pathname || pathname.startsWith('/admin')) return null;
+  if (pathname.startsWith('/blog-lab')) return 'bloglab';
   if (pathname.startsWith('/neighbor')) return 'neighbor';
   if (pathname.startsWith('/community')) return 'community';
   if (pathname.startsWith('/experience-diary')) return 'diary';
@@ -482,7 +492,7 @@ export async function getAdminVisitorStats(): Promise<VisitorStatsSummary> {
         };
       });
     } else {
-      // API에 개별 카운터가 없는 경우 (하이브리드 자동 점유율 배분: 6개 카테고리 모두 자연스러운 순위 제공)
+      // API에 개별 카운터가 없는 경우 (하이브리드 자동 점유율 배분: 전체 8개 카테고리 모두 자연스러운 순위 제공)
       const { todayWeights, totalWeights } = getLocalPageWeights();
       const sumTodayWeight = Object.values(todayWeights).reduce((a, b) => a + b, 0) || 1;
       const sumTotalWeight = Object.values(totalWeights).reduce((a, b) => a + b, 0) || 1;

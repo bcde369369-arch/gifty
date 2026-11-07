@@ -240,7 +240,7 @@ export default function AdminDashboard() {
                     counterapi.dev 회원가입 <ExternalLink size={11} />
                   </a>
                   후 생성된 <strong>Workspace 이름</strong>과 <strong>API Key</strong>를 입력해주세요.
-                  기본 카운터 1개만 있어도 전체 방문자/페이지뷰가 실시간 연동되며, 카테고리별 순위는 하이브리드 엔진으로 6개 메뉴 모두 자동 집계됩니다.
+                  기본 카운터 1개만 있어도 전체 방문자/페이지뷰가 실시간 연동되며, 카테고리별 순위는 하이브리드 엔진으로 8개 메뉴 모두 자동 집계됩니다.
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -425,7 +425,7 @@ export default function AdminDashboard() {
                 <div>
                   <h4 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
                     <MousePointerClick size={16} className="text-pink-600" />
-                    어떤 페이지를 가장 많이 클릭했을까요? (인기 카테고리 TOP 6)
+                    어떤 페이지를 가장 많이 클릭했을까요? (전체 카테고리 순위 TOP 8)
                   </h4>
                   <p className="text-xs text-slate-500 mt-0.5">
                     방문자가 각 메뉴를 클릭해 열람한 횟수와 전체 대비 점유율(%)입니다.
@@ -478,7 +478,7 @@ export default function AdminDashboard() {
               {/* 카테고리별 순위 리스트 */}
               <div className="space-y-2.5">
                 {isLoadingStats ? (
-                  Array.from({ length: 7 }).map((_, i) => (
+                  Array.from({ length: 8 }).map((_, i) => (
                     <div key={i} className="h-14 bg-slate-200/70 animate-pulse rounded-xl" />
                   ))
                 ) : (
