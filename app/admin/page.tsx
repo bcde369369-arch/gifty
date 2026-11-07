@@ -215,7 +215,7 @@ export default function AdminDashboard() {
       </nav>
 
       <div className="max-w-4xl mx-auto px-6 py-12">
-        <div className="flex justify-between items-end mb-8">
+        <div className="flex justify-between items-end mb-6">
           <div>
             <h1 className="text-3xl font-extrabold text-slate-900">사이트 설정</h1>
             <p className="text-slate-500 mt-2">이곳에서 변경한 텍스트와 링크는 사이트에 실시간으로 즉시 반영됩니다.</p>
@@ -229,9 +229,41 @@ export default function AdminDashboard() {
           </button>
         </div>
 
+        {/* 상단 퀵 네비게이션 탭 */}
+        <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-1">
+          <a
+            href="#emoticons-section"
+            className="px-4 py-2.5 bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white rounded-xl text-xs font-black shadow-sm flex items-center gap-1.5 shrink-0 transition-transform hover:scale-105 active:scale-95 animate-pulse"
+          >
+            <Smile size={16} />
+            <span>🎨 자체 제작 이모티콘 관리 바로가기 (NEW ✨)</span>
+          </a>
+          <a
+            href="#visitor-stats-section"
+            className="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold border border-slate-200 shrink-0 transition-colors flex items-center gap-1"
+          >
+            <Users size={14} />
+            <span>📊 방문자 통계</span>
+          </a>
+          <a
+            href="#text-settings-section"
+            className="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold border border-slate-200 shrink-0 transition-colors flex items-center gap-1"
+          >
+            <Type size={14} />
+            <span>📝 메인 텍스트</span>
+          </a>
+          <a
+            href="#banner-settings-section"
+            className="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold border border-slate-200 shrink-0 transition-colors flex items-center gap-1"
+          >
+            <LinkIcon size={14} />
+            <span>🔗 제휴 배너</span>
+          </a>
+        </div>
+
         <div className="space-y-8">
           {/* Visitor Stats Section */}
-          <section className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+          <section id="visitor-stats-section" className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
               <div>
                 <div className="flex items-center gap-2 text-indigo-700 font-bold text-lg mb-1">
@@ -683,7 +715,7 @@ export default function AdminDashboard() {
           </section>
 
           {/* Custom Emoticons & Mini Toolbar Management Section */}
-          <section className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+          <section id="emoticons-section" className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6 scroll-mt-20">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-2">
               <div>
                 <div className="flex items-center gap-2">
@@ -880,7 +912,7 @@ export default function AdminDashboard() {
           </section>
 
           {/* Main Hero Section Settings */}
-          <section className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+          <section id="text-settings-section" className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm scroll-mt-20">
             <div className="flex items-center gap-2 text-indigo-700 font-bold text-lg mb-6 pb-4 border-b border-slate-100">
               <Type size={20} /> 메인 화면 텍스트 설정
             </div>
@@ -900,7 +932,7 @@ export default function AdminDashboard() {
           </section>
 
           {/* Affiliate Banner Settings */}
-          <section className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+          <section id="banner-settings-section" className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm scroll-mt-20">
             <div className="flex items-center gap-2 text-indigo-700 font-bold text-lg mb-6 pb-4 border-b border-slate-100">
               <LinkIcon size={20} /> 제휴 마케팅 배너 설정 (하단)
             </div>
