@@ -29,6 +29,12 @@ export interface SubtitleConfig {
   position?: 'bottom' | 'center' | 'top';
 }
 
+export interface EmoticonOverlayConfig {
+  file: File;
+  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'above-text';
+  size?: 'small' | 'medium' | 'large';
+}
+
 export const convertToGif = async (
   videoFile: File,
   startTime: number,
@@ -38,18 +44,24 @@ export const convertToGif = async (
   speed: number,
   logoFile: File | null,
   videoFilter: 'none' | 'grayscale' | 'sepia' | 'bright',
-  onProgress?: (ratio: number, status?: string) => void
+  onProgress?: (ratio: number, status?: string) => void,
+  emoticonConfig?: EmoticonOverlayConfig | null
 ): Promise<{ url: string; size: number }> => {
   const ffmpegInstance = await getFFmpeg();
   
   const inputName = 'input.mp4';
   const outputName = 'output.gif';
   const logoName = 'logo.png';
+  const emoticonName = 'emoticon.png';
   
   await ffmpegInstance.writeFile(inputName, await fetchFile(videoFile));
 
   if (logoFile) {
     await ffmpegInstance.writeFile(logoName, await fetchFile(logoFile));
+  }
+
+  if (emoticonConfig?.file) {
+    await ffmpegInstance.writeFile(emoticonName, await fetchFile(emoticonConfig.file));
   }
 
   // Parse text overlay options
@@ -178,17 +190,48 @@ export const convertToGif = async (
 
     // Build the filtergraph
     let filterGraph = `[0:v]${speedFilter}fps=${profile.fps},scale=${profile.scale}:-1:flags=lanczos${colorFilterStr}${fontFilter}[v_base];`;
-    
+    let currentNode = '[v_base]';
+
+    const hasEmoticon = !!emoticonConfig?.file;
+    let nextInputIdx = 1;
+    let logoInputIdx = -1;
+    let emoInputIdx = -1;
+
     if (logoFile) {
-      // Scale logo to a maximum of 25% of the video width
-      const logoScaleWidth = Math.round(profile.scale * 0.25);
-      filterGraph += `[1:v]scale=${logoScaleWidth}:-1[logo_scaled];`;
-      // Overlay logo at the bottom right with 15px padding
-      filterGraph += `[v_base][logo_scaled]overlay=W-w-15:H-h-15[v_overlay];`;
+      logoInputIdx = nextInputIdx++;
+    }
+    if (hasEmoticon) {
+      emoInputIdx = nextInputIdx++;
     }
 
-    const lastNode = logoFile ? '[v_overlay]' : '[v_base]';
-    filterGraph += `${lastNode}split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
+    if (hasEmoticon && emoticonConfig) {
+      let scaleRatio = 0.25;
+      if (emoticonConfig.size === 'small') scaleRatio = 0.18;
+      else if (emoticonConfig.size === 'large') scaleRatio = 0.35;
+
+      const emoScaleWidth = Math.max(40, Math.round(profile.scale * scaleRatio));
+      filterGraph += `[${emoInputIdx}:v]scale=${emoScaleWidth}:-1[emo_scaled];`;
+
+      let overlayPos = 'W-w-15:15'; // top-right default
+      const pos = emoticonConfig.position || 'top-right';
+      if (pos === 'top-left') overlayPos = '15:15';
+      else if (pos === 'bottom-right') overlayPos = 'W-w-15:H-h-15';
+      else if (pos === 'bottom-left') overlayPos = '15:H-h-15';
+      else if (pos === 'center') overlayPos = '(W-w)/2:(H-h)/2';
+      else if (pos === 'above-text') overlayPos = '(W-w)/2:H-h-70';
+
+      filterGraph += `${currentNode}[emo_scaled]overlay=${overlayPos}[v_emo];`;
+      currentNode = '[v_emo]';
+    }
+
+    if (logoFile) {
+      const logoScaleWidth = Math.round(profile.scale * 0.22);
+      filterGraph += `[${logoInputIdx}:v]scale=${logoScaleWidth}:-1[logo_scaled];`;
+      filterGraph += `${currentNode}[logo_scaled]overlay=W-w-15:H-h-15[v_logo];`;
+      currentNode = '[v_logo]';
+    }
+
+    filterGraph += `${currentNode}split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
 
     const args = [
       '-ss', startTime.toString(),
@@ -198,6 +241,9 @@ export const convertToGif = async (
 
     if (logoFile) {
       args.push('-i', logoName);
+    }
+    if (hasEmoticon) {
+      args.push('-i', emoticonName);
     }
 
     args.push('-filter_complex', filterGraph, '-loop', '0', outputName);

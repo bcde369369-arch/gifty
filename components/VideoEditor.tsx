@@ -2,10 +2,15 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { convertToGif } from '@/lib/ffmpeg';
-import { Loader2, Download, RotateCcw, Sparkles, Copy, Play, Pause, Repeat, Film } from 'lucide-react';
+import { Loader2, Download, RotateCcw, Sparkles, Copy, Play, Pause, Repeat, Film, Smile } from 'lucide-react';
 import { useSiteSettings } from '@/lib/settings';
 import CoupangBanner from '@/components/CoupangBanner';
 import CoupangSupportCard from '@/components/CoupangSupportCard';
+import {
+  getAllEmoticons,
+  CustomEmoticon,
+  convertToPngBlob,
+} from '@/lib/emoticonManager';
 
 interface VideoEditorProps {
   videoFile: File;
@@ -46,6 +51,23 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
   const [playbackSpeed, setPlaybackSpeed] = useState<string>('1.0');
   const [videoFilter, setVideoFilter] = useState<'none' | 'grayscale' | 'sepia' | 'bright'>('none');
   const [logoFile, setLogoFile] = useState<File | null>(null);
+
+  // Custom Emoticon / Sticker State (미니툴바)
+  const [emoticons, setEmoticons] = useState<CustomEmoticon[]>([]);
+  const [selectedEmoticon, setSelectedEmoticon] = useState<CustomEmoticon | null>(null);
+  const [emoticonPosition, setEmoticonPosition] = useState<
+    'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'above-text'
+  >('top-right');
+  const [emoticonSize, setEmoticonSize] = useState<'small' | 'medium' | 'large'>('medium');
+
+  useEffect(() => {
+    setEmoticons(getAllEmoticons());
+    const handleUpdate = () => {
+      setEmoticons(getAllEmoticons());
+    };
+    window.addEventListener('gifty_emoticons_updated', handleUpdate);
+    return () => window.removeEventListener('gifty_emoticons_updated', handleUpdate);
+  }, []);
 
   const [isConverting, setIsConverting] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -336,6 +358,26 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
     const resultDuration = Math.min(endTime - startTime, 15);
 
     try {
+      let emoticonConfig: {
+        file: File;
+        position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'above-text';
+        size?: 'small' | 'medium' | 'large';
+      } | null = null;
+
+      if (selectedEmoticon) {
+        try {
+          const emoPngBlob = await convertToPngBlob(selectedEmoticon.imageUrl, 256);
+          const emoFile = new File([emoPngBlob], 'emoticon.png', { type: 'image/png' });
+          emoticonConfig = {
+            file: emoFile,
+            position: emoticonPosition,
+            size: emoticonSize,
+          };
+        } catch (err) {
+          console.warn('Failed to prepare emoticon PNG for FFmpeg:', err);
+        }
+      }
+
       const result = await convertToGif(
         videoFile,
         startTime,
@@ -356,7 +398,8 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
         (ratio, status) => {
           setProgress(Math.round(ratio * 100));
           if (status) setStatusMessage(status);
-        }
+        },
+        emoticonConfig
       );
       setGifUrl(result.url);
       setGifSize(result.size);
@@ -459,6 +502,38 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
             >
               {textOverlay}
             </span>
+          </div>
+        )}
+
+        {/* Live Emoticon / Custom Sticker Overlay Preview */}
+        {selectedEmoticon && (
+          <div
+            className={`pointer-events-none absolute z-15 transition-all duration-200 select-none ${
+              emoticonPosition === 'top-left'
+                ? 'top-4 left-4'
+                : emoticonPosition === 'top-right'
+                ? 'top-4 right-4'
+                : emoticonPosition === 'bottom-left'
+                ? 'bottom-14 left-4'
+                : emoticonPosition === 'bottom-right'
+                ? 'bottom-14 right-4'
+                : emoticonPosition === 'center'
+                ? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'
+                : 'bottom-20 left-1/2 -translate-x-1/2'
+            }`}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={selectedEmoticon.imageUrl}
+              alt={selectedEmoticon.name}
+              className={`drop-shadow-xl object-contain transition-all ${
+                emoticonSize === 'small'
+                  ? 'w-16 h-16 sm:w-20 sm:h-20'
+                  : emoticonSize === 'large'
+                  ? 'w-28 h-28 sm:w-36 sm:h-36'
+                  : 'w-20 h-20 sm:w-28 sm:h-28'
+              }`}
+            />
           </div>
         )}
 
@@ -779,6 +854,130 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
               <button onClick={() => setVideoFilter('sepia')} disabled={isConverting} className={`py-2 px-1 rounded-xl border text-xs font-bold transition-all ${videoFilter === 'sepia' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}>세피아<br/><span className="font-normal opacity-70">빈티지</span></button>
               <button onClick={() => setVideoFilter('bright')} disabled={isConverting} className={`py-2 px-1 rounded-xl border text-xs font-bold transition-all ${videoFilter === 'bright' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}>뽀샤시<br/><span className="font-normal opacity-70">화사하게</span></button>
             </div>
+          </div>
+
+          {/* New Feature: Custom Emoticons & Stickers Mini Toolbar */}
+          <div className="flex flex-col gap-2.5 animate-in fade-in slide-in-from-bottom-2 mb-2 p-3.5 bg-gradient-to-br from-rose-50/70 via-purple-50/40 to-indigo-50/70 border border-rose-200/80 rounded-2xl">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <Smile size={16} className="text-rose-600" />
+                <span>자체 제작 이모티콘 스티커</span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-600 text-white shadow-xs">
+                  미니툴바 ✨
+                </span>
+              </h4>
+              {selectedEmoticon && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedEmoticon(null)}
+                  className="text-xs text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 bg-white px-2 py-0.5 rounded-lg border border-rose-200"
+                >
+                  ✕ 스티커 해제
+                </button>
+              )}
+            </div>
+
+            {/* Horizontal Scrollable Emoticon Mini Toolbar */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5 scroll-smooth">
+              <button
+                type="button"
+                onClick={() => setSelectedEmoticon(null)}
+                className={`flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold border transition-all flex flex-col items-center justify-center gap-1 ${
+                  !selectedEmoticon
+                    ? 'border-indigo-600 bg-indigo-600 text-white shadow-xs'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <span className="text-sm">🚫</span>
+                <span className="text-[10px] whitespace-nowrap">스티커 없음</span>
+              </button>
+
+              {emoticons.map((emo) => {
+                const isSelected = selectedEmoticon?.id === emo.id;
+                return (
+                  <button
+                    key={emo.id}
+                    type="button"
+                    onClick={() => setSelectedEmoticon(isSelected ? null : emo)}
+                    title={emo.name}
+                    className={`flex-shrink-0 p-1.5 px-2.5 rounded-xl border transition-all flex flex-col items-center justify-center gap-1 group ${
+                      isSelected
+                        ? 'border-rose-500 bg-white ring-2 ring-rose-400 shadow-md scale-105'
+                        : 'border-slate-200/80 bg-white/90 hover:bg-white hover:border-indigo-300 shadow-xs'
+                    }`}
+                  >
+                    <div className="w-12 h-12 flex items-center justify-center p-0.5 overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={emo.imageUrl}
+                        alt={emo.name}
+                        className="max-w-full max-h-full object-contain pointer-events-none drop-shadow-sm group-hover:scale-110 transition-transform"
+                      />
+                    </div>
+                    <span
+                      className={`text-[10px] font-bold max-w-[72px] truncate ${
+                        isSelected ? 'text-rose-600' : 'text-slate-700'
+                      }`}
+                    >
+                      {emo.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Selected Emoticon Controls (Position & Size) */}
+            {selectedEmoticon && (
+              <div className="pt-2 border-t border-rose-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 text-xs">
+                {/* Position */}
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className="text-[11px] font-bold text-slate-500 mr-1">위치:</span>
+                  {[
+                    { id: 'top-right' as const, label: '우상단' },
+                    { id: 'top-left' as const, label: '좌상단' },
+                    { id: 'center' as const, label: '중앙' },
+                    { id: 'above-text' as const, label: '자막위' },
+                    { id: 'bottom-right' as const, label: '우하단' },
+                  ].map((pos) => (
+                    <button
+                      key={pos.id}
+                      type="button"
+                      onClick={() => setEmoticonPosition(pos.id)}
+                      className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-all ${
+                        emoticonPosition === pos.id
+                          ? 'border-indigo-600 bg-indigo-600 text-white'
+                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {pos.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Size */}
+                <div className="flex items-center gap-1 justify-end">
+                  <span className="text-[11px] font-bold text-slate-500 mr-1">크기:</span>
+                  {[
+                    { id: 'small' as const, label: '소' },
+                    { id: 'medium' as const, label: '중' },
+                    { id: 'large' as const, label: '대' },
+                  ].map((sz) => (
+                    <button
+                      key={sz.id}
+                      type="button"
+                      onClick={() => setEmoticonSize(sz.id)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all ${
+                        emoticonSize === sz.id
+                          ? 'border-rose-500 bg-rose-500 text-white'
+                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {sz.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* New Feature: Text Overlay */}

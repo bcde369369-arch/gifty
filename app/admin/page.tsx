@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSiteSettings } from '@/lib/settings';
 import {
@@ -28,8 +28,18 @@ import {
   CheckCircle2,
   AlertCircle,
   X,
+  Smile,
+  Upload,
+  Image as ImageIcon,
 } from 'lucide-react';
 import Link from 'next/link';
+import {
+  getAllEmoticons,
+  addCustomEmoticon,
+  deleteCustomEmoticon,
+  resetEmoticonsToDefault,
+  CustomEmoticon,
+} from '@/lib/emoticonManager';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -38,6 +48,13 @@ export default function AdminDashboard() {
   // Local state for the form
   const [formData, setFormData] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Custom Emoticon Management state
+  const [emoticons, setEmoticons] = useState<CustomEmoticon[]>([]);
+  const [newEmoName, setNewEmoName] = useState('');
+  const [newEmoCategory, setNewEmoCategory] = useState<'도장/인증' | '맛집/먹방' | '감정/리액션' | '기타'>('도장/인증');
+  const [newEmoPreview, setNewEmoPreview] = useState<string | null>(null);
+  const emoFileInputRef = useRef<HTMLInputElement>(null);
 
   // Visitor stats state
   const [visitorStats, setVisitorStats] = useState<VisitorStatsSummary | null>(null);
@@ -58,7 +75,56 @@ export default function AdminDashboard() {
     setCounterApiKey(config.apiKey);
     const savedSyncUrl = localStorage.getItem('gifty_diary_custom_sync_url');
     if (savedSyncUrl) setSyncEndpoint(savedSyncUrl);
+    setEmoticons(getAllEmoticons());
   }, []);
+
+  const handleEmoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 3 * 1024 * 1024) {
+      alert('이모티콘 이미지 파일은 3MB 이하를 권장합니다!');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      setNewEmoPreview(result);
+      if (!newEmoName.trim()) {
+        const defaultName = file.name.replace(/\.[^/.]+$/, '');
+        setNewEmoName(defaultName);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAddEmoticon = () => {
+    if (!newEmoPreview) {
+      alert('먼저 등록할 이모티콘 이미지(PNG/GIF/WebP 등)를 선택해주세요!');
+      return;
+    }
+    addCustomEmoticon(newEmoName, newEmoPreview, newEmoCategory);
+    setEmoticons(getAllEmoticons());
+    setNewEmoName('');
+    setNewEmoPreview(null);
+    if (emoFileInputRef.current) emoFileInputRef.current.value = '';
+    alert('새 이모티콘이 성공적으로 등록되었습니다!\n움짤 편집기 미니툴바에 즉시 반영됩니다.');
+  };
+
+  const handleDeleteEmoticon = (id: string, name: string) => {
+    if (confirm(`'${name}' 이모티콘을 미니툴바에서 삭제하시겠습니까?`)) {
+      deleteCustomEmoticon(id);
+      setEmoticons(getAllEmoticons());
+    }
+  };
+
+  const handleResetEmoticons = () => {
+    if (confirm('모든 이모티콘을 기본 6종 세트로 초기화하시겠습니까?')) {
+      resetEmoticonsToDefault();
+      setEmoticons(getAllEmoticons());
+    }
+  };
 
   const handleTestCounter = async () => {
     setIsTestingCounter(true);
@@ -614,6 +680,203 @@ export default function AdminDashboard() {
                 </div>
               </div>
             )}
+          </section>
+
+          {/* Custom Emoticons & Mini Toolbar Management Section */}
+          <section className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Smile className="text-rose-600" size={22} />
+                  <h3 className="text-lg font-black text-slate-900">
+                    🎨 자체 제작 커스텀 이모티콘 &amp; 미니툴바 관리
+                  </h3>
+                  <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200">
+                    움짤 에디터 연동
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  대표님께서 직접 만드신 캐릭터, 도장, 시그니처 투명 PNG 이미지를 등록하면 사용자가 움짤을 만들 때 <strong>[미니툴바]</strong>에서 바로 영상에 얹을 수 있습니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleResetEmoticons}
+                className="text-xs text-slate-500 hover:text-slate-800 font-bold px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors self-start sm:self-auto flex items-center gap-1"
+              >
+                <RefreshCw size={13} />
+                기본 6종 세트로 초기화
+              </button>
+            </div>
+
+            {/* 1. 신규 이모티콘 등록 폼 */}
+            <div className="bg-gradient-to-br from-rose-50/60 via-purple-50/40 to-indigo-50/60 p-5 sm:p-6 rounded-2xl border border-rose-100">
+              <h4 className="text-sm font-extrabold text-slate-800 mb-3 flex items-center gap-1.5">
+                <Upload size={16} className="text-rose-600" />
+                <span>새 이모티콘 / 스티커 이미지 등록하기</span>
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
+                {/* 이미지 업로드 & 미리보기 */}
+                <div className="md:col-span-4 flex flex-col items-center">
+                  <input
+                    ref={emoFileInputRef}
+                    type="file"
+                    accept="image/png,image/gif,image/webp,image/svg+xml,image/jpeg"
+                    onChange={handleEmoFileSelect}
+                    className="hidden"
+                    id="admin-emo-file-input"
+                  />
+                  <label
+                    htmlFor="admin-emo-file-input"
+                    className="w-full h-36 border-2 border-dashed border-rose-300 hover:border-rose-500 bg-white/80 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all hover:bg-white p-3 text-center relative overflow-hidden group shadow-xs"
+                  >
+                    {newEmoPreview ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={newEmoPreview}
+                        alt="Preview"
+                        className="max-h-full max-w-full object-contain drop-shadow-md group-hover:scale-105 transition-transform"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-1 text-slate-400 group-hover:text-rose-600">
+                        <ImageIcon size={32} />
+                        <span className="text-xs font-bold text-slate-600">이미지 파일 선택</span>
+                        <span className="text-[10px] text-slate-400">투명 PNG, GIF, WebP 권장 (최대 3MB)</span>
+                      </div>
+                    )}
+                  </label>
+                  {newEmoPreview && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewEmoPreview(null);
+                        if (emoFileInputRef.current) emoFileInputRef.current.value = '';
+                      }}
+                      className="text-[11px] text-slate-400 hover:text-red-500 font-bold mt-1.5"
+                    >
+                      이미지 다시 선택 ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* 메타데이터 입력 및 등록 버튼 */}
+                <div className="md:col-span-8 space-y-3.5">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      이모티콘 이름 (미니툴바 툴팁에 표시)
+                    </label>
+                    <input
+                      type="text"
+                      value={newEmoName}
+                      onChange={(e) => setNewEmoName(e.target.value)}
+                      placeholder="예: 100% 내돈내산 도장, 침 흘리는 캐릭터"
+                      maxLength={20}
+                      className="w-full px-4 py-2.5 bg-white rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 text-sm font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      카테고리 분류
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {(['도장/인증', '맛집/먹방', '감정/리액션', '기타'] as const).map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setNewEmoCategory(cat)}
+                          className={`py-2 px-2 rounded-xl text-xs font-extrabold border transition-all text-center ${
+                            newEmoCategory === cat
+                              ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={handleAddEmoticon}
+                      disabled={!newEmoPreview}
+                      className="w-full py-3 bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-700 hover:to-indigo-700 disabled:opacity-40 text-white rounded-xl text-sm font-black shadow-md transition-all flex items-center justify-center gap-2 active:scale-98"
+                    >
+                      <Sparkles size={16} />
+                      <span>➕ 미니툴바에 이모티콘 등록하기</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. 현재 미니툴바에 등록된 이모티콘 갤러리 */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-extrabold text-slate-700">
+                  📋 현재 미니툴바에 등록된 이모티콘 목록 ({emoticons.length}개)
+                </h4>
+                <span className="text-[11px] text-slate-400">
+                  움짤 편집기 화면의 미니툴바에 이 순서대로 표시됩니다.
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                {emoticons.map((emo) => (
+                  <div
+                    key={emo.id}
+                    className="bg-white border border-slate-200 rounded-2xl p-3 flex flex-col items-center justify-between gap-2 shadow-xs hover:border-rose-300 hover:shadow-sm transition-all relative group"
+                  >
+                    {/* 삭제 버튼 */}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteEmoticon(emo.id, emo.name)}
+                      title="이모티콘 삭제"
+                      className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-slate-100 hover:bg-red-50 text-slate-400 hover:text-red-600 flex items-center justify-center transition-colors"
+                    >
+                      <X size={13} />
+                    </button>
+
+                    {/* 썸네일 */}
+                    <div className="w-16 h-16 flex items-center justify-center p-1 bg-slate-50/80 rounded-xl mt-1 overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={emo.imageUrl}
+                        alt={emo.name}
+                        className="max-w-full max-h-full object-contain pointer-events-none drop-shadow-sm group-hover:scale-110 transition-transform"
+                      />
+                    </div>
+
+                    {/* 정보 */}
+                    <div className="w-full text-center">
+                      <div className="text-xs font-black text-slate-800 truncate" title={emo.name}>
+                        {emo.name}
+                      </div>
+                      <div className="flex items-center justify-center gap-1 mt-1">
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
+                          {emo.category}
+                        </span>
+                        {emo.isBuiltin && (
+                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600">
+                            기본
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-3 text-xs text-amber-900 flex items-start gap-2">
+              <span className="text-base shrink-0">💡</span>
+              <p className="leading-relaxed">
+                <strong>대표님을 위한 팁:</strong> 이미지의 배경이 투명하게 제거된 <strong>투명 PNG</strong> 파일이나 <strong>움짤 GIF</strong>를 등록하시면, 영상 뒤 배경을 가리지 않고 자연스러운 스티커처럼 합성됩니다. 이미지가 불투명하다면 상단 메뉴의 <strong>[✂️ 누끼따기]</strong> 도구로 1초 만에 배경을 지워서 등록해 보세요!
+              </p>
+            </div>
           </section>
 
           {/* Main Hero Section Settings */}
