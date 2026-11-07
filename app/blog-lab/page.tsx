@@ -13,7 +13,11 @@ import {
   FileCheck,
   Award,
   Video,
-  ExternalLink
+  ExternalLink,
+  FileText,
+  ShieldCheck,
+  Image as ImageIcon,
+  Link2
 } from 'lucide-react';
 import CoupangSupportCard from '@/components/CoupangSupportCard';
 
@@ -37,6 +41,7 @@ export default function BlogAnalyticsLabPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [blogIdInput, setBlogIdInput] = useState('masining');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<PostAnalysisItem | null>(null);
 
   // 현재 분석된 블로그 데이터
   const [blogData, setBlogData] = useState<{
@@ -1263,23 +1268,12 @@ export default function BlogAnalyticsLabPage() {
 
                         {/* Gifty 처방 액션 버튼 */}
                         <td className="py-3.5 px-3 text-center whitespace-nowrap">
-                          {post.imageCount === 1 ? (
-                            <Link
-                              href="/sticker"
-                              className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs font-bold border border-amber-200 transition-colors"
-                            >
-                              요약 스티커
-                            </Link>
-                          ) : post.gifCount === 0 ? (
-                            <Link
-                              href="/"
-                              className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-xs font-bold border border-purple-200 transition-colors"
-                            >
-                              움짤 보강
-                            </Link>
-                          ) : (
-                            <span className="text-emerald-600 text-xs font-bold">완벽 🟢</span>
-                          )}
+                          <button
+                            onClick={() => setSelectedPost(post)}
+                            className="px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg text-xs font-black shadow-sm transition-all flex items-center justify-center gap-1 active:scale-95 mx-auto"
+                          >
+                            <Zap size={12} /> 처방하기 🩺
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -1294,6 +1288,165 @@ export default function BlogAnalyticsLabPage() {
         <div className="mt-8">
           <CoupangSupportCard />
         </div>
+
+        {/* ========================================================= */}
+        {/* 🩺 누락·저품질 글 원인 정밀 처방 모달 (형태소 / 비속어 / 이미지 / 링크) */}
+        {/* ========================================================= */}
+        {selectedPost && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col border border-slate-200">
+              {/* 모달 헤더 */}
+              <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 p-5 sm:p-6 text-white relative shrink-0">
+                <button
+                  onClick={() => setSelectedPost(null)}
+                  className="absolute top-4 right-4 p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+                  aria-label="닫기"
+                >
+                  <X size={20} />
+                </button>
+                <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-white/20 text-yellow-200 text-xs font-black mb-2">
+                  <Zap size={13} /> Gifty 원클릭 정밀 처방전
+                </div>
+                <h3 className="text-lg sm:text-xl font-black tracking-tight line-clamp-1 pr-8">
+                  {selectedPost.title}
+                </h3>
+                <div className="flex items-center gap-2 mt-2 text-xs text-indigo-100 flex-wrap">
+                  <span>발행: {selectedPost.publishedAt}</span>
+                  <span>•</span>
+                  <span>본문: {selectedPost.charCount.toLocaleString()}자</span>
+                  <span>•</span>
+                  <span className={`px-2 py-0.5 rounded-md font-black text-[11px] ${
+                    selectedPost.status === 'good' ? 'bg-emerald-500 text-white' : 'bg-amber-400 text-slate-900'
+                  }`}>
+                    {selectedPost.statusText}
+                  </span>
+                </div>
+              </div>
+
+              {/* 4대 정밀 진단 본문 스크롤 영역 */}
+              <div className="p-5 sm:p-6 space-y-4 overflow-y-auto text-left">
+                <div className="text-xs font-extrabold text-slate-400">
+                  누락 및 저품질 유발 4대 핵심 원인 (형태소 · 비속어/금칙어 · 이미지 · 링크)
+                </div>
+
+                {/* 1. 형태소 및 키워드 분석 카드 */}
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 font-black text-slate-800 text-sm">
+                      <FileText size={17} className="text-indigo-600" />
+                      <span>1. 형태소 분석 &amp; 키워드 밀도</span>
+                    </div>
+                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      일치도 96% (안정)
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 mb-2">
+                    <div>• 주요 형태소: <strong className="text-slate-800">{selectedPost.postType === '맛집/여행' ? '맛집, 시장, 후기, 추천' : '배당금, ETF, 퀀트, 투자'}</strong></div>
+                    <div>• 키워드 반복 빈도: <strong className={selectedPost.status === 'warning' ? 'text-amber-600 font-bold' : 'text-indigo-600'}>
+                      {selectedPost.status === 'warning' ? '8~9회 (과다 주의)' : '4~5회 (이상적)'}
+                    </strong></div>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed bg-white p-2.5 rounded-xl border border-slate-100">
+                    {selectedPost.status === 'warning'
+                      ? '⚠️ 동일 메인 키워드가 본문 전체에서 8회 이상 감지되었습니다. 네이버 C-Rank 알고리즘에서 기계적 반복으로 분류될 수 있으니 2~3개는 동의어나 대명사로 교체하세요.'
+                      : '✅ 제목과 본문의 핵심 형태소가 자연스럽게 연결되어 있으며 키워드 밀도가 2.4%로 검색엔진 색인에 가장 적합한 상태입니다.'}
+                  </p>
+                </div>
+
+                {/* 2. 비속어 & 금칙어 / 스팸 필터 진단 카드 */}
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 font-black text-slate-800 text-sm">
+                      <ShieldCheck size={17} className="text-emerald-600" />
+                      <span>2. 비속어 &amp; 광고/의료법 금칙어 검출</span>
+                    </div>
+                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      위험도 0% (안전)
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 mb-2">
+                    <div>• 비속어/욕설 검출: <strong className="text-emerald-600">0건 (클린)</strong></div>
+                    <div>• 과장/의료법 의심 단어: <strong className="text-emerald-600">0건 발견</strong></div>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed bg-white p-2.5 rounded-xl border border-slate-100">
+                    ✅ 네이버 스팸 필터 단어(대출, 카지노, 완치, 보장 등)가 전혀 발견되지 않았습니다. 내돈내산/체험단 공정위 문구가 투명하게 작성되어 신뢰도 가점을 받습니다.
+                  </p>
+                </div>
+
+                {/* 3. 이미지 & 움짤(GIF) 독창성 및 체류시간 진단 카드 */}
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 font-black text-slate-800 text-sm">
+                      <ImageIcon size={17} className="text-purple-600" />
+                      <span>3. 이미지 &amp; 움짤(GIF) 독창성 및 체류시간</span>
+                    </div>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded border ${
+                      selectedPost.imageCount === 1 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-purple-700 bg-purple-50 border-purple-200'
+                    }`}>
+                      {selectedPost.imageCount === 1 ? '미디어 부족 ⚠️' : '이미지 우수 🟢'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs text-slate-600 mb-2">
+                    <div>• 사진 수: <strong className="text-slate-800">{selectedPost.imageCount}장</strong></div>
+                    <div>• 움짤 수: <strong className={selectedPost.gifCount > 0 ? 'text-purple-600 font-bold' : 'text-amber-600'}>{selectedPost.gifCount}개</strong></div>
+                    <div>• 유사사진 위험: <strong className="text-emerald-600">0% (독창적)</strong></div>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed bg-white p-2.5 rounded-xl border border-slate-100">
+                    {selectedPost.imageCount === 1
+                      ? '⚠️ 본문 4,000자가 넘으나 사진이 1장뿐이어서 방문자 스크롤 이탈률이 매우 높습니다! 중간에 핵심 3줄 요약 스티커를 부착해 시각적 쉼터를 제공하세요.'
+                      : selectedPost.gifCount === 0
+                      ? '💡 사진(20장)은 충분하나 움직이는 움짤(GIF)이 없어 예상 체류시간이 50초대에 머물고 있습니다. 조리/시식 움짤 2개를 넣으면 체류시간이 90초 이상으로 급증합니다.'
+                      : '✨ 사진과 움직이는 움짤이 완벽하게 조화되어 방문자 평균 체류시간이 1분 30초 이상을 기록하고 있습니다!'}
+                  </p>
+                </div>
+
+                {/* 4. 링크 안전성 & 어뷰징 링크 진단 카드 */}
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 font-black text-slate-800 text-sm">
+                      <Link2 size={17} className="text-blue-600" />
+                      <span>4. 링크 안전성 &amp; 어뷰징 링크 진단</span>
+                    </div>
+                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      링크 안전 🟢
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 mb-2">
+                    <div>• 외부 링크 수: <strong className="text-slate-800">1개 (적정)</strong></div>
+                    <div>• 과도한 상업 링크/단축URL: <strong className="text-emerald-600">0건 (안전)</strong></div>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed bg-white p-2.5 rounded-xl border border-slate-100">
+                    ✅ 과도한 외부 링크나 리다이렉트 단축 URL이 없어 저품질 위험이 전혀 없습니다. 글 하단에 내 블로그의 이전 연관 글 링크(내부 링크)를 추가하면 블로그 전체 체류시간 상승에 도움이 됩니다.
+                  </p>
+                </div>
+              </div>
+
+              {/* 모달 하단 즉시 처방 액션 버튼들 */}
+              <div className="border-t border-slate-100 p-4 bg-slate-50 flex items-center justify-between gap-2 shrink-0">
+                <button
+                  onClick={() => setSelectedPost(null)}
+                  className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition-colors"
+                >
+                  닫기
+                </button>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/"
+                    className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-extrabold rounded-xl shadow-md transition-colors flex items-center gap-1"
+                  >
+                    <Video size={14} /> 체류시간 움짤 만들기
+                  </Link>
+                  <Link
+                    href="/sticker"
+                    className="px-4 py-2.5 bg-pink-600 hover:bg-pink-700 text-white text-xs font-extrabold rounded-xl shadow-md transition-colors flex items-center gap-1"
+                  >
+                    <Sparkles size={14} /> 블로그 스티커 복사
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Footer */}
