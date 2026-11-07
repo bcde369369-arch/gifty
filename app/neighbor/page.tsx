@@ -1117,8 +1117,8 @@ export default function NeighborAnalyticsPage() {
 
   const targetIdClean = cleanBlogId(blogId);
   const naverAdminUrl = targetIdClean
-    ? `https://admin.blog.naver.com/BuddyOrderManage.naver?blogId=${targetIdClean}`
-    : 'https://admin.blog.naver.com/BuddyOrderManage.naver';
+    ? `https://admin.blog.naver.com/${targetIdClean}`
+    : 'https://section.blog.naver.com/';
 
   // 네이버 공식 이웃 관리 페이지 안전 열기 핸들러
   const handleOpenNaverAdmin = (
