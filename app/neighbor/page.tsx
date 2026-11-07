@@ -108,7 +108,6 @@ export default function NeighborAnalyticsPage() {
   const [historyRecords, setHistoryRecords] = useState<AnalysisRecord[]>([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showExtensionModal, setShowExtensionModal] = useState(false);
-  const [copiedChromeUrl, setCopiedChromeUrl] = useState(false);
   const [visitedToday, setVisitedToday] = useState<Record<string, boolean>>({});
   const [routineFilter, setRoutineFilter] = useState<'all' | 'unvisited' | 'visited'>('all');
   const [topFilter, setTopFilter] = useState<'all' | 'vip' | 'new' | 'unvisited'>('all');
@@ -823,14 +822,6 @@ export default function NeighborAnalyticsPage() {
     });
   };
 
-  // 크롬 확장 관리자 주소 복사 핸들러
-  const handleCopyChromeUrl = () => {
-    navigator.clipboard.writeText('chrome://extensions').then(() => {
-      setCopiedChromeUrl(true);
-      setTimeout(() => setCopiedChromeUrl(false), 2000);
-    });
-  };
-
   // 특정 이웃 즉시 보호(제외) 처리 핸들러
   const handleProtectNeighbor = (nickname: string) => {
     setInactiveNeighbors((prev) => prev.filter((i) => i.nickname !== nickname));
@@ -1253,11 +1244,11 @@ export default function NeighborAnalyticsPage() {
 
               <div>
                 <h3 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
-                  <span>네이버 창에서 버튼 1번으로 자동 분석 연동!</span>
+                  <span>압축 풀고 [1초_자동설치] 더블클릭하면 끝!</span>
                   <span className="text-amber-400">⚡</span>
                 </h3>
                 <p className="text-xs sm:text-sm text-indigo-100 leading-relaxed mt-1">
-                  확장 프로그램을 설치하시면 마우스로 드래그 복사할 필요 없이, 네이버 이웃 관리 창에서 <strong>[📊 Gifty 분석실로 보내기]</strong> 버튼 클릭 한 번으로 모든 이웃 데이터가 자동 입력됩니다.
+                  다운로드 후 압축을 풀고 안의 <strong>[1초_자동설치.bat]</strong>만 더블클릭하세요. 크롬이 자동으로 켜지면서 확장 프로그램이 바로 장착되어 네이버 화면으로 이동합니다!
                 </p>
               </div>
 
@@ -3124,7 +3115,7 @@ export default function NeighborAnalyticsPage() {
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 leading-relaxed">
-                  아래 버튼을 눌러 압축 파일(<code className="bg-slate-200 px-1 py-0.5 rounded text-[11px]">gifty-neighbor-cleaner.zip</code>)을 다운로드한 후, 원하는 폴더(예: 바탕화면 또는 다운로드 폴더)에 압축을 풀어주세요.
+                  아래 버튼을 눌러 압축 파일(<code className="bg-slate-200 px-1 py-0.5 rounded text-[11px]">gifty-neighbor-cleaner.zip</code>)을 다운로드한 후, 바탕화면이나 편한 폴더에 압축을 풀어주세요.
                 </p>
                 <a
                   href="/downloads/gifty-neighbor-cleaner.zip"
@@ -3136,53 +3127,31 @@ export default function NeighborAnalyticsPage() {
                 </a>
               </div>
 
-              {/* Step 2 */}
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
-                <span className="font-black text-slate-800 flex items-center gap-1.5">
-                  <span className="w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[11px]">2</span>
-                  <span>크롬 확장 관리 페이지 열기</span>
-                </span>
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  크롬 브라우저 주소창에 아래 주소를 입력하거나 복사 후 새 탭에 붙여넣어 접속합니다.
+              {/* Step 2 - One Click BAT (추천) */}
+              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-300 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-emerald-950 flex items-center gap-1.5">
+                    <span className="w-5 h-5 bg-emerald-600 text-white rounded-full flex items-center justify-center text-[11px]">2</span>
+                    <span>폴더 안의 [1초_자동설치.bat] 더블클릭! (끝 🎉)</span>
+                  </span>
+                  <span className="text-[10px] bg-emerald-600 text-white font-black px-2 py-0.5 rounded-full">가장 쉬움</span>
+                </div>
+                <p className="text-[11px] text-emerald-800 leading-relaxed">
+                  압축을 푼 폴더 안에서 <strong>1초_자동설치.bat</strong> 파일을 더블클릭하시면, 크롬이 자동으로 켜지면서 확장 프로그램이 바로 장착되어 네이버 화면으로 이동합니다!
                 </p>
-                <div className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-slate-200">
-                  <code className="text-indigo-600 font-mono font-bold text-xs flex-1">
-                    chrome://extensions
-                  </code>
-                  <button
-                    type="button"
-                    onClick={handleCopyChromeUrl}
-                    className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg transition-colors flex items-center gap-1 cursor-pointer shrink-0"
-                  >
-                    {copiedChromeUrl ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
-                    <span>{copiedChromeUrl ? '복사됨!' : '주소 복사'}</span>
-                  </button>
+                <div className="text-[10px] text-emerald-700 bg-white/70 p-2 rounded-xl border border-emerald-200">
+                  ※ 만약 윈도우 파란색 보안 창(&apos;PC 보호&apos;)이 뜨면 <strong>[추가 정보] ➔ [실행]</strong>을 누르시면 됩니다.
                 </div>
               </div>
 
-              {/* Step 3 & 4 */}
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
-                <span className="font-black text-slate-800 flex items-center gap-1.5">
-                  <span className="w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[11px]">3</span>
-                  <span>[개발자 모드] 켜기 ➔ [압축해제된 확장 프로그램 로드]</span>
+              {/* Step 3 - Manual Chrome Extensions (대체 방법) */}
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2 text-slate-600">
+                <span className="font-bold text-slate-700 flex items-center gap-1.5 text-[11px]">
+                  <span>💡 직접 크롬에 등록하고 싶으신 경우:</span>
                 </span>
-                <ul className="text-[11px] text-slate-600 space-y-1.5 list-disc list-inside leading-relaxed pl-1">
-                  <li>화면 우측 상단의 <strong>[개발자 모드]</strong> 스위치를 켭니다.</li>
-                  <li>좌측 상단에 나타난 <strong>[압축해제된 확장 프로그램을 로드합니다]</strong> 버튼을 클릭합니다.</li>
-                  <li>
-                    압축을 푼 <strong className="text-indigo-600 font-black">gifty-neighbor-cleaner</strong> 폴더(안에 <code className="bg-slate-200 px-1 py-0.5 rounded text-[10px]">manifest.json</code>이 들어있는 폴더)를 선택하면 설치 끝!
-                  </li>
-                </ul>
-
-                {/* 🚨 매니페스트 오류 해결 팁 */}
-                <div className="mt-2 p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-[11px] space-y-1">
-                  <div className="font-bold flex items-center gap-1 text-amber-800">
-                    <span>💡 &apos;매니페스트 파일이 없거나 읽을 수 없습니다&apos; 오류가 발생하나요?</span>
-                  </div>
-                  <p className="text-amber-700/90 leading-relaxed font-normal">
-                    압축을 풀었을 때 폴더가 2중(폴더 안에 또 같은 이름의 폴더)으로 풀렸을 수 있습니다. 폴더 안으로 한 단계 더 들어가서 <strong>manifest.json</strong> 파일이 바로 보이는 폴더를 선택해 주세요!
-                  </p>
-                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  크롬 주소창에 <code className="bg-white px-1 py-0.5 rounded text-indigo-600 font-mono font-bold">chrome://extensions</code> 입력 ➔ 우측 상단 <strong>[개발자 모드]</strong> 켜기 ➔ 좌측 상단 <strong>[압축해제된 확장 프로그램을 로드합니다]</strong> 클릭 후 압축 푼 폴더를 선택하셔도 됩니다.
+                </p>
               </div>
 
               {/* Step 5 */}
