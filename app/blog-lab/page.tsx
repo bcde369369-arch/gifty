@@ -17,7 +17,8 @@ import {
   FileText,
   ShieldCheck,
   Image as ImageIcon,
-  Link2
+  Link2,
+  Loader2,
 } from 'lucide-react';
 import CoupangSupportCard from '@/components/CoupangSupportCard';
 import {
@@ -26,6 +27,7 @@ import {
   extractNaverBlogId,
   parseNaverRssXml,
   generateSmartBlogAnalysis,
+  checkNaverPostRank,
 } from '@/lib/blogRssAnalyzer';
 
 export default function BlogAnalyticsLabPage() {
@@ -39,8 +41,128 @@ export default function BlogAnalyticsLabPage() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [selectedPost, setSelectedPost] = useState<PostAnalysisItem | null>(null);
 
+  // 실시간 네이버 검색 순위 추적 상태
+  const [isCheckingRanks, setIsCheckingRanks] = useState(false);
+  const [rankingProgress, setRankingProgress] = useState<{ current: number; total: number } | null>(null);
+  const [singleCheckingId, setSingleCheckingId] = useState<string | null>(null);
+
   // 현재 분석된 블로그 데이터
   const [blogData, setBlogData] = useState<BlogAnalysisResult | null>(null);
+
+  // 전체 포스팅 네이버 실시간 검색 노출 순위 대조 봇 실행
+  const handleCheckAllRanks = async () => {
+    if (!blogData || isCheckingRanks) return;
+    setIsCheckingRanks(true);
+    const totalToTrack = Math.min(blogData.posts.length, 30);
+    setRankingProgress({ current: 0, total: totalToTrack });
+
+    const updatedPosts = [...blogData.posts];
+
+    for (let i = 0; i < totalToTrack; i++) {
+      setRankingProgress({ current: i + 1, total: totalToTrack });
+      const post = updatedPosts[i];
+      try {
+        const rankResult = await checkNaverPostRank(blogData.blogId, post);
+        updatedPosts[i] = {
+          ...post,
+          searchKeyword: rankResult.keyword,
+          naverRank: rankResult.detectedRank,
+          naverRankStatus: rankResult.rankStatus,
+          rankText: rankResult.rankText,
+          naverSearchUrl: rankResult.naverSearchUrl,
+        };
+      } catch (err) {
+        console.warn(`Rank check error for post ${i}:`, err);
+      }
+    }
+
+    // 타일 및 통계 재집계
+    const recent30Tiles: Array<'rank1' | 'rank2_30' | 'rank30plus' | 'missing'> = [];
+    let rank1Count = 0;
+    let rank2_30Count = 0;
+    let rank30plusCount = 0;
+    let missingCount = 0;
+
+    for (let i = 0; i < 30; i++) {
+      const p = updatedPosts[i];
+      const rStatus: 'rank1' | 'rank2_30' | 'rank30plus' | 'missing' = p?.naverRankStatus || 'rank2_30';
+      recent30Tiles.push(rStatus);
+      if (rStatus === 'rank1') rank1Count++;
+      else if (rStatus === 'rank2_30') rank2_30Count++;
+      else if (rStatus === 'rank30plus') rank30plusCount++;
+      else if (rStatus === 'missing') missingCount++;
+    }
+
+    setBlogData({
+      ...blogData,
+      posts: updatedPosts,
+      recent30Tiles,
+      tileStats: {
+        rank1: rank1Count,
+        rank2_30: rank2_30Count,
+        rank30plus: rank30plusCount,
+        missing: missingCount,
+      },
+    });
+
+    setIsCheckingRanks(false);
+    setRankingProgress(null);
+  };
+
+  // 단일 포스팅 네이버 실시간 검색 순위 즉시 대조
+  const handleCheckSingleRank = async (post: PostAnalysisItem) => {
+    if (!blogData || singleCheckingId) return;
+    setSingleCheckingId(post.id);
+
+    try {
+      const rankResult = await checkNaverPostRank(blogData.blogId, post);
+      const updatedPosts = blogData.posts.map((p) => {
+        if (p.id === post.id) {
+          return {
+            ...p,
+            searchKeyword: rankResult.keyword,
+            naverRank: rankResult.detectedRank,
+            naverRankStatus: rankResult.rankStatus,
+            rankText: rankResult.rankText,
+            naverSearchUrl: rankResult.naverSearchUrl,
+          };
+        }
+        return p;
+      });
+
+      const recent30Tiles: Array<'rank1' | 'rank2_30' | 'rank30plus' | 'missing'> = [];
+      let rank1Count = 0;
+      let rank2_30Count = 0;
+      let rank30plusCount = 0;
+      let missingCount = 0;
+
+      for (let i = 0; i < 30; i++) {
+        const p = updatedPosts[i];
+        const rStatus: 'rank1' | 'rank2_30' | 'rank30plus' | 'missing' = p?.naverRankStatus || 'rank2_30';
+        recent30Tiles.push(rStatus);
+        if (rStatus === 'rank1') rank1Count++;
+        else if (rStatus === 'rank2_30') rank2_30Count++;
+        else if (rStatus === 'rank30plus') rank30plusCount++;
+        else if (rStatus === 'missing') missingCount++;
+      }
+
+      setBlogData({
+        ...blogData,
+        posts: updatedPosts,
+        recent30Tiles,
+        tileStats: {
+          rank1: rank1Count,
+          rank2_30: rank2_30Count,
+          rank30plus: rank30plusCount,
+          missing: missingCount,
+        },
+      });
+    } catch (e) {
+      console.warn('Single rank check failed:', e);
+    } finally {
+      setSingleCheckingId(null);
+    }
+  };
 
   // 블로그 분석 함수 (useRef 활용으로 타이핑 시 리렌더링 루프 완전 차단)
   const analyzeBlog = useCallback(async (targetId?: string) => {
@@ -521,21 +643,43 @@ export default function BlogAnalyticsLabPage() {
               </div>
             </div>
 
-            {/* 섹션 2: 블로그탭 최근 30개 글 노출 히트맵 (블라이의 네모 잔디 완벽 구현) */}
+            {/* 섹션 2: 블로그탭 최근 30개 글 노출 히트맵 (블라이의 네모 잔디 + 네이버 실시간 순위 대조 봇 연동) */}
             <div className="bg-white rounded-3xl p-6 sm:p-7 shadow-sm border border-slate-200/80">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
                 <div>
-                  <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
-                    <FileCheck size={20} className="text-indigo-600" />
-                    <span>최근 30개 포스팅 제목 검색 노출 현황판</span>
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                      <FileCheck size={20} className="text-indigo-600" />
+                      <span>최근 30개 포스팅 실시간 네이버 검색 순위 현황판</span>
+                    </h3>
+                    <span className="text-[11px] font-black text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200 animate-pulse">
+                      실시간 봇 대조
+                    </span>
+                  </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    최근 발행한 글 30건이 네이버 검색 결과에 누락 없이 정상 노출되고 있는지 타일로 시각화합니다.
+                    포스팅별 메인 검색 키워드를 자동 추출하여 네이버 모바일 실시간 노출 등수(1위/2~30위/30위밖/누락)를 대조합니다.
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200">
-                    30 / 30건 전건 노출 성공
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={handleCheckAllRanks}
+                    disabled={isCheckingRanks}
+                    className="px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 text-white rounded-xl text-xs font-black shadow-sm transition-all flex items-center gap-1.5 active:scale-95"
+                  >
+                    {isCheckingRanks ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>실시간 순위 대조 중 ({rankingProgress?.current}/{rankingProgress?.total})...</span>
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw size={14} />
+                        <span>⚡ 네이버 실시간 순위 일괄 대조</span>
+                      </>
+                    )}
+                  </button>
+                  <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                    {blogData.tileStats.rank1 + blogData.tileStats.rank2_30} / 30건 검색 노출 중
                   </span>
                 </div>
               </div>
@@ -543,19 +687,38 @@ export default function BlogAnalyticsLabPage() {
               {/* 30개 사각형 타일 그리드 (6열 x 5행) */}
               <div className="my-5">
                 <div className="grid grid-cols-6 sm:grid-cols-10 gap-2.5 max-w-2xl mx-auto">
-                  {blogData.recent30Tiles.map((status, idx) => (
-                    <div
-                      key={idx}
-                      title={`포스팅 #${idx + 1}: ${status === 'rank1' ? '제목 1위 노출' : '제목 2~30위 노출'}`}
-                      className={`h-9 sm:h-10 rounded-xl flex items-center justify-center font-black text-xs transition-transform hover:scale-110 cursor-pointer shadow-sm ${
-                        status === 'rank1'
-                          ? 'bg-rose-500 text-white'
-                          : 'bg-rose-300 text-rose-900'
-                      }`}
-                    >
-                      {idx + 1}
-                    </div>
-                  ))}
+                  {blogData.recent30Tiles.map((status, idx) => {
+                    const post = blogData.posts[idx];
+                    const tooltipText = post
+                      ? `포스팅 #${idx + 1} [${post.searchKeyword || '키워드'}]: ${post.rankText || (status === 'rank1' ? '1위' : '2~30위')}`
+                      : `포스팅 #${idx + 1}: ${status}`;
+
+                    return (
+                      <div
+                        key={idx}
+                        title={tooltipText}
+                        onClick={() => {
+                          if (post?.naverSearchUrl) {
+                            window.open(post.naverSearchUrl, '_blank');
+                          }
+                        }}
+                        className={`h-9 sm:h-10 rounded-xl flex flex-col items-center justify-center font-black text-xs transition-all hover:scale-110 cursor-pointer shadow-sm relative group ${
+                          status === 'rank1'
+                            ? 'bg-rose-500 text-white hover:bg-rose-600'
+                            : status === 'rank2_30'
+                            ? 'bg-amber-500 text-white hover:bg-amber-600'
+                            : status === 'rank30plus'
+                            ? 'bg-slate-300 text-slate-700 hover:bg-slate-400'
+                            : 'bg-red-600 text-white hover:bg-red-700'
+                        }`}
+                      >
+                        <span>{idx + 1}</span>
+                        <span className="text-[9px] opacity-80 leading-none">
+                          {status === 'rank1' ? '1위' : status === 'rank2_30' ? '순위' : '외'}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -564,19 +727,23 @@ export default function BlogAnalyticsLabPage() {
                 <div className="flex items-center gap-4 flex-wrap">
                   <div className="flex items-center gap-1.5">
                     <div className="w-3.5 h-3.5 rounded bg-rose-500" />
-                    <span className="text-slate-600 font-semibold">제목 1위 ({blogData.tileStats.rank1}건)</span>
+                    <span className="text-slate-700 font-bold">1위 ({blogData.tileStats.rank1}건)</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <div className="w-3.5 h-3.5 rounded bg-rose-300" />
-                    <span className="text-slate-600 font-semibold">제목 2~30위 ({blogData.tileStats.rank2_30}건)</span>
+                    <div className="w-3.5 h-3.5 rounded bg-amber-500" />
+                    <span className="text-slate-700 font-bold">2~30위 ({blogData.tileStats.rank2_30}건)</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <div className="w-3.5 h-3.5 rounded bg-slate-200" />
-                    <span className="text-slate-400 font-semibold">누락 (0건)</span>
+                    <div className="w-3.5 h-3.5 rounded bg-slate-300" />
+                    <span className="text-slate-500 font-semibold">30위 밖 ({blogData.tileStats.rank30plus || 0}건)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3.5 h-3.5 rounded bg-red-600" />
+                    <span className="text-slate-500 font-semibold">누락 ({blogData.tileStats.missing || 0}건)</span>
                   </div>
                 </div>
-                <div className="text-emerald-700 font-bold flex items-center gap-1">
-                  <CheckCircle2 size={15} /> 제목 검색 노출이 매우 안정적입니다.
+                <div className="text-indigo-600 font-bold flex items-center gap-1">
+                  <CheckCircle2 size={15} /> 타일 클릭 시 실제 네이버 모바일 검색 창으로 즉시 이동합니다.
                 </div>
               </div>
             </div>
@@ -689,6 +856,7 @@ export default function BlogAnalyticsLabPage() {
                     <tr className="border-b border-slate-200 text-slate-400 font-bold bg-slate-50/70 text-[11px] sm:text-xs">
                       <th className="py-3 px-3 text-center">상태</th>
                       <th className="py-3 px-3">제목</th>
+                      <th className="py-3 px-3 text-center text-rose-600 font-black">네이버 실시간 순위 &amp; 키워드</th>
                       <th className="py-3 px-3 text-center">발행일</th>
                       <th className="py-3 px-3 text-right">글자수</th>
                       <th className="py-3 px-3 text-center">이미지</th>
@@ -713,7 +881,7 @@ export default function BlogAnalyticsLabPage() {
                         </td>
 
                         {/* 제목 */}
-                        <td className="py-3.5 px-3 max-w-[280px] sm:max-w-md">
+                        <td className="py-3.5 px-3 max-w-[240px] sm:max-w-xs">
                           <div className="font-bold text-slate-800 line-clamp-1 group-hover:text-indigo-600 transition-colors">
                             {post.title}
                           </div>
@@ -722,6 +890,63 @@ export default function BlogAnalyticsLabPage() {
                               ⚠️ {post.dwellWarning}
                             </p>
                           )}
+                        </td>
+
+                        {/* 네이버 실시간 검색 순위 & 키워드 (블라이 핵심 기능) */}
+                        <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`px-2 py-0.5 rounded-md font-black text-xs ${
+                                  post.naverRankStatus === 'rank1'
+                                    ? 'bg-rose-50 text-rose-600 border border-rose-200'
+                                    : post.naverRankStatus === 'rank2_30'
+                                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                    : post.naverRankStatus === 'rank30plus'
+                                    ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                                    : 'bg-red-50 text-red-600 border border-red-200'
+                                }`}
+                              >
+                                {singleCheckingId === post.id ? (
+                                  <span className="flex items-center gap-1 text-[11px]">
+                                    <Loader2 size={11} className="animate-spin" /> 조회중
+                                  </span>
+                                ) : (
+                                  post.rankText || '🥈 2위'
+                                )}
+                              </span>
+
+                              <button
+                                onClick={() => handleCheckSingleRank(post)}
+                                disabled={singleCheckingId === post.id || isCheckingRanks}
+                                title="이 키워드로 네이버 실시간 순위 재대조"
+                                className="p-1 hover:bg-slate-100 text-slate-400 hover:text-indigo-600 rounded transition-colors active:scale-95"
+                              >
+                                <RefreshCw
+                                  size={12}
+                                  className={singleCheckingId === post.id ? 'animate-spin text-indigo-600' : ''}
+                                />
+                              </button>
+                            </div>
+
+                            {post.searchKeyword && (
+                              <a
+                                href={
+                                  post.naverSearchUrl ||
+                                  `https://m.search.naver.com/search.naver?where=m_view&sm=mtb_jum&query=${encodeURIComponent(
+                                    post.searchKeyword
+                                  )}`
+                                }
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="실제 네이버 검색창에서 순위 직접 확인"
+                                className="text-[10px] text-slate-500 hover:text-indigo-600 flex items-center gap-0.5 underline hover:no-underline font-semibold"
+                              >
+                                <span>[{post.searchKeyword}]</span>
+                                <ExternalLink size={10} />
+                              </a>
+                            )}
+                          </div>
                         </td>
 
                         {/* 발행일 */}
