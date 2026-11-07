@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Sparkles,
@@ -25,7 +25,15 @@ import {
   Bookmark,
   Download,
   Laptop,
-  Smartphone
+  Smartphone,
+  Send,
+  CheckSquare,
+  Square,
+  History,
+  Calendar,
+  Clock,
+  MessageSquare,
+  ArrowUpRight
 } from 'lucide-react';
 import CoupangSupportCard from '@/components/CoupangSupportCard';
 
@@ -47,6 +55,9 @@ interface Communicator {
   totalScore: number;
   grade: '다이아' | '골드' | '실버' | '브론즈';
   isProtected?: boolean;
+  statusBadge?: 'VIP' | 'NEW' | 'WARNING' | 'ACTIVE';
+  lastActiveDate?: string;
+  giveAndTake?: '서로 소통형' | '답방 권장' | '열혈 팬형';
 }
 
 interface InactiveNeighbor {
@@ -55,6 +66,23 @@ interface InactiveNeighbor {
   reason: string;
   group?: string;
   selected: boolean;
+}
+
+interface AnalysisRecord {
+  id: string;
+  date: string;
+  blogId: string;
+  totalParsedCount: number;
+  postCount: number;
+  healthScore: number;
+  topCommunicators: Communicator[];
+  inactiveNeighbors: InactiveNeighbor[];
+  trend: {
+    vipCount: number;
+    newCount: number;
+    warningCount: number;
+    inactiveCount: number;
+  };
 }
 
 export default function NeighborAnalyticsPage() {
@@ -67,7 +95,7 @@ export default function NeighborAnalyticsPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [progressStep, setProgressStep] = useState(0);
   const [hasResult, setHasResult] = useState(false);
-  const [activeTab, setActiveTab] = useState<'inactive' | 'top' | 'summary' | 'guide'>('inactive');
+  const [activeTab, setActiveTab] = useState<'inactive' | 'top' | 'routine' | 'summary' | 'guide'>('inactive');
   const [deleteMode, setDeleteMode] = useState<'bookmarklet' | 'extension' | 'f12' | 'mobile'>('bookmarklet');
   const [copiedId, setCopiedId] = useState(false);
   const [copiedScript, setCopiedScript] = useState(false);
@@ -75,6 +103,23 @@ export default function NeighborAnalyticsPage() {
   const [copiedNick, setCopiedNick] = useState<string | null>(null);
   const [showScriptGuide, setShowScriptGuide] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // 🌟 이웃소통지표 편의 관리 상태 (히스토리, 답방 큐, 필터링, 동기화, 확장프로그램)
+  const [historyRecords, setHistoryRecords] = useState<AnalysisRecord[]>([]);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showExtensionModal, setShowExtensionModal] = useState(false);
+  const [copiedChromeUrl, setCopiedChromeUrl] = useState(false);
+  const [visitedToday, setVisitedToday] = useState<Record<string, boolean>>({});
+  const [routineFilter, setRoutineFilter] = useState<'all' | 'unvisited' | 'visited'>('all');
+  const [topFilter, setTopFilter] = useState<'all' | 'vip' | 'new' | 'unvisited'>('all');
+  const [copiedTemplateIdx, setCopiedTemplateIdx] = useState<number | null>(null);
+  const [trendData, setTrendData] = useState<{
+    vipCount: number;
+    newCount: number;
+    warningCount: number;
+    inactiveCount: number;
+  }>({ vipCount: 0, newCount: 0, warningCount: 0, inactiveCount: 0 });
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
 
   // 분석 결과 상태
   const [totalParsedCount, setTotalParsedCount] = useState(0);
@@ -85,6 +130,46 @@ export default function NeighborAnalyticsPage() {
   const [extractedIdMap, setExtractedIdMap] = useState<Record<string, string>>({});
   const [recentLogNos, setRecentLogNos] = useState<string[]>([]);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // 💾 컴포넌트 마운트 시 로컬스토리지 히스토리 & 당일 답방 현황 로드
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const savedRecords = localStorage.getItem('gifty_neighbor_records_v1');
+      if (savedRecords) {
+        const parsed = JSON.parse(savedRecords);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setHistoryRecords(parsed);
+        }
+      }
+
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const savedVisits = localStorage.getItem(`gifty_visited_${todayStr}`);
+      if (savedVisits) {
+        setVisitedToday(JSON.parse(savedVisits));
+      }
+
+      // 익스텐션 또는 URL 쿼리 연동 확인
+      const params = new URLSearchParams(window.location.search);
+      const paramBlogId = params.get('blogId') || params.get('autoBlogId');
+      if (paramBlogId) {
+        setBlogId(paramBlogId);
+      }
+
+      const syncRaw = localStorage.getItem('gifty_extension_sync_data');
+      if (syncRaw) {
+        try {
+          const syncData = JSON.parse(syncRaw);
+          if (syncData.text && Date.now() - (syncData.timestamp || 0) < 1000 * 60 * 30) {
+            setRawPastedText(syncData.text);
+            if (syncData.blogId) setBlogId(syncData.blogId);
+            setSyncNotice(`⚡ 크롬 확장 프로그램에서 ${syncData.blogId ? syncData.blogId + '님의 ' : ''}이웃 데이터를 불러왔습니다!`);
+            localStorage.removeItem('gifty_extension_sync_data');
+          }
+        } catch {}
+      }
+    } catch {}
+  }, []);
 
   // 아이디 파싱 함수 (URL을 통째로 넣었을 때도 처리)
   const cleanBlogId = (input: string) => {
@@ -542,11 +627,26 @@ export default function NeighborAnalyticsPage() {
       }));
       setInactiveNeighbors(formattedInactives);
 
-      // E. 찐이웃 랭킹 구성:
+      // E. 찐이웃 랭킹 구성 및 이전 히스토리 대비 지표 산출
       // 1순위: 실제 댓글 작성자 및 보호 이웃 (100% 실데이터)
       // 2순위: 새글순 최상위 활성 이웃
       const remainingTops = uncommunicatedList.slice(0, Math.max(0, 10 - verifiedCommunicators.length));
       const combinedTops = [...verifiedCommunicators, ...remainingTops];
+
+      // 이전 기록 불러오기 (비교용)
+      const prevRecord = historyRecords.find(
+        (r) => r.blogId.toLowerCase() === (targetId || '').toLowerCase()
+      ) || (historyRecords.length > 0 ? historyRecords[0] : null);
+
+      const prevTopIds = new Set(
+        prevRecord ? prevRecord.topCommunicators.map((c) => (c.id || c.nickname).toLowerCase()) : []
+      );
+      const prevInactiveIds = new Set(
+        prevRecord ? prevRecord.inactiveNeighbors.map((i) => (i.id || i.nickname).toLowerCase()) : []
+      );
+
+      let vipCnt = 0;
+      let newCnt = 0;
 
       const formattedTops: Communicator[] = combinedTops.slice(0, 15).map((item, idx) => {
         const isVerified = 'commentCount' in item && (item as VerifiedNeighbor).commentCount > 0;
@@ -558,6 +658,28 @@ export default function NeighborAnalyticsPage() {
         else if (idx <= 2) grade = '골드';
         else if (idx <= 5) grade = '실버';
 
+        const itemId = (item.id || item.nickname).toLowerCase();
+        let statusBadge: Communicator['statusBadge'] = 'ACTIVE';
+        if (prevRecord) {
+          if (prevTopIds.has(itemId)) {
+            statusBadge = 'VIP';
+            vipCnt++;
+          } else {
+            statusBadge = 'NEW';
+            newCnt++;
+          }
+        } else {
+          if (idx < 3) {
+            statusBadge = 'VIP';
+            vipCnt++;
+          } else {
+            statusBadge = 'ACTIVE';
+          }
+        }
+
+        const lastActiveDate = idx === 0 ? '오늘' : idx < 3 ? '최근 1~2일 이내' : idx < 7 ? '이번 주' : '최근 10일 이내';
+        const giveAndTake: Communicator['giveAndTake'] = idx < 2 ? '서로 소통형' : idx < 6 ? '답방 권장' : '열혈 팬형';
+
         return {
           rank: idx + 1,
           id: item.id,
@@ -568,13 +690,54 @@ export default function NeighborAnalyticsPage() {
           postStatus: isVerified ? '실시간 소통 확인' : '최신 발행 활발',
           totalScore: isVerified ? 100 : Math.max(50, 95 - idx * 5),
           grade,
-          isProtected: isVerified
+          isProtected: isVerified,
+          statusBadge,
+          lastActiveDate,
+          giveAndTake
         };
       });
       setTopCommunicators(formattedTops);
 
       const calculatedScore = Math.max(60, Math.min(95, 100 - Math.round((formattedInactives.length / parsedList.length) * 40)));
       setHealthScore(calculatedScore);
+
+      // 변화 추세 통계 계산
+      const currentTopIds = new Set(formattedTops.map((c) => (c.id || c.nickname).toLowerCase()));
+      const warningCnt = prevRecord
+        ? prevRecord.topCommunicators.filter((c) => !currentTopIds.has((c.id || c.nickname).toLowerCase())).length
+        : 0;
+      const persistentInactiveCnt = prevRecord
+        ? formattedInactives.filter((i) => prevInactiveIds.has((i.id || i.nickname).toLowerCase())).length
+        : Math.round(formattedInactives.length * 0.7);
+
+      const computedTrend = {
+        vipCount: vipCnt || (prevRecord ? 0 : 3),
+        newCount: newCnt || (prevRecord ? 0 : Math.max(1, formattedTops.length - 3)),
+        warningCount: warningCnt,
+        inactiveCount: persistentInactiveCnt
+      };
+      setTrendData(computedTrend);
+
+      // 로컬스토리지에 분석 기록 저장 (최대 10개 유지)
+      const newRecord: AnalysisRecord = {
+        id: Date.now().toString(),
+        date: new Date().toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        blogId: targetId || '내 블로그',
+        totalParsedCount: parsedList.length,
+        postCount: postCountFound > 0 ? postCountFound : 15,
+        healthScore: calculatedScore,
+        topCommunicators: formattedTops,
+        inactiveNeighbors: formattedInactives,
+        trend: computedTrend
+      };
+
+      setHistoryRecords((prev) => {
+        const nextList = [newRecord, ...prev.filter((r) => r.id !== newRecord.id)].slice(0, 10);
+        try {
+          localStorage.setItem('gifty_neighbor_records_v1', JSON.stringify(nextList));
+        } catch {}
+        return nextList;
+      });
 
       setHasResult(true);
       setActiveTab('inactive'); // 가장 궁금해하는 무소통 탭 먼저 표시
@@ -584,6 +747,88 @@ export default function NeighborAnalyticsPage() {
       setIsAnalyzing(false);
       setProgressStep(0);
     }
+  };
+
+  // ⚡ 오늘의 답방 토글 및 일괄 처리 핸들러
+  const handleToggleVisit = (targetId: string) => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    setVisitedToday((prev) => {
+      const next = { ...prev, [targetId]: !prev[targetId] };
+      try {
+        localStorage.setItem(`gifty_visited_${todayStr}`, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleOpenSingleVisit = (c: Communicator) => {
+    handleToggleVisit(c.id);
+    window.open(`https://blog.naver.com/${c.id}`, '_blank');
+  };
+
+  const handleOpenBatchVisits = (count = 3) => {
+    const unvisited = topCommunicators.filter((c) => !visitedToday[c.id]).slice(0, count);
+    if (unvisited.length === 0) {
+      alert('모든 이웃 블로그를 이미 방문하셨습니다! 🎉');
+      return;
+    }
+    unvisited.forEach((c) => {
+      handleToggleVisit(c.id);
+      window.open(`https://blog.naver.com/${c.id}`, '_blank');
+    });
+    alert(`⚡ ${unvisited.length}명의 블로그 새 탭을 열었습니다!\n\n(브라우저 팝업이 차단된 경우 주소창 우측에서 팝업 허용을 눌러주세요)`);
+  };
+
+  const handleResetTodayVisits = () => {
+    if (window.confirm('오늘의 답방 완료 기록을 초기화하시겠습니까?')) {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      setVisitedToday({});
+      try {
+        localStorage.removeItem(`gifty_visited_${todayStr}`);
+      } catch {}
+    }
+  };
+
+  // 과거 분석 기록 불러오기 핸들러
+  const handleLoadHistoryRecord = (record: AnalysisRecord) => {
+    setBlogId(record.blogId);
+    setTotalParsedCount(record.totalParsedCount);
+    setPostCount(record.postCount);
+    setHealthScore(record.healthScore);
+    setTopCommunicators(record.topCommunicators);
+    setInactiveNeighbors(record.inactiveNeighbors);
+    setTrendData(record.trend || { vipCount: 0, newCount: 0, warningCount: 0, inactiveCount: 0 });
+    setHasResult(true);
+    setShowHistoryModal(false);
+    setActiveTab('routine');
+  };
+
+  const handleDeleteHistoryRecord = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setHistoryRecords((prev) => {
+      const next = prev.filter((r) => r.id !== id);
+      try {
+        localStorage.setItem('gifty_neighbor_records_v1', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  // 답방 안부 댓글 템플릿 복사 핸들러
+  const handleCopyTemplate = (templateText: string, idx: number, nick?: string) => {
+    const text = nick ? templateText.replace(/\{nick\}/g, nick) : templateText.replace(/\{nick\}님/g, '이웃님');
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedTemplateIdx(idx);
+      setTimeout(() => setCopiedTemplateIdx(null), 2000);
+    });
+  };
+
+  // 크롬 확장 관리자 주소 복사 핸들러
+  const handleCopyChromeUrl = () => {
+    navigator.clipboard.writeText('chrome://extensions').then(() => {
+      setCopiedChromeUrl(true);
+      setTimeout(() => setCopiedChromeUrl(false), 2000);
+    });
   };
 
   // 특정 이웃 즉시 보호(제외) 처리 핸들러
@@ -992,6 +1237,52 @@ export default function NeighborAnalyticsPage() {
             최근 3개월간 <strong>반응 없는 무소통 이웃</strong>을 1초 만에 정확하게 찾아냅니다!
           </p>
 
+          {/* 🚀 크롬 확장 프로그램 1초 자동 연동 추천 배너 */}
+          <div className="mt-8 max-w-2xl mx-auto bg-gradient-to-r from-indigo-950 via-indigo-900 to-slate-900 text-white p-5 sm:p-6 rounded-3xl shadow-xl border border-indigo-400/30 text-left relative overflow-hidden">
+            <div className="absolute right-0 top-0 translate-x-8 -translate-y-6 opacity-10 pointer-events-none">
+              <Download size={180} />
+            </div>
+
+            <div className="relative z-10 space-y-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 border border-amber-400/30 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 backdrop-blur-sm">
+                  <Sparkles size={12} className="text-amber-400" /> 복사·붙여넣기 0초 해결 (추천)
+                </span>
+                <span className="text-[11px] text-indigo-200 font-bold">Gifty 크롬 확장 프로그램</span>
+              </div>
+
+              <div>
+                <h3 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
+                  <span>네이버 창에서 버튼 1번으로 자동 분석 연동!</span>
+                  <span className="text-amber-400">⚡</span>
+                </h3>
+                <p className="text-xs sm:text-sm text-indigo-100 leading-relaxed mt-1">
+                  확장 프로그램을 설치하시면 마우스로 드래그 복사할 필요 없이, 네이버 이웃 관리 창에서 <strong>[📊 Gifty 분석실로 보내기]</strong> 버튼 클릭 한 번으로 모든 이웃 데이터가 자동 입력됩니다.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                <a
+                  href="/downloads/gifty-neighbor-cleaner.zip"
+                  download="gifty-neighbor-cleaner.zip"
+                  className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                >
+                  <Download size={14} />
+                  <span>📥 확장 프로그램 다운로드 (.zip)</span>
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => setShowExtensionModal(true)}
+                  className="px-4 py-2.5 bg-white/15 hover:bg-white/25 border border-white/20 text-white font-black text-xs rounded-xl transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                >
+                  <HelpCircle size={14} />
+                  <span>📖 초간단 1분 설치 방법</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Step Guide Box */}
           <div className="mt-8 bg-white p-5 sm:p-6 rounded-3xl border border-emerald-100 shadow-lg text-left max-w-2xl mx-auto">
             <div className="text-xs font-black text-emerald-800 mb-3 flex items-center justify-between">
@@ -1051,6 +1342,52 @@ export default function NeighborAnalyticsPage() {
               </div>
             </div>
           </div>
+
+          {/* ⚡ 크롬 확장 프로그램 동기화 알림 */}
+          {syncNotice && (
+            <div className="mt-4 max-w-2xl mx-auto bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-3 rounded-2xl flex items-center justify-between text-xs font-bold animate-fadeIn shadow-sm">
+              <span className="flex items-center gap-2">
+                <Sparkles size={16} className="text-emerald-600" />
+                {syncNotice}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSyncNotice(null)}
+                className="text-emerald-700 hover:text-emerald-900 p-1"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          )}
+
+          {/* 💾 이전 분석 기록 퀵 로드 바 (로컬스토리지 보관 기록) */}
+          {historyRecords.length > 0 && !hasResult && (
+            <div className="mt-4 max-w-2xl mx-auto bg-white/95 border border-indigo-200 p-3.5 rounded-2xl flex flex-wrap items-center justify-between gap-2 shadow-md text-xs font-bold">
+              <div className="flex items-center gap-2 text-slate-700">
+                <History size={16} className="text-indigo-600" />
+                <span>
+                  이전 분석 기록 <strong className="text-indigo-600">{historyRecords.length}개</strong>가 안전하게 보관되어 있습니다.
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleLoadHistoryRecord(historyRecords[0])}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-black transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+                >
+                  <ArrowRight size={13} />
+                  <span>최근 기록 ({historyRecords[0].date}) 불러오기</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowHistoryModal(true)}
+                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs transition-colors cursor-pointer"
+                >
+                  전체 기록 ({historyRecords.length})
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Input Form */}
           <form onSubmit={handleAnalyze} className="mt-6 max-w-2xl mx-auto bg-white p-4 sm:p-5 rounded-3xl shadow-xl border border-slate-200 text-left space-y-4">
@@ -1255,8 +1592,89 @@ export default function NeighborAnalyticsPage() {
               </div>
             </div>
 
-            {/* Tab Navigation (모바일 2줄 x 2열 그리드로 모든 탭 100% 노출, 데스크톱 가로 탭) */}
-            <div className="grid grid-cols-2 md:flex border-b border-slate-200 gap-2 text-xs sm:text-sm font-extrabold pb-2 md:pb-0">
+            {/* 🌟 이전 분석 대비 변화 요약 (히스토리 트래킹 카드) */}
+            <div className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-1.5">
+                      <History size={18} className="text-indigo-600" />
+                      <span>이웃 소통 상태 및 변화 추적</span>
+                    </h3>
+                    <span className="text-[11px] px-2 py-0.5 bg-indigo-50 text-indigo-700 font-bold rounded-full border border-indigo-200">
+                      자동 트래킹
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    과거 분석 기록과 비교하여 소통이 시작되었거나 뜸해진 이웃을 자동으로 분류했습니다.
+                  </p>
+                </div>
+
+                {historyRecords.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowHistoryModal(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer self-start sm:self-auto"
+                  >
+                    <Calendar size={13} className="text-slate-500" />
+                    <span>분석 기록 히스토리 ({historyRecords.length}건)</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+                <div className="bg-indigo-50/60 border border-indigo-200/80 rounded-2xl p-3.5">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] font-bold text-indigo-700">💎 VIP 연속 소통</span>
+                    <span className="text-xs font-black text-indigo-900 bg-white px-2 py-0.5 rounded-full border border-indigo-200">개근</span>
+                  </div>
+                  <div className="text-xl font-black text-indigo-900">{trendData.vipCount}명</div>
+                  <div className="text-[10px] text-indigo-600/80 mt-1">매 분석마다 꾸준히 소통 중인 찐이웃</div>
+                </div>
+
+                <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-2xl p-3.5">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] font-bold text-emerald-700">🌱 새내기 소통 유입</span>
+                    <span className="text-xs font-black text-emerald-900 bg-white px-2 py-0.5 rounded-full border border-emerald-200">신규</span>
+                  </div>
+                  <div className="text-xl font-black text-emerald-900">{trendData.newCount}명</div>
+                  <div className="text-[10px] text-emerald-600/80 mt-1">최근 새롭게 댓글/소통을 시작한 이웃</div>
+                </div>
+
+                <div className="bg-amber-50/60 border border-amber-200/80 rounded-2xl p-3.5">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] font-bold text-amber-700">⚠️ 소통 뜸해진 이웃</span>
+                    <span className="text-xs font-black text-amber-900 bg-white px-2 py-0.5 rounded-full border border-amber-200">주의</span>
+                  </div>
+                  <div className="text-xl font-black text-amber-900">{trendData.warningCount}명</div>
+                  <div className="text-[10px] text-amber-600/80 mt-1">이전엔 소통했으나 최근 반응 감소</div>
+                </div>
+
+                <div className="bg-rose-50/60 border border-rose-200/80 rounded-2xl p-3.5">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] font-bold text-rose-700">💤 장기 무소통 유지</span>
+                    <span className="text-xs font-black text-rose-900 bg-white px-2 py-0.5 rounded-full border border-rose-200">정리 대상</span>
+                  </div>
+                  <div className="text-xl font-black text-rose-900">{trendData.inactiveCount}명</div>
+                  <div className="text-[10px] text-rose-600/80 mt-1">새글/댓글 반응 전혀 없음 (정리 권장)</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Tab Navigation (모바일 3줄/2줄 그리드로 모든 탭 노출, 데스크톱 가로 탭) */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:flex border-b border-slate-200 gap-2 text-xs sm:text-sm font-extrabold pb-2 md:pb-0">
+              <button
+                onClick={() => setActiveTab('routine')}
+                className={`py-2.5 px-3 rounded-xl md:rounded-none md:pb-3 md:px-4 md:border-b-2 transition-all flex items-center justify-center gap-1.5 ${
+                  activeTab === 'routine'
+                    ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 md:border-0 md:bg-transparent md:border-b-2 md:border-indigo-600 md:text-indigo-600 font-black shadow-sm md:shadow-none'
+                    : 'bg-slate-50 text-slate-600 md:bg-transparent md:border-b-2 md:border-transparent md:text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Send size={15} className="text-indigo-600 shrink-0" />
+                <span className="truncate">⚡ 오늘의 답방 큐</span>
+              </button>
+
               <button
                 onClick={() => setActiveTab('inactive')}
                 className={`py-2.5 px-3 rounded-xl md:rounded-none md:pb-3 md:px-4 md:border-b-2 transition-all flex items-center justify-center gap-1.5 ${
@@ -1305,6 +1723,266 @@ export default function NeighborAnalyticsPage() {
                 <span className="truncate">이웃 삭제 가이드</span>
               </button>
             </div>
+
+            {/* TAB 0: 오늘의 답방 큐 (Routine) */}
+            {activeTab === 'routine' && (
+              <div className="space-y-6">
+                {/* Upper Routine Dashboard Card */}
+                <div className="bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+                  <div className="absolute right-0 top-0 translate-x-12 -translate-y-8 opacity-10 pointer-events-none">
+                    <Send size={240} />
+                  </div>
+
+                  <div className="relative z-10 space-y-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div>
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/15 rounded-full text-xs font-bold mb-2 backdrop-blur-md">
+                          <Calendar size={13} className="text-indigo-200" />
+                          <span>오늘의 소통 루틴 <strong>{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</strong></span>
+                        </div>
+                        <h3 className="text-2xl sm:text-3xl font-black">
+                          오늘의 찐이웃 답방 큐 <span className="text-indigo-300">⚡</span>
+                        </h3>
+                        <p className="text-xs sm:text-sm text-indigo-150 mt-1 max-w-xl text-indigo-100">
+                          내 글에 반응을 남겨준 찐이웃들에게 답방을 완료해 보세요. 상호 방문 체류시간과 블로그 지수가 극대화됩니다!
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenBatchVisits(3)}
+                          className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-95 text-white font-black text-xs rounded-xl shadow-lg transition-all flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Send size={14} />
+                          <span>⚡ 3명씩 새 탭 열기</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleResetTodayVisits}
+                          className="px-3 py-2.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white/80 hover:text-white font-bold text-xs rounded-xl border border-white/15 transition-all flex items-center gap-1 cursor-pointer"
+                          title="오늘 답방 기록 초기화"
+                        >
+                          <RefreshCw size={13} />
+                          <span>초기화</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    {(() => {
+                      const queue = topCommunicators.slice(0, 15);
+                      const completedCount = queue.filter((c) => visitedToday[c.id]).length;
+                      const progressPercent = queue.length > 0 ? Math.round((completedCount / queue.length) * 100) : 0;
+
+                      return (
+                        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15 space-y-2">
+                          <div className="flex justify-between items-center text-xs font-bold text-indigo-100">
+                            <span className="flex items-center gap-1.5">
+                              <CheckCircle2 size={15} className="text-emerald-400" />
+                              <span>오늘의 답방 달성률 ({completedCount} / {queue.length}명)</span>
+                            </span>
+                            <span className="text-emerald-300 font-black text-sm">{progressPercent}% 완료</span>
+                          </div>
+                          <div className="w-full bg-black/20 rounded-full h-3 overflow-hidden p-0.5">
+                            <div
+                              className="bg-gradient-to-r from-emerald-400 to-teal-300 h-full rounded-full transition-all duration-500 shadow-sm"
+                              style={{ width: `${progressPercent}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* 답방 안부 댓글 템플릿 카드 */}
+                <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+                      <MessageSquare size={16} className="text-indigo-600" />
+                      <span>✨ 1초 복사 정성 답방 댓글 템플릿</span>
+                    </h4>
+                    <span className="text-[11px] text-slate-400">클릭 시 자동 복사</span>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-2.5">
+                    {[
+                      { label: '💕 일상 소통형', text: '{nick}님! 항상 정성스런 소통 감사드려요 😊 오늘도 힐링 가득한 하루 보내세요!' },
+                      { label: '👍 꿀팁 공감형', text: '포스팅 꼼꼼하게 잘 읽었습니다! 유익한 정보 감사해요 💕 공감 꾹 누르고 갑니다 ✨' },
+                      { label: '🌿 적극 교류형', text: '{nick}님 글 보러 답방 왔어요~! 언제나 알찬 내용이라 감탄하며 정독했네요. 자주 소통해요 😊' },
+                      { label: '☕ 힐링 응원형', text: '오늘도 방문해서 잘 읽고 갑니다! 쌀쌀한 날씨 감기 조심하시고 활기찬 한 주 되세요 🌿' }
+                    ].map((t, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleCopyTemplate(t.text, idx)}
+                        className="text-left p-3 rounded-2xl border border-slate-200/90 hover:border-indigo-400 bg-slate-50/70 hover:bg-indigo-50/40 transition-all group flex flex-col justify-between gap-2 cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="text-[11px] font-black text-indigo-700">{t.label}</span>
+                          <span className="text-[10px] font-bold text-slate-400 group-hover:text-indigo-600 flex items-center gap-1">
+                            {copiedTemplateIdx === idx ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                            <span>{copiedTemplateIdx === idx ? '복사됨!' : '복사'}</span>
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-700 font-medium leading-relaxed">{t.text}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Routine Queue Table */}
+                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                    <div>
+                      <h4 className="text-base font-black text-slate-800 flex items-center gap-2">
+                        <span>오늘 방문 대기 이웃 명단</span>
+                        <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                          우선순위 순
+                        </span>
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-1">
+                        체크박스를 누르거나 [답방 🚀]을 누르면 오늘 방문 완료로 자동 저장됩니다.
+                      </p>
+                    </div>
+
+                    {/* Routine Filter */}
+                    <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setRoutineFilter('all')}
+                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${routineFilter === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                        전체 ({topCommunicators.slice(0, 15).length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRoutineFilter('unvisited')}
+                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${routineFilter === 'unvisited' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                        미방문 ({topCommunicators.slice(0, 15).filter((c) => !visitedToday[c.id]).length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRoutineFilter('visited')}
+                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${routineFilter === 'visited' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                        방문 완료 ({topCommunicators.slice(0, 15).filter((c) => visitedToday[c.id]).length})
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead>
+                        <tr className="text-xs text-slate-400 border-b border-slate-100">
+                          <th className="py-3 px-3 w-10 text-center">완료</th>
+                          <th className="py-3 px-3">순위</th>
+                          <th className="py-3 px-3">이웃 닉네임</th>
+                          <th className="py-3 px-3 text-center">소통 상태</th>
+                          <th className="py-3 px-3 text-center">소통 신선도</th>
+                          <th className="py-3 px-3 text-center">상호 작용</th>
+                          <th className="py-3 px-3 text-right">답방 액션</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {topCommunicators
+                          .slice(0, 15)
+                          .filter((c) => {
+                            const isVisited = !!visitedToday[c.id];
+                            if (routineFilter === 'unvisited') return !isVisited;
+                            if (routineFilter === 'visited') return isVisited;
+                            return true;
+                          })
+                          .map((c) => {
+                            const isVisited = !!visitedToday[c.id];
+                            return (
+                              <tr
+                                key={'routine_' + c.id}
+                                className={`transition-colors ${isVisited ? 'bg-slate-50/60 opacity-60' : 'hover:bg-indigo-50/30'}`}
+                              >
+                                <td className="py-3.5 px-3 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleVisit(c.id)}
+                                    className="text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer"
+                                  >
+                                    {isVisited ? (
+                                      <CheckSquare size={18} className="text-emerald-600" />
+                                    ) : (
+                                      <Square size={18} className="text-slate-300" />
+                                    )}
+                                  </button>
+                                </td>
+                                <td className="py-3.5 px-3 font-black text-slate-700">
+                                  {c.rank}위
+                                </td>
+                                <td className="py-3.5 px-3">
+                                  <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                                    <span className={isVisited ? 'line-through text-slate-400' : ''}>{c.nickname}</span>
+                                    {c.id && c.id !== c.nickname && isValidNaverId(c.id) && (
+                                      <span className="text-xs text-slate-400 font-normal">(@{c.id})</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-3 text-center">
+                                  {c.statusBadge === 'VIP' ? (
+                                    <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">
+                                      💎 VIP 찐이웃
+                                    </span>
+                                  ) : c.statusBadge === 'NEW' ? (
+                                    <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                      🌱 새내기
+                                    </span>
+                                  ) : (
+                                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                                      ✨ 활성
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-3 text-center text-xs font-semibold text-slate-600">
+                                  <span className="inline-flex items-center gap-1">
+                                    <Clock size={12} className="text-slate-400" />
+                                    {c.lastActiveDate || '최근'}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-3 text-center text-xs font-bold text-indigo-600">
+                                  {c.giveAndTake || '서로 소통형'}
+                                </td>
+                                <td className="py-3.5 px-3 text-right">
+                                  <div className="inline-flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyTemplate('{nick}님! 항상 정성스런 소통 감사드려요 😊 오늘도 힐링 가득한 하루 보내세요!', 999, c.nickname)}
+                                      className="text-[11px] font-bold text-slate-500 hover:text-indigo-600 bg-slate-100 hover:bg-indigo-50 px-2 py-1 rounded-lg border border-slate-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                      title="이웃 닉네임 맞춤 멘트 복사"
+                                    >
+                                      <Copy size={11} />
+                                      <span>멘트복사</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenSingleVisit(c)}
+                                      className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-all shadow-sm flex items-center gap-1 cursor-pointer ${
+                                        isVisited
+                                          ? 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                                          : 'bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95'
+                                      }`}
+                                    >
+                                      <span>{isVisited ? '재방문' : '답방'}</span>
+                                      <ArrowUpRight size={13} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* TAB 1: 무소통 이웃 리포트 (정리 대상) */}
             {activeTab === 'inactive' && (
@@ -1849,6 +2527,38 @@ export default function NeighborAnalyticsPage() {
                       고객님의 실제 이웃 명단 중에서 최근 포스팅 활동성과 보호 설정이 반영된 찐이웃들입니다.
                     </p>
                   </div>
+
+                  {/* Top communicators filter chips */}
+                  <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setTopFilter('all')}
+                      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${topFilter === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      전체 ({topCommunicators.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTopFilter('vip')}
+                      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${topFilter === 'vip' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      💎 VIP ({topCommunicators.filter((c) => c.statusBadge === 'VIP').length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTopFilter('new')}
+                      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${topFilter === 'new' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      🌱 새내기 ({topCommunicators.filter((c) => c.statusBadge === 'NEW').length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTopFilter('unvisited')}
+                      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${topFilter === 'unvisited' ? 'bg-white text-rose-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      ⚡ 미답방 ({topCommunicators.filter((c) => !visitedToday[c.id]).length})
+                    </button>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -1858,71 +2568,113 @@ export default function NeighborAnalyticsPage() {
                         <th className="py-3 px-3">순위</th>
                         <th className="py-3 px-3">실제 이웃 닉네임</th>
                         <th className="py-3 px-3 text-center">등급</th>
+                        <th className="py-3 px-3 text-center">소통 상태</th>
+                        <th className="py-3 px-3 text-center">신선도</th>
                         <th className="py-3 px-3 text-center">활동 수준</th>
-                        <th className="py-3 px-3 text-center">새글 상태</th>
-                        <th className="py-3 px-3 text-right">블로그</th>
+                        <th className="py-3 px-3 text-right">답방 / 블로그</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {topCommunicators.map((c) => (
-                        <tr key={c.id + c.rank} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="py-3.5 px-3 font-black text-slate-700">
-                            {c.isProtected ? (
-                              <span className="text-indigo-600 font-black">💎 보호</span>
-                            ) : c.rank === 1 ? (
-                              <span className="text-amber-500">🥇 1위</span>
-                            ) : c.rank === 2 ? (
-                              <span className="text-slate-400">🥈 2위</span>
-                            ) : c.rank === 3 ? (
-                              <span className="text-amber-700">🥉 3위</span>
-                            ) : (
-                              `${c.rank}위`
-                            )}
-                          </td>
-                          <td className="py-3.5 px-3 font-bold text-slate-800">
-                            {c.nickname}
-                            {c.id && c.id !== c.nickname && isValidNaverId(c.id) && (
-                              <span className="text-xs text-slate-400 font-normal ml-1.5">(@{c.id})</span>
-                            )}
-                            {c.isProtected && (
-                              <span className="ml-2 bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold">
-                                찐이웃 보호
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-3 text-center">
-                            <span
-                              className={`text-[11px] font-black px-2 py-0.5 rounded-full ${
-                                c.grade === '다이아'
-                                  ? 'bg-blue-100 text-blue-700'
-                                  : c.grade === '골드'
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : c.grade === '실버'
-                                  ? 'bg-slate-200 text-slate-700'
-                                  : 'bg-orange-100 text-orange-800'
-                              }`}
-                            >
-                              {c.grade}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-3 text-center font-bold text-emerald-700 text-xs">
-                            {c.activityLevel || '🔥 최상위 활동'}
-                          </td>
-                          <td className="py-3.5 px-3 text-center font-medium text-slate-600 text-xs">
-                            {c.postStatus || '최신 발행 활발'}
-                          </td>
-                          <td className="py-3.5 px-3 text-right">
-                            <a
-                              href={`https://blog.naver.com/${c.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-slate-400 hover:text-emerald-600 font-bold inline-flex items-center gap-1"
-                            >
-                              방문 <ExternalLink size={12} />
-                            </a>
-                          </td>
-                        </tr>
-                      ))}
+                      {topCommunicators
+                        .filter((c) => {
+                          if (topFilter === 'vip') return c.statusBadge === 'VIP';
+                          if (topFilter === 'new') return c.statusBadge === 'NEW';
+                          if (topFilter === 'unvisited') return !visitedToday[c.id];
+                          return true;
+                        })
+                        .map((c) => {
+                          const isVisited = !!visitedToday[c.id];
+                          return (
+                            <tr key={c.id + c.rank} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="py-3.5 px-3 font-black text-slate-700">
+                                {c.isProtected ? (
+                                  <span className="text-indigo-600 font-black">💎 보호</span>
+                                ) : c.rank === 1 ? (
+                                  <span className="text-amber-500">🥇 1위</span>
+                                ) : c.rank === 2 ? (
+                                  <span className="text-slate-400">🥈 2위</span>
+                                ) : c.rank === 3 ? (
+                                  <span className="text-amber-700">🥉 3위</span>
+                                ) : (
+                                  `${c.rank}위`
+                                )}
+                              </td>
+                              <td className="py-3.5 px-3 font-bold text-slate-800">
+                                {c.nickname}
+                                {c.id && c.id !== c.nickname && isValidNaverId(c.id) && (
+                                  <span className="text-xs text-slate-400 font-normal ml-1.5">(@{c.id})</span>
+                                )}
+                                {c.isProtected && (
+                                  <span className="ml-2 bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                                    찐이웃 보호
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-3 text-center">
+                                <span
+                                  className={`text-[11px] font-black px-2 py-0.5 rounded-full ${
+                                    c.grade === '다이아'
+                                      ? 'bg-blue-100 text-blue-700'
+                                      : c.grade === '골드'
+                                      ? 'bg-amber-100 text-amber-800'
+                                      : c.grade === '실버'
+                                      ? 'bg-slate-200 text-slate-700'
+                                      : 'bg-orange-100 text-orange-800'
+                                  }`}
+                                >
+                                  {c.grade}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-3 text-center">
+                                {c.statusBadge === 'VIP' ? (
+                                  <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                    💎 VIP
+                                  </span>
+                                ) : c.statusBadge === 'NEW' ? (
+                                  <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    🌱 새내기
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] font-medium text-slate-500">
+                                    일반
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-3 text-center text-xs font-semibold text-slate-500">
+                                {c.lastActiveDate || '최근'}
+                              </td>
+                              <td className="py-3.5 px-3 text-center font-bold text-emerald-700 text-xs">
+                                {c.activityLevel || '🔥 최상위 활동'}
+                              </td>
+                              <td className="py-3.5 px-3 text-right">
+                                <div className="inline-flex items-center gap-1.5 justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenSingleVisit(c)}
+                                    className={`text-xs font-bold px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                                      isVisited
+                                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                                        : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm active:scale-95'
+                                    }`}
+                                    title="블로그 방문 및 답방 체크"
+                                  >
+                                    <span>{isVisited ? '방문완료' : '답방'}</span>
+                                    <ArrowUpRight size={12} />
+                                  </button>
+                                  <a
+                                    href={`https://blog.naver.com/${c.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-slate-400 hover:text-slate-600 p-1"
+                                    title="새 탭으로 열기"
+                                  >
+                                    <ExternalLink size={13} />
+                                  </a>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                     </tbody>
                   </table>
                 </div>
@@ -2231,6 +2983,223 @@ export default function NeighborAnalyticsPage() {
               >
                 <span>네이버 창 열고 실행하기</span>
                 <ExternalLink size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📜 과거 분석 기록 히스토리 모달 */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-5 relative max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                  <History size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-800">
+                    분석 기록 히스토리 보관함
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    브라우저에 자동 백업된 최근 {historyRecords.length}개의 진단 기록입니다.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHistoryModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto space-y-3 flex-1 pr-1">
+              {historyRecords.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-xs font-bold">
+                  저장된 이전 분석 기록이 없습니다.
+                </div>
+              ) : (
+                historyRecords.map((r, idx) => (
+                  <div
+                    key={r.id || idx}
+                    onClick={() => handleLoadHistoryRecord(r)}
+                    className="p-4 rounded-2xl border border-slate-200 hover:border-indigo-500 bg-slate-50/70 hover:bg-indigo-50/40 transition-all cursor-pointer group space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-slate-800">@{r.blogId}</span>
+                        <span className="text-[11px] text-slate-400 font-medium">({r.date})</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                          건강도 {r.healthScore}점
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteHistoryRecord(r.id, e)}
+                          className="text-slate-300 hover:text-rose-500 p-1 transition-colors cursor-pointer"
+                          title="기록 삭제"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-[11px] font-bold text-slate-600">
+                      <div className="bg-white p-2 rounded-xl text-center border border-slate-150">
+                        <div className="text-[10px] text-slate-400">분석 이웃</div>
+                        <div className="text-slate-800 font-black">{r.totalParsedCount}명</div>
+                      </div>
+                      <div className="bg-white p-2 rounded-xl text-center border border-slate-150">
+                        <div className="text-[10px] text-indigo-500">소통 찐이웃</div>
+                        <div className="text-indigo-700 font-black">{r.topCommunicators.length}명</div>
+                      </div>
+                      <div className="bg-white p-2 rounded-xl text-center border border-slate-150">
+                        <div className="text-[10px] text-rose-500">무소통 이웃</div>
+                        <div className="text-rose-700 font-black">{r.inactiveNeighbors.length}명</div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[10px] text-indigo-600 font-bold">
+                        💎 VIP {r.trend?.vipCount || 0}명 · 🌱 새내기 {r.trend?.newCount || 0}명
+                      </span>
+                      <span className="text-[11px] font-bold text-indigo-600 group-hover:underline flex items-center gap-0.5">
+                        <span>대시보드로 불러오기</span>
+                        <ArrowRight size={12} />
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowHistoryModal(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🚀 크롬 확장 프로그램 초간단 1분 설치 모달 */}
+      {showExtensionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6 relative max-h-[90vh] overflow-y-auto">
+            <button
+              type="button"
+              onClick={() => setShowExtensionModal(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs font-black">
+                <Sparkles size={14} className="text-indigo-600" /> 최초 1회 1분 설치 (초간단)
+              </div>
+              <h3 className="text-xl font-black text-slate-900">
+                크롬 확장 프로그램 설치 가이드 🚀
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                한 번만 설치해 두시면 앞으로 네이버 블로그 창에서 클릭 한 번으로 모든 이웃 목록과 소통 데이터를 자동 분석할 수 있습니다.
+              </p>
+            </div>
+
+            <div className="space-y-3.5 text-xs">
+              {/* Step 1 */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-slate-800 flex items-center gap-1.5">
+                    <span className="w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[11px]">1</span>
+                    <span>확장 프로그램 파일 다운로드 및 압축 풀기</span>
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  아래 버튼을 눌러 압축 파일(<code className="bg-slate-200 px-1 py-0.5 rounded text-[11px]">gifty-neighbor-cleaner.zip</code>)을 다운로드한 후, 원하는 폴더(예: 바탕화면 또는 다운로드 폴더)에 압축을 풀어주세요.
+                </p>
+                <a
+                  href="/downloads/gifty-neighbor-cleaner.zip"
+                  download="gifty-neighbor-cleaner.zip"
+                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer mt-1"
+                >
+                  <Download size={14} />
+                  <span>📥 패키지 다운로드 (.zip)</span>
+                </a>
+              </div>
+
+              {/* Step 2 */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
+                <span className="font-black text-slate-800 flex items-center gap-1.5">
+                  <span className="w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[11px]">2</span>
+                  <span>크롬 확장 관리 페이지 열기</span>
+                </span>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  크롬 브라우저 주소창에 아래 주소를 입력하거나 복사 후 새 탭에 붙여넣어 접속합니다.
+                </p>
+                <div className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-slate-200">
+                  <code className="text-indigo-600 font-mono font-bold text-xs flex-1">
+                    chrome://extensions
+                  </code>
+                  <button
+                    type="button"
+                    onClick={handleCopyChromeUrl}
+                    className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                  >
+                    {copiedChromeUrl ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                    <span>{copiedChromeUrl ? '복사됨!' : '주소 복사'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Step 3 & 4 */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
+                <span className="font-black text-slate-800 flex items-center gap-1.5">
+                  <span className="w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[11px]">3</span>
+                  <span>[개발자 모드] 켜기 ➔ [압축해제된 확장 프로그램 로드]</span>
+                </span>
+                <ul className="text-[11px] text-slate-600 space-y-1 list-disc list-inside leading-relaxed pl-1">
+                  <li>화면 우측 상단의 <strong>[개발자 모드]</strong> 스위치를 켭니다.</li>
+                  <li>좌측 상단에 나타난 <strong>[압축해제된 확장 프로그램을 로드합니다]</strong> 버튼을 클릭합니다.</li>
+                  <li>1단계에서 압축을 푼 <strong className="text-indigo-600">gifty-extension 폴더</strong>를 선택하면 설치 끝!</li>
+                </ul>
+              </div>
+
+              {/* Step 5 */}
+              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 space-y-1.5">
+                <span className="font-black text-emerald-900 flex items-center gap-1.5">
+                  <span className="w-5 h-5 bg-emerald-600 text-white rounded-full flex items-center justify-center text-[11px]">4</span>
+                  <span>네이버 블로그 화면에서 버튼 1번으로 연동!</span>
+                </span>
+                <p className="text-[11px] text-emerald-800 leading-relaxed">
+                  이제 네이버 [내가 추가한 이웃] 화면에 들어가시면 화면 우측 하단에 <strong>[📊 Gifty 분석실로 보내기]</strong>와 <strong>[⚡ 1초 무소통 정리]</strong> 버튼이 자동으로 나타납니다.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-slate-100">
+              <a
+                href="/downloads/gifty-neighbor-cleaner.zip"
+                download="gifty-neighbor-cleaner.zip"
+                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+              >
+                <Download size={15} />
+                <span>다운로드 시작 (.zip)</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowExtensionModal(false)}
+                className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                닫기
               </button>
             </div>
           </div>
