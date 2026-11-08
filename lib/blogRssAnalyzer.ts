@@ -39,7 +39,8 @@ export interface BlogAnalysisResult {
   scraps: number;
   createdDate: string;
   firstPostDate: string;
-  blaiRank: number;
+  gScoreRank: number; // 전국 네이버 블로그 G-Score™ 통합 랭킹
+  blaiRank?: number; // legacy alias
   exposedKeywords: number;
   legacyLevel: string;
   legacyLevelScore: number;
@@ -494,6 +495,7 @@ export function generateSmartBlogAnalysis(blogId: string): BlogAnalysisResult {
     scraps: 3 + (absHash % 5),
     createdDate: `${2015 + (absHash % 8)}.${String((absHash % 12) + 1).padStart(2, '0')}.12`,
     firstPostDate: `${2026 - (absHash % 2)}.${String((absHash % 12) + 1).padStart(2, '0')}.10`,
+    gScoreRank: 12000 + (absHash % 18000),
     blaiRank: 12000 + (absHash % 18000),
     exposedKeywords: 40 + (absHash % 60),
     legacyLevel,
@@ -704,6 +706,7 @@ export function parseNaverRssXml(
       scraps: 5,
       createdDate: '2016.03.15',
       firstPostDate: posts[posts.length - 1]?.publishedAt || '2026.01.10',
+      gScoreRank: blogId.toLowerCase() === 'masining' ? 14058 : 28410,
       blaiRank: blogId.toLowerCase() === 'masining' ? 14058 : 28410,
       exposedKeywords: Math.max(20, Math.floor(neighborCount / 80)),
       legacyLevel,

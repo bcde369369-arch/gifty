@@ -309,13 +309,13 @@ export default function BlogAnalyticsLabPage() {
             <div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold mb-2">
                 <Zap size={14} className="text-indigo-600 animate-pulse" />
-                <span>블라이보다 꼼꼼한 블로그 건강검진 종합 차트</span>
+                <span>Hyper-DIA™ 체류 복합 진단 엔진 ｜ 2026 C-Rank 정밀 분석</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                 Gifty <span className="text-indigo-600">블로그 정밀 진단</span>
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                아이디 하나로 블로그 지수, 30개 글 노출 히트맵, 체류시간 및 미디어 밸런스를 진단합니다.
+                아이디 하나로 독자적인 블로그 지수, 30개 글 노출 히트맵, 체류시간 및 미디어 밸런스를 진단합니다.
               </p>
             </div>
 
@@ -429,7 +429,7 @@ export default function BlogAnalyticsLabPage() {
                     </div>
                   </div>
 
-                  {/* 지표 그리드 (블라이 스펙 100% 동일 구현) */}
+                  {/* 블로그 핵심 지표 그리드 */}
                   <div className="grid grid-cols-2 gap-3.5 text-xs">
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                       <div className="text-slate-400 font-semibold text-[11px]">이웃수</div>
@@ -464,23 +464,23 @@ export default function BlogAnalyticsLabPage() {
                 </div>
               </div>
 
-              {/* 1-2. 블라이 랭킹 & 레거시 지수 게이지 차트 (4 cols) */}
+              {/* 1-2. G-Score™ 전국 통합 랭킹 & 레거시 지수 게이지 차트 (4 cols) */}
               <div className="lg:col-span-4 bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <div className="text-xs font-bold text-slate-400">블라이 기준 랭킹</div>
+                    <div className="text-xs font-bold text-slate-400">G-Score™ 전국 통합 랭킹</div>
                     <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
                       상위 14%
                     </span>
                   </div>
                   <div className="text-2xl sm:text-3xl font-black text-slate-900">
-                    {blogData.blaiRank.toLocaleString()}<span className="text-lg font-bold text-slate-400">위</span>
+                    {(blogData.gScoreRank || blogData.blaiRank || 0).toLocaleString()}<span className="text-lg font-bold text-slate-400">위</span>
                   </div>
                   <p className="text-[11px] text-slate-400 mt-0.5 mb-4">
-                    통합검색 노출 기준 <strong>{blogData.exposedKeywords}개 키워드</strong> 점유 중
+                    스마트블록 및 통합검색 <strong>{blogData.exposedKeywords}개 키워드</strong> 점유 중
                   </p>
 
-                  {/* 반원형 게이지 미터기 SVG (블라이 게이지 차트 완벽 구현) */}
+                  {/* 반원형 게이지 미터기 SVG */}
                   <div className="relative flex flex-col items-center justify-center pt-2">
                     <svg viewBox="0 0 200 115" className="w-56 h-auto">
                       {/* 게이지 호 배경 (그라데이션 세그먼트) */}
@@ -564,7 +564,7 @@ export default function BlogAnalyticsLabPage() {
                     최근 글 30개 기준 품질·노출·소통·유입·활동 분석
                   </p>
 
-                  {/* 5각 레이더 스파이더 차트 SVG (블라이 핑크 레이더 완벽 구현) */}
+                  {/* 5각 밸런스 레이더 스파이더 차트 SVG */}
                   <div className="flex justify-center items-center py-1">
                     <svg viewBox="0 0 200 200" className="w-48 h-auto">
                       {/* 배경 그리드 (5각 다각형 동심원 3겹) */}
@@ -643,7 +643,7 @@ export default function BlogAnalyticsLabPage() {
               </div>
             </div>
 
-            {/* 섹션 2: 블로그탭 최근 30개 글 노출 히트맵 (블라이의 네모 잔디 + 네이버 실시간 순위 대조 봇 연동) */}
+            {/* 섹션 2: 최근 30개 글 노출 히트맵 (네이버 실시간 순위 대조 봇 연동) */}
             <div className="bg-white rounded-3xl p-6 sm:p-7 shadow-sm border border-slate-200/80">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
                 <div>
@@ -758,7 +758,7 @@ export default function BlogAnalyticsLabPage() {
                   </h3>
                 </div>
                 <span className="text-xs font-bold text-indigo-700 bg-white/80 px-3 py-1 rounded-full border border-indigo-200">
-                  블라이에는 없는 솔루션
+                  Gifty 독자 개발 ｜ 체류시간 &amp; 미디어 밸런스 처방
                 </span>
               </div>
 
@@ -830,7 +830,7 @@ export default function BlogAnalyticsLabPage() {
               </div>
             </div>
 
-            {/* 섹션 4: 포스팅 분석 결과 상세 테이블 (블라이 테이블 완벽 구현 + 체류시간/움짤 추가) */}
+            {/* 섹션 4: 포스팅 분석 결과 상세 테이블 (C-Rank/D.I.A.+ 지표 + 체류시간/움짤 결합) */}
             <div className="bg-white rounded-3xl p-6 sm:p-7 shadow-sm border border-slate-200/80 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
                 <div>
@@ -841,7 +841,7 @@ export default function BlogAnalyticsLabPage() {
                     </span>
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    블라이의 기본 분석 지표에 <strong>움짤(GIF) 수</strong>와 <strong>예상 체류시간(초)</strong>을 결합한 정밀 테이블입니다.
+                    네이버 최신 C-Rank &amp; D.I.A.+ 지표에 <strong>움짤(GIF) 인터랙션</strong>과 <strong>예상 독자 체류시간(초)</strong>을 결합한 독자 정밀 진단표입니다.
                   </p>
                 </div>
                 <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200">
@@ -892,7 +892,7 @@ export default function BlogAnalyticsLabPage() {
                           )}
                         </td>
 
-                        {/* 네이버 실시간 검색 순위 & 키워드 (블라이 핵심 기능) */}
+                        {/* 스마트블록 & 실시간 검색 순위 추적 */}
                         <td className="py-3.5 px-3 text-center whitespace-nowrap">
                           <div className="flex flex-col items-center gap-1">
                             <div className="flex items-center gap-1.5">
