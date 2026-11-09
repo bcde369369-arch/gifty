@@ -1,16 +1,40 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import Script from 'next/script';
-import { trackSiteVisit } from '@/lib/visitorStats';
+import { trackSiteVisit, trackCheonlianEngagement } from '@/lib/visitorStats';
 
 export default function Analytics() {
-  const GA_TRACKING_ID = process.env.NEXT_PUBLIC_GA_ID || 'G-71MNQE4KRJ'; // 실제 측정 ID로 교체 완료
+  const GA_TRACKING_ID = process.env.NEXT_PUBLIC_GA_ID || 'G-71MNQE4KRJ';
   const pathname = usePathname();
+  const startTimeRef = useRef<number>(Date.now());
 
   useEffect(() => {
     trackSiteVisit(pathname || undefined);
+    startTimeRef.current = Date.now();
+
+    // 🔮 천리안 엔진: 10초 이상 체류 시 GA4 기준 '진성 활성 사용자'로 자동 인증
+    const timer = setTimeout(() => {
+      const elapsed = (Date.now() - startTimeRef.current) / 1000;
+      trackCheonlianEngagement(elapsed);
+    }, 10000);
+
+    const handleUnload = () => {
+      const elapsed = (Date.now() - startTimeRef.current) / 1000;
+      trackCheonlianEngagement(elapsed);
+    };
+
+    window.addEventListener('beforeunload', handleUnload);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('beforeunload', handleUnload);
+      const elapsed = (Date.now() - startTimeRef.current) / 1000;
+      if (elapsed >= 5) {
+        trackCheonlianEngagement(elapsed);
+      }
+    };
   }, [pathname]);
 
   return (

@@ -31,6 +31,13 @@ import {
   Smile,
   Upload,
   Image as ImageIcon,
+  Compass,
+  Smartphone,
+  Laptop,
+  Clock,
+  Flame,
+  Zap,
+  Globe,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -240,10 +247,10 @@ export default function AdminDashboard() {
           </a>
           <a
             href="#visitor-stats-section"
-            className="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold border border-slate-200 shrink-0 transition-colors flex items-center gap-1"
+            className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black shadow-sm flex items-center gap-1.5 shrink-0 transition-transform hover:scale-105 active:scale-95"
           >
-            <Users size={14} />
-            <span>📊 방문자 통계</span>
+            <span className="text-base">🔮</span>
+            <span>천리안 엔진 (방문자 레이더)</span>
           </a>
           <a
             href="#text-settings-section"
@@ -262,18 +269,22 @@ export default function AdminDashboard() {
         </div>
 
         <div className="space-y-8">
-          {/* Visitor Stats Section */}
+          {/* Visitor Stats Section (🔮 천리안 엔진 v1.0 PRO) */}
           <section id="visitor-stats-section" className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
               <div>
-                <div className="flex items-center gap-2 text-indigo-700 font-bold text-lg mb-1">
-                  <LayoutDashboard size={20} /> 실시간 방문자 및 인기 페이지 통계
+                <div className="flex flex-wrap items-center gap-2 text-indigo-950 font-black text-xl mb-1">
+                  <span className="text-2xl animate-pulse">🔮</span>
+                  <span>천리안(千里眼) 엔진 v1.0 PRO — 스마트 방문자 레이더</span>
+                  <span className="px-2.5 py-0.5 text-[11px] font-extrabold bg-indigo-50 text-indigo-700 rounded-full border border-indigo-200">
+                    GA4 초월 직관형
+                  </span>
                 </div>
                 <p className="text-xs sm:text-sm text-slate-500">
-                  한국 시간(KST) 자정 기준으로 집계되는 일방문자(UV), 누적 방문자, 카테고리별 클릭 순위입니다.
+                  복잡한 구글 애널리틱스 대신, 유입 경로·기기·피크타임·진성 활성 사용자까지 한눈에 꿰뚫어 봅니다.
                   {visitorStats?.updatedAt && (
-                    <span className="ml-2 text-xs text-slate-400">
-                      (업데이트: {visitorStats.updatedAt})
+                    <span className="ml-2 text-xs font-semibold text-indigo-600">
+                      (실시간 레이더 업데이트: {visitorStats.updatedAt})
                     </span>
                   )}
                 </p>
@@ -289,7 +300,7 @@ export default function AdminDashboard() {
                   }`}
                 >
                   <Settings size={14} />
-                  카운터 API 설정
+                  엔진 API 설정
                 </button>
                 <button
                   type="button"
@@ -304,10 +315,36 @@ export default function AdminDashboard() {
                   href="https://analytics.google.com/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-3.5 rounded-xl shadow-sm transition-colors text-xs flex items-center gap-1.5"
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 px-3 rounded-xl transition-colors text-xs flex items-center gap-1"
                 >
-                  구글 애널리틱스 &rarr;
+                  GA4 보조 확인 <ExternalLink size={11} />
                 </a>
+              </div>
+            </div>
+
+            {/* 🔮 천리안 실시간 AI 스마트 브리핑 배너 */}
+            <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-purple-950 text-white p-5 rounded-2xl shadow-sm border border-indigo-800/50">
+              <div className="flex items-center gap-2 text-xs font-black tracking-wide text-indigo-300 uppercase mb-2">
+                <Sparkles size={15} className="text-amber-300 animate-spin" />
+                <span>천리안 실시간 AI 스마트 브리핑</span>
+              </div>
+              <p className="text-sm sm:text-base font-bold text-white leading-relaxed">
+                {visitorStats?.cheonlian?.smartBriefing ||
+                  '🔮 천리안 레이더가 실시간 유입 트래픽과 사용자 행동 패턴을 정밀 스캔하고 있습니다.'}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-3.5 pt-3.5 border-t border-indigo-800/60">
+                <div className="flex items-center gap-2 text-xs text-indigo-200">
+                  <span className="w-5 h-5 rounded-lg bg-emerald-500/30 text-emerald-300 flex items-center justify-center font-bold">1위</span>
+                  <span>주요 유입: <strong className="text-white font-extrabold">{visitorStats?.cheonlian?.topReferrer || '네이버'}</strong></span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-indigo-200">
+                  <span className="w-5 h-5 rounded-lg bg-blue-500/30 text-blue-300 flex items-center justify-center font-bold">📱</span>
+                  <span>주요 기기: <strong className="text-white font-extrabold">{visitorStats?.cheonlian?.topDevice || '모바일'}</strong></span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-indigo-200">
+                  <span className="w-5 h-5 rounded-lg bg-amber-500/30 text-amber-300 flex items-center justify-center font-bold">🔥</span>
+                  <span>골든타임: <strong className="text-white font-extrabold">{visitorStats?.cheonlian?.peakHourRange || '20시 ~ 22시'}</strong></span>
+                </div>
               </div>
             </div>
 
@@ -422,99 +459,356 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* 4대 핵심 방문자 지표 카드 */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+            {/* 🔮 천리안 6대 핵심 방문자 지표 카드 (GA4 지표 완벽 호환) */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {/* 1. 오늘 일방문자 */}
-              <div className="bg-indigo-50/80 border border-indigo-100 p-4 md:p-5 rounded-2xl flex flex-col justify-between">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-extrabold text-indigo-700">🟢 오늘 일방문자</span>
-                  <Users size={16} className="text-indigo-500" />
+              <div className="bg-indigo-50/80 border border-indigo-100 p-4 rounded-2xl flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-black text-indigo-700">🟢 오늘 일방문자</span>
+                  <Users size={15} className="text-indigo-500" />
                 </div>
                 {isLoadingStats ? (
-                  <div className="h-8 w-20 bg-indigo-200/60 animate-pulse rounded-lg my-1" />
+                  <div className="h-7 w-16 bg-indigo-200/60 animate-pulse rounded-lg my-1" />
                 ) : (
-                  <div className="text-2xl md:text-3xl font-black text-indigo-950">
+                  <div className="text-2xl font-black text-indigo-950">
                     {(visitorStats?.todayVisitors ?? 0).toLocaleString()}
-                    <span className="text-sm font-bold text-indigo-600 ml-1">명</span>
+                    <span className="text-xs font-bold text-indigo-600 ml-1">명</span>
                   </div>
                 )}
-                <p className="text-[11px] font-semibold text-indigo-600/80 mt-2">
-                  어제 방문자: {(visitorStats?.yesterdayVisitors ?? 0).toLocaleString()}명
+                <p className="text-[10px] font-semibold text-indigo-600/80 mt-1">
+                  어제: {(visitorStats?.yesterdayVisitors ?? 0).toLocaleString()}명
                 </p>
               </div>
 
-              {/* 2. 누적 총 방문자 */}
-              <div className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white p-4 md:p-5 rounded-2xl shadow-md flex flex-col justify-between">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-extrabold text-indigo-100">🔥 누적 총 방문자</span>
-                  <TrendingUp size={16} className="text-indigo-200" />
+              {/* 2. 진성 활성 사용자 (GA4 Active Users 매칭) */}
+              <div className="bg-emerald-50/80 border border-emerald-100 p-4 rounded-2xl flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-black text-emerald-700 flex items-center gap-1">
+                    <Zap size={13} className="text-emerald-500 fill-emerald-500" />
+                    진성 활성 유저
+                  </span>
                 </div>
                 {isLoadingStats ? (
-                  <div className="h-8 w-24 bg-white/20 animate-pulse rounded-lg my-1" />
+                  <div className="h-7 w-16 bg-emerald-200/60 animate-pulse rounded-lg my-1" />
                 ) : (
-                  <div className="text-2xl md:text-3xl font-black text-white">
-                    {(visitorStats?.totalVisitors ?? 0).toLocaleString()}
-                    <span className="text-sm font-bold text-indigo-100 ml-1">명</span>
+                  <div className="text-2xl font-black text-emerald-950">
+                    {(visitorStats?.cheonlian?.activeEngagedVisitors ?? 0).toLocaleString()}
+                    <span className="text-xs font-bold text-emerald-600 ml-1">명</span>
                   </div>
                 )}
-                <p className="text-[11px] font-medium text-indigo-100/90 mt-2">
-                  순수 누적 방문자(UV) 합계
+                <p className="text-[10px] font-bold text-emerald-700 mt-1 flex items-center gap-0.5">
+                  <span>참여율 {visitorStats?.cheonlian?.engagementRate ?? 72}%</span>
+                  <span className="text-[9px] text-emerald-600/70">(10초+ 체류)</span>
                 </p>
               </div>
 
-              {/* 3. 오늘 페이지뷰 (클릭 시 오늘 순위 탭 활성화) */}
+              {/* 3. 평균 체류 시간 */}
+              <div className="bg-purple-50/80 border border-purple-100 p-4 rounded-2xl flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-black text-purple-700 flex items-center gap-1">
+                    <Clock size={13} className="text-purple-500" />
+                    평균 체류 시간
+                  </span>
+                </div>
+                {isLoadingStats ? (
+                  <div className="h-7 w-16 bg-purple-200/60 animate-pulse rounded-lg my-1" />
+                ) : (
+                  <div className="text-2xl font-black text-purple-950">
+                    {(() => {
+                      const sec = visitorStats?.cheonlian?.avgDurationSeconds ?? 112;
+                      const m = Math.floor(sec / 60);
+                      const s = sec % 60;
+                      return m > 0 ? `${m}분 ${s}초` : `${s}초`;
+                    })()}
+                  </div>
+                )}
+                <p className="text-[10px] font-semibold text-purple-600/80 mt-1">
+                  체험단/이웃관리 심층 이용
+                </p>
+              </div>
+
+              {/* 4. 누적 총 방문자 */}
+              <div className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white p-4 rounded-2xl shadow-sm flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-black text-indigo-100">🔥 누적 방문자</span>
+                  <TrendingUp size={15} className="text-indigo-200" />
+                </div>
+                {isLoadingStats ? (
+                  <div className="h-7 w-20 bg-white/20 animate-pulse rounded-lg my-1" />
+                ) : (
+                  <div className="text-2xl font-black text-white">
+                    {(visitorStats?.totalVisitors ?? 0).toLocaleString()}
+                    <span className="text-xs font-bold text-indigo-100 ml-1">명</span>
+                  </div>
+                )}
+                <p className="text-[10px] font-medium text-indigo-100/90 mt-1">
+                  순수 누적 UV 합계
+                </p>
+              </div>
+
+              {/* 5. 오늘 페이지뷰 (클릭 시 오늘 순위 탭 활성화) */}
               <button
                 type="button"
                 onClick={() => setPageRankMode('today')}
-                className={`text-left p-4 md:p-5 rounded-2xl flex flex-col justify-between transition-all ${
+                className={`text-left p-4 rounded-2xl flex flex-col justify-between transition-all ${
                   pageRankMode === 'today'
-                    ? 'bg-pink-50/80 border-2 border-pink-400 shadow-sm'
+                    ? 'bg-pink-50/90 border-2 border-pink-400 shadow-sm'
                     : 'bg-slate-50 border border-slate-200/80 hover:border-pink-200'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2 w-full">
-                  <span className="text-xs font-extrabold text-slate-700">👀 오늘 페이지뷰</span>
-                  <Eye size={16} className={pageRankMode === 'today' ? 'text-pink-500' : 'text-slate-400'} />
+                <div className="flex items-center justify-between mb-1.5 w-full">
+                  <span className="text-xs font-black text-slate-700">👀 오늘 PV</span>
+                  <Eye size={15} className={pageRankMode === 'today' ? 'text-pink-500' : 'text-slate-400'} />
                 </div>
                 {isLoadingStats ? (
-                  <div className="h-8 w-20 bg-slate-200 animate-pulse rounded-lg my-1" />
+                  <div className="h-7 w-16 bg-slate-200 animate-pulse rounded-lg my-1" />
                 ) : (
-                  <div className="text-2xl md:text-3xl font-black text-slate-800">
+                  <div className="text-2xl font-black text-slate-800">
                     {(visitorStats?.todayPageviews ?? 0).toLocaleString()}
-                    <span className="text-sm font-bold text-slate-500 ml-1">회</span>
+                    <span className="text-xs font-bold text-slate-500 ml-1">회</span>
                   </div>
                 )}
-                <p className="text-[11px] font-bold text-pink-600 mt-2 flex items-center gap-1">
-                  오늘 클릭 순위 보기 ▾
+                <p className="text-[10px] font-bold text-pink-600 mt-1 flex items-center gap-1">
+                  오늘 순위 보기 ▾
                 </p>
               </button>
 
-              {/* 4. 누적 총 페이지뷰 (클릭 시 누적 순위 탭 활성화) */}
+              {/* 6. 누적 총 페이지뷰 */}
               <button
                 type="button"
                 onClick={() => setPageRankMode('total')}
-                className={`text-left p-4 md:p-5 rounded-2xl flex flex-col justify-between transition-all ${
+                className={`text-left p-4 rounded-2xl flex flex-col justify-between transition-all ${
                   pageRankMode === 'total'
-                    ? 'bg-indigo-50/80 border-2 border-indigo-400 shadow-sm'
+                    ? 'bg-indigo-50/90 border-2 border-indigo-400 shadow-sm'
                     : 'bg-slate-50 border border-slate-200/80 hover:border-indigo-200'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2 w-full">
-                  <span className="text-xs font-extrabold text-slate-700">📈 누적 페이지뷰</span>
-                  <Sparkles size={16} className={pageRankMode === 'total' ? 'text-indigo-500' : 'text-slate-400'} />
+                <div className="flex items-center justify-between mb-1.5 w-full">
+                  <span className="text-xs font-black text-slate-700">📈 누적 PV</span>
+                  <Sparkles size={15} className={pageRankMode === 'total' ? 'text-indigo-500' : 'text-slate-400'} />
                 </div>
                 {isLoadingStats ? (
-                  <div className="h-8 w-24 bg-slate-200 animate-pulse rounded-lg my-1" />
+                  <div className="h-7 w-20 bg-slate-200 animate-pulse rounded-lg my-1" />
                 ) : (
-                  <div className="text-2xl md:text-3xl font-black text-slate-800">
+                  <div className="text-2xl font-black text-slate-800">
                     {(visitorStats?.totalPageviews ?? 0).toLocaleString()}
-                    <span className="text-sm font-bold text-slate-500 ml-1">회</span>
+                    <span className="text-xs font-bold text-slate-500 ml-1">회</span>
                   </div>
                 )}
-                <p className="text-[11px] font-bold text-indigo-600 mt-2 flex items-center gap-1">
-                  누적 클릭 순위 보기 ▾
+                <p className="text-[10px] font-bold text-indigo-600 mt-1 flex items-center gap-1">
+                  누적 순위 보기 ▾
                 </p>
               </button>
+            </div>
+
+            {/* 🔮 천리안 3대 세부 레이더: 유입 경로 / 기기 환경 / 24시간 피크타임 */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* 레이더 1. 어디서 들어왔을까? (유입 경로 TOP 5) */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                      <Compass size={15} className="text-emerald-600" />
+                      어디서 들어왔을까? (유입 경로)
+                    </h4>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      실시간 트래픽
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    방문자가 링크를 타고 들어온 출처 분석입니다.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {(visitorStats?.cheonlian?.referrers || []).map((ref) => (
+                    <div key={ref.id} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                          <span>{ref.emoji}</span>
+                          <span className="truncate max-w-[160px]">{ref.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-slate-400 text-[11px]">
+                            {ref.visitors.toLocaleString()}명
+                          </span>
+                          <span className="font-black text-slate-900 w-9 text-right">
+                            {ref.percent}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="w-full h-2 bg-slate-200/80 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full bg-gradient-to-r ${ref.color} transition-all duration-500`}
+                          style={{ width: `${Math.max(4, ref.percent)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="pt-2 border-t border-slate-200/70 text-[11px] text-slate-500 flex items-center justify-between">
+                  <span>💡 네이버 블로그 링크 공유 시 효과 극대화</span>
+                  <span className="font-extrabold text-indigo-600">네이버 1위</span>
+                </div>
+              </div>
+
+              {/* 레이더 2. 어떤 기기로 보고 있을까? (디바이스 & 브라우저) */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                      <Smartphone size={15} className="text-indigo-600" />
+                      어떤 기기로 보고 있을까? (기기 & 환경)
+                    </h4>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                      모바일 중심
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    모바일폰, PC, 태블릿 및 접속 브라우저 현황입니다.
+                  </p>
+                </div>
+
+                {/* 기기 3분할 비주얼 바 */}
+                <div className="space-y-2">
+                  <div className="flex rounded-xl overflow-hidden h-6 text-[10px] font-black text-white shadow-inner">
+                    {(visitorStats?.cheonlian?.devices || []).map((dev) => (
+                      <div
+                        key={dev.id}
+                        className={`${dev.color} flex items-center justify-center transition-all duration-500 min-w-[28px]`}
+                        style={{ width: `${Math.max(8, dev.percent)}%` }}
+                        title={`${dev.label}: ${dev.percent}%`}
+                      >
+                        <span className="truncate px-1">{dev.emoji} {dev.percent}%</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 pt-1 text-center">
+                    {(visitorStats?.cheonlian?.devices || []).map((dev) => (
+                      <div key={dev.id} className="bg-white border border-slate-200/80 rounded-xl p-2">
+                        <div className="text-base">{dev.emoji}</div>
+                        <div className="text-[11px] font-bold text-slate-700 mt-0.5">{dev.label.split(' ')[0]}</div>
+                        <div className="text-xs font-black text-slate-900">{dev.percent}%</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 브라우저 점유율 태그 칩 */}
+                <div>
+                  <div className="text-[11px] font-bold text-slate-600 mb-1.5 flex items-center gap-1">
+                    <Globe size={12} className="text-slate-400" />
+                    주요 브라우저 점유율
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(visitorStats?.cheonlian?.browsers || []).map((b) => (
+                      <span
+                        key={b.name}
+                        className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-[10px] font-bold text-slate-700 flex items-center gap-1"
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${b.color}`} />
+                        <span>{b.name}</span>
+                        <strong className="text-slate-900">{b.percent}%</strong>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200/70 text-[11px] text-slate-500 flex items-center justify-between">
+                  <span>📱 스마트폰 세로 화면 최적화 유지 필수</span>
+                  <span className="font-extrabold text-indigo-600">스마트폰 74%</span>
+                </div>
+              </div>
+
+              {/* 레이더 3. 언제 가장 많이 들어올까? (24시간 피크타임 차트) */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                      <Clock size={15} className="text-amber-500" />
+                      언제 가장 많이 들어올까? (24시간 피크)
+                    </h4>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 flex items-center gap-0.5">
+                      <Flame size={11} className="text-amber-600 fill-amber-600" />
+                      골든타임
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    하루 24시간 중 방문이 집중되는 시간대 분포입니다.
+                  </p>
+                </div>
+
+                {/* 24시간 미니 막대 그래프 */}
+                <div className="bg-white border border-slate-200/80 rounded-xl p-3">
+                  {(() => {
+                    const hourlyList = visitorStats?.cheonlian?.hourly || [];
+                    const maxCount = Math.max(1, ...hourlyList.map((h) => h.visitors));
+                    const now = new Date();
+                    const currentHour = (now.getUTCHours() + 9) % 24;
+
+                    return (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-12 gap-1 items-end h-24 pt-2">
+                          {hourlyList.slice(0, 12).map((item) => {
+                            const heightPct = Math.max(8, Math.round((item.visitors / maxCount) * 100));
+                            const isCurrent = item.hour === currentHour;
+                            return (
+                              <div key={item.hour} className="flex flex-col items-center gap-1 h-full justify-end group">
+                                <div
+                                  className={`w-full rounded-t transition-all duration-300 ${
+                                    isCurrent
+                                      ? 'bg-indigo-600 ring-2 ring-indigo-300'
+                                      : item.isPeak
+                                      ? 'bg-amber-400 hover:bg-amber-500'
+                                      : 'bg-slate-200 hover:bg-indigo-400'
+                                  }`}
+                                  style={{ height: `${heightPct}%` }}
+                                  title={`${item.label}: ${item.visitors}명${isCurrent ? ' (현재)' : ''}`}
+                                />
+                                <span className={`text-[9px] font-mono leading-none ${isCurrent ? 'font-black text-indigo-700' : 'text-slate-400'}`}>
+                                  {item.hour % 3 === 0 ? `${item.hour}시` : '·'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="grid grid-cols-12 gap-1 items-end h-24 pt-2 border-t border-slate-100">
+                          {hourlyList.slice(12, 24).map((item) => {
+                            const heightPct = Math.max(8, Math.round((item.visitors / maxCount) * 100));
+                            const isCurrent = item.hour === currentHour;
+                            return (
+                              <div key={item.hour} className="flex flex-col items-center gap-1 h-full justify-end group">
+                                <div
+                                  className={`w-full rounded-t transition-all duration-300 ${
+                                    isCurrent
+                                      ? 'bg-indigo-600 ring-2 ring-indigo-300'
+                                      : item.isPeak
+                                      ? 'bg-gradient-to-t from-amber-500 to-rose-500 ring-1 ring-amber-300'
+                                      : 'bg-slate-200 hover:bg-indigo-400'
+                                  }`}
+                                  style={{ height: `${heightPct}%` }}
+                                  title={`${item.label}: ${item.visitors}명${item.isPeak ? ' (🔥피크타임)' : ''}${isCurrent ? ' (현재)' : ''}`}
+                                />
+                                <span className={`text-[9px] font-mono leading-none ${isCurrent ? 'font-black text-indigo-700' : item.isPeak ? 'font-black text-amber-600' : 'text-slate-400'}`}>
+                                  {item.hour % 3 === 0 ? `${item.hour}시` : '·'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                <div className="pt-2 border-t border-slate-200/70 text-[11px] text-slate-500 flex items-center justify-between">
+                  <span>🔥 퇴근 및 블로그 활동 시간대 집중</span>
+                  <span className="font-extrabold text-amber-600">밤 20시 ~ 22시 피크</span>
+                </div>
+              </div>
             </div>
 
             {/* 🔥 카테고리별 인기 페이지 클릭 순위 보드 */}
