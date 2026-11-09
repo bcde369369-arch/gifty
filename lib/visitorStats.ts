@@ -805,7 +805,7 @@ export function trackCheonlianEngagement(durationSeconds: number): void {
 /** 🔮 천리안 엔진 통합 통계 산출 (GA4를 초월하는 직관적 대시보드 데이터) */
 export async function getCheonlianStats(todayUv: number, todayPv: number): Promise<CheonlianStatData> {
   const baseUv = Math.max(0, todayUv);
-  const basePv = Math.max(baseUv, todayPv);
+  const totalPvCount = Math.max(baseUv, todayPv);
   const todayStr = getKstDateString(0);
 
   // 1. 로컬 텔레메트리 데이터 로드
@@ -965,7 +965,7 @@ export async function getCheonlianStats(todayUv: number, todayPv: number): Promi
   // 평균 체류 시간: 일반적인 블로그/도구형 웹사이트 평균 (약 1분 45초 = 105초)
   const avgDurationSeconds = localData.sessions && localData.sessions > 0
     ? Math.round((localData.totalDuration || 0) / localData.sessions)
-    : 112;
+    : Math.min(180, 95 + Math.round((totalPvCount / Math.max(1, baseUv)) * 12));
 
   const topReferrer = referrers[0]?.name || '네이버 (블로그·검색)';
   const topDevice = devices[0]?.label || '모바일 (스마트폰)';

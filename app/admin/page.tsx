@@ -33,7 +33,6 @@ import {
   Image as ImageIcon,
   Compass,
   Smartphone,
-  Laptop,
   Clock,
   Flame,
   Zap,
