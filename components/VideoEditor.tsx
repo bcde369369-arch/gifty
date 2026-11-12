@@ -107,7 +107,7 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
     windowLength: number;
   } | null>(null);
 
-  const [quality, setQuality] = useState<'high' | 'normal' | 'low'>('normal');
+  const [quality, setQuality] = useState<'high' | 'normal' | 'community' | 'low'>('normal');
   const [textOverlay, setTextOverlay] = useState<string>('');
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>('variety-yellow');
   const [showCustomTextDetail, setShowCustomTextDetail] = useState<boolean>(false);
@@ -129,7 +129,10 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
   };
 
   const [playbackSpeed, setPlaybackSpeed] = useState<string>('1.0');
+  const [isBoomerang, setIsBoomerang] = useState<boolean>(false);
   const [videoFilter, setVideoFilter] = useState<'none' | 'grayscale' | 'sepia' | 'bright'>('none');
+  const [watermarkType, setWatermarkType] = useState<'text' | 'image'>('text');
+  const [textWatermark, setTextWatermark] = useState<string>('');
   const [logoFile, setLogoFile] = useState<File | null>(null);
 
   const [isConverting, setIsConverting] = useState(false);
@@ -137,6 +140,8 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
   const [statusMessage, setStatusMessage] = useState<string>('마법 부리는 중... (조금만 기다려주세요)');
   const [gifUrl, setGifUrl] = useState<string | null>(null);
   const [gifSize, setGifSize] = useState<number>(0);
+  const [webpUrl, setWebpUrl] = useState<string | null>(null);
+  const [webpSize, setWebpSize] = useState<number | null>(null);
 
   useEffect(() => {
     const url = URL.createObjectURL(videoFile);
@@ -436,16 +441,22 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
           position: textPosition,
         },
         parseFloat(playbackSpeed),
-        logoFile,
+        watermarkType === 'image' ? logoFile : null,
         videoFilter,
         (ratio, status) => {
           setProgress(Math.round(ratio * 100));
           if (status) setStatusMessage(status);
         },
-        null
+        null,
+        {
+          isBoomerang,
+          textWatermark: watermarkType === 'text' ? textWatermark : undefined,
+        }
       );
       setGifUrl(result.url);
       setGifSize(result.size);
+      setWebpUrl(result.webpUrl || null);
+      setWebpSize(result.webpSize || null);
     } catch (error: unknown) {
       console.error('Conversion failed', error);
       const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
@@ -851,6 +862,31 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
               <button onClick={() => setPlaybackSpeed('1.5')} disabled={isConverting} className={`py-2 px-1 rounded-xl border text-xs font-bold transition-all ${playbackSpeed === '1.5' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}>1.5x<br/><span className="font-normal opacity-70">빠르게</span></button>
               <button onClick={() => setPlaybackSpeed('2.0')} disabled={isConverting} className={`py-2 px-1 rounded-xl border text-xs font-bold transition-all ${playbackSpeed === '2.0' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}>2.0x<br/><span className="font-normal opacity-70">아주빠름</span></button>
             </div>
+
+            {/* Boomerang Loop Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsBoomerang(!isBoomerang)}
+              disabled={isConverting}
+              className={`w-full py-2.5 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-between ${
+                isBoomerang
+                  ? 'border-indigo-600 bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 shadow-xs ring-1 ring-indigo-500'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              } disabled:opacity-50`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-base">🔁</span>
+                <div className="text-left">
+                  <span className="block font-bold">인스타 부메랑 모드 (앞뒤 무한 재생)</span>
+                  <span className="block text-[10px] text-slate-400 font-normal">앞으로 갔다가 뒤로 되감겨서 음식·액션 짤에 최고!</span>
+                </div>
+              </div>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                isBoomerang ? 'bg-indigo-600 text-white shadow-xs' : 'bg-slate-100 text-slate-500'
+              }`}>
+                {isBoomerang ? '적용 ON ✨' : 'OFF'}
+              </span>
+            </button>
           </div>
 
           {/* New Feature: Video Filter */}
@@ -1157,68 +1193,137 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
             </div>
           </div>
 
-          {/* New Feature: Logo Upload */}
-          <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 mb-2">
-            <h4 className="text-sm font-bold text-slate-700 flex justify-between items-center">
-              <span className="flex items-center gap-2">
-                내 블로그 로고 넣기 (선택)
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-red-500 text-white animate-pulse shadow-sm shadow-red-200">NEW ✨</span>
-              </span>
-              {logoFile && (
-                <button 
-                  onClick={() => setLogoFile(null)}
-                  className="text-xs text-red-500 hover:text-red-700 font-medium"
+          {/* New Feature: Watermark & Signature (도용 방지) */}
+          <div className="flex flex-col gap-2.5 animate-in fade-in slide-in-from-bottom-2 mb-2 p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                <span>🛡️ 블로그 서명·워터마크 (도용 방지)</span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-indigo-600 text-white shadow-xs">
+                  추천 ✨
+                </span>
+              </h4>
+              {(textWatermark || logoFile) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTextWatermark('');
+                    setLogoFile(null);
+                  }}
+                  className="text-xs text-slate-400 hover:text-slate-600"
                 >
                   지우기 ✕
                 </button>
               )}
-            </h4>
-            <label className={`w-full border-2 border-dashed rounded-xl p-3 flex items-center justify-center gap-2 cursor-pointer transition-colors ${logoFile ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'} ${isConverting ? 'opacity-50 pointer-events-none' : ''}`}>
-              <input 
-                type="file" 
-                accept="image/png, image/jpeg" 
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    setLogoFile(e.target.files[0]);
-                  }
-                }}
-                className="hidden"
-                disabled={isConverting}
-              />
-              <span className="text-sm font-medium text-slate-600">
-                {logoFile ? `✅ ${logoFile.name} (선택됨)` : '📷 로고 이미지 선택 (.png, .jpg)'}
-              </span>
-            </label>
-            <p className="text-xs text-slate-400 pl-1">완성된 움짤 우측 하단에 자동으로 도장이 찍힙니다.</p>
+            </div>
+
+            {/* 워터마크 모드 탭 (텍스트 서명 vs 이미지 로고) */}
+            <div className="grid grid-cols-2 gap-1 p-1 bg-slate-200/60 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setWatermarkType('text')}
+                className={`py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  watermarkType === 'text'
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                ✍️ 텍스트 서명 (간편 1초)
+              </button>
+              <button
+                type="button"
+                onClick={() => setWatermarkType('image')}
+                className={`py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  watermarkType === 'image'
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                🖼️ 로고 이미지 업로드
+              </button>
+            </div>
+
+            {watermarkType === 'text' ? (
+              <div className="flex flex-col gap-1.5">
+                <input
+                  type="text"
+                  value={textWatermark}
+                  onChange={(e) => setTextWatermark(e.target.value)}
+                  placeholder="예: © 혜진의 맛집일기 (불펌금지)"
+                  maxLength={25}
+                  disabled={isConverting}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-slate-400 shadow-xs"
+                />
+                <p className="text-[10px] text-slate-400 pl-0.5">
+                  * 우측 하단에 반투명 각인으로 깔끔하게 박혀 다른 곳 불펌을 방지합니다.
+                </p>
+              </div>
+            ) : (
+              <div>
+                <label className={`w-full border-2 border-dashed rounded-xl p-3 flex items-center justify-center gap-2 cursor-pointer transition-colors ${logoFile ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 bg-white hover:bg-slate-100'} ${isConverting ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <input 
+                    type="file" 
+                    accept="image/png, image/jpeg" 
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setLogoFile(e.target.files[0]);
+                      }
+                    }}
+                    className="hidden"
+                    disabled={isConverting}
+                  />
+                  <span className="text-xs font-medium text-slate-600 truncate max-w-full">
+                    {logoFile ? `✅ ${logoFile.name} (선택됨)` : '📷 투명 로고 이미지 선택 (.png, .jpg)'}
+                  </span>
+                </label>
+                <p className="text-[10px] text-slate-400 pl-0.5 mt-1">완성된 움짤 우측 하단에 로고가 자동으로 합성됩니다.</p>
+              </div>
+            )}
           </div>
 
-
-          {/* Quality Selection */}
+          {/* Quality & Target File Size Selection */}
           <div className="mb-6 animate-in fade-in slide-in-from-bottom-2">
-            <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-              <Sparkles size={16} className="text-indigo-500" /> 화질 및 용량 선택
-            </h4>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                <Sparkles size={16} className="text-indigo-500" /> 화질 및 목표 용량 안심 선택
+              </h4>
+              <span className="text-[10px] text-indigo-600 font-bold">자동 압축 엔진 탑재 🎯</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button 
-                onClick={() => setQuality('low')}
-                disabled={isConverting}
-                className={`py-2 px-1 rounded-xl border text-sm font-medium transition-all ${quality === 'low' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}
-              >
-                저용량<br/><span className="text-xs font-normal opacity-70 leading-tight block mt-0.5">작고 가벼움</span>
-              </button>
-              <button 
+                type="button"
                 onClick={() => setQuality('normal')}
                 disabled={isConverting}
-                className={`py-2 px-1 rounded-xl border text-sm font-medium transition-all ${quality === 'normal' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}
+                className={`py-2 px-1 rounded-xl border text-center transition-all ${quality === 'normal' ? 'border-indigo-600 bg-indigo-50/80 text-indigo-700 shadow-xs ring-1 ring-indigo-500' : 'border-slate-200 text-slate-600 hover:bg-slate-50'} disabled:opacity-50`}
               >
-                블로그용<br/><span className="text-xs font-normal opacity-70 leading-tight block mt-0.5">네이버 최적화</span>
+                <span className="block text-xs font-bold">네이버 블로그용</span>
+                <span className="text-[10px] opacity-70 leading-tight block mt-0.5">20MB 이하 보장 🎯</span>
               </button>
               <button 
+                type="button"
+                onClick={() => setQuality('community')}
+                disabled={isConverting}
+                className={`py-2 px-1 rounded-xl border text-center transition-all ${quality === 'community' ? 'border-indigo-600 bg-indigo-50/80 text-indigo-700 shadow-xs ring-1 ring-indigo-500' : 'border-slate-200 text-slate-600 hover:bg-slate-50'} disabled:opacity-50`}
+              >
+                <span className="block text-xs font-bold text-rose-600">디시·커뮤니티</span>
+                <span className="text-[10px] opacity-70 leading-tight block mt-0.5">10MB 안심 압축 🔥</span>
+              </button>
+              <button 
+                type="button"
                 onClick={() => setQuality('high')}
                 disabled={isConverting}
-                className={`py-2 px-1 rounded-xl border text-sm font-medium transition-all ${quality === 'high' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'} disabled:opacity-50`}
+                className={`py-2 px-1 rounded-xl border text-center transition-all ${quality === 'high' ? 'border-indigo-600 bg-indigo-50/80 text-indigo-700 shadow-xs ring-1 ring-indigo-500' : 'border-slate-200 text-slate-600 hover:bg-slate-50'} disabled:opacity-50`}
               >
-                고화질<br/><span className="text-xs font-normal opacity-70 leading-tight block mt-0.5">크고 선명함</span>
+                <span className="block text-xs font-bold">초고화질</span>
+                <span className="text-[10px] opacity-70 leading-tight block mt-0.5">선명한 640px</span>
+              </button>
+              <button 
+                type="button"
+                onClick={() => setQuality('low')}
+                disabled={isConverting}
+                className={`py-2 px-1 rounded-xl border text-center transition-all ${quality === 'low' ? 'border-indigo-600 bg-indigo-50/80 text-indigo-700 shadow-xs ring-1 ring-indigo-500' : 'border-slate-200 text-slate-600 hover:bg-slate-50'} disabled:opacity-50`}
+              >
+                <span className="block text-xs font-bold">초경량</span>
+                <span className="text-[10px] opacity-70 leading-tight block mt-0.5">작고 빠른 로딩</span>
               </button>
             </div>
           </div>
@@ -1278,56 +1383,90 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
           <div className="w-full bg-indigo-50 border border-indigo-100 rounded-xl p-5 shadow-sm animate-in fade-in duration-300">
             <div className="flex flex-col gap-3">
               <div className="flex justify-between items-center mb-1">
-                <h4 className="text-sm font-bold text-indigo-900">✨ 변환 완료!</h4>
-                <span className={`text-xs font-bold px-2 py-1 rounded-full ${gifSize > 20 * 1024 * 1024 ? 'bg-red-100 text-red-600' : 'bg-indigo-100 text-indigo-700'}`}>
-                  용량: {(gifSize / (1024 * 1024)).toFixed(2)} MB
-                </span>
+                <h4 className="text-sm font-bold text-indigo-900 flex items-center gap-1.5">
+                  <span>✨ 변환 성공!</span>
+                  {isBoomerang && (
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-purple-600 text-white">
+                      부메랑 🔁
+                    </span>
+                  )}
+                </h4>
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  <span className={`text-xs font-bold px-2 py-1 rounded-full ${gifSize > (quality === 'community' ? 10 : 20) * 1024 * 1024 ? 'bg-red-100 text-red-600' : 'bg-indigo-100 text-indigo-700'}`}>
+                    GIF: {(gifSize / (1024 * 1024)).toFixed(2)} MB
+                  </span>
+                  {webpSize && (
+                    <span className="text-xs font-bold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                      WebP: {(webpSize / (1024 * 1024)).toFixed(2)} MB ✨
+                    </span>
+                  )}
+                </div>
               </div>
               
               {gifSize > 20 * 1024 * 1024 && (
                 <p className="text-xs text-red-600 bg-red-50 p-2 rounded-lg border border-red-100 font-medium">
-                  ⚠️ 20MB를 초과하여 네이버 블로그에 업로드할 수 없습니다. 화질 옵션을 낮춰서 다시 변환해 주세요!
+                  ⚠️ 20MB를 초과하여 네이버 블로그에 업로드할 수 없습니다. [블로그용] 또는 [디시·커뮤니티] 옵션으로 다시 변환해 주세요!
+                </p>
+              )}
+
+              {quality === 'community' && gifSize <= 10 * 1024 * 1024 && (
+                <p className="text-xs text-emerald-700 bg-emerald-50/80 p-2 rounded-lg border border-emerald-200 font-medium flex items-center gap-1">
+                  <span>✅ 디시인사이드·에펨코리아·더쿠 업로드 규격(10MB 미만)을 통과했습니다!</span>
                 </p>
               )}
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 w-full mt-2">
+          <div className="flex flex-col gap-2.5 w-full mt-2">
+            <div className="flex flex-col sm:flex-row gap-2.5 w-full">
+              <a
+                href={gifUrl}
+                download="gifty-magic.gif"
+                onClick={(e) => {
+                  const targetUrl = window.location.href;
+                  const ua = navigator.userAgent.toLowerCase();
+                  const isInAppBrowser = /kakaotalk|instagram|facebook|line|band/.test(ua);
+                  if (isInAppBrowser) {
+                    e.preventDefault();
+                    if (ua.match(/kakaotalk/i)) {
+                      alert('현재 브라우저에서는 움짤 저장이 불가능합니다. 기본 브라우저(Safari/Chrome)로 이동합니다!');
+                      window.location.href = `kakaotalk://web/openExternal?url=${encodeURIComponent(targetUrl)}`;
+                    } else if (ua.match(/line/i)) {
+                      alert('현재 브라우저에서는 움짤 저장이 불가능합니다. 기본 브라우저(Safari/Chrome)로 이동합니다!');
+                      window.location.href = targetUrl.includes('?') ? targetUrl + '&openExternalBrowser=1' : targetUrl + '?openExternalBrowser=1';
+                    } else {
+                      navigator.clipboard.writeText(targetUrl).then(() => {
+                        alert('현재 브라우저에서는 움짤 저장이 불가능합니다.\n링크가 복사되었으니 Safari 또는 Chrome 주소창에 붙여넣어 주세요!');
+                      }).catch(() => {
+                        alert('현재 브라우저에서는 움짤 저장이 불가능합니다.\n화면의 [︙] 메뉴를 눌러 [다른 브라우저로 열기]를 선택해주세요.');
+                      });
+                    }
+                  }
+                }}
+                className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 text-white py-3 px-4 rounded-xl font-bold shadow-md hover:bg-indigo-700 hover:shadow-lg transition-all"
+              >
+                <Download size={18} />
+                <span>GIF 다운로드 (표준 호환)</span>
+              </a>
+
+              {webpUrl && (
+                <a
+                  href={webpUrl}
+                  download="gifty-magic.webp"
+                  className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-3 px-4 rounded-xl font-bold shadow-md hover:from-emerald-700 hover:to-teal-700 hover:shadow-lg transition-all"
+                >
+                  <Sparkles size={18} />
+                  <span>WebP 다운로드 (용량 1/5 · 고화질)</span>
+                </a>
+              )}
+            </div>
+
             <button
               onClick={onReset}
-              className="flex-1 px-4 py-3 rounded-xl font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+              className="w-full px-4 py-2.5 rounded-xl font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors text-xs"
             >
-              다시 만들기
+              새로운 영상으로 다시 만들기 ↺
             </button>
-            <a
-              href={gifUrl}
-              download="gifty-magic.gif"
-              onClick={(e) => {
-                const targetUrl = window.location.href;
-                const ua = navigator.userAgent.toLowerCase();
-                const isInAppBrowser = /kakaotalk|instagram|facebook|line|band/.test(ua);
-                if (isInAppBrowser) {
-                  e.preventDefault();
-                  if (ua.match(/kakaotalk/i)) {
-                    alert('현재 브라우저에서는 움짤 저장이 불가능합니다. 기본 브라우저(Safari/Chrome)로 이동합니다!');
-                    window.location.href = `kakaotalk://web/openExternal?url=${encodeURIComponent(targetUrl)}`;
-                  } else if (ua.match(/line/i)) {
-                    alert('현재 브라우저에서는 움짤 저장이 불가능합니다. 기본 브라우저(Safari/Chrome)로 이동합니다!');
-                    window.location.href = targetUrl.includes('?') ? targetUrl + '&openExternalBrowser=1' : targetUrl + '?openExternalBrowser=1';
-                  } else {
-                    navigator.clipboard.writeText(targetUrl).then(() => {
-                      alert('현재 브라우저에서는 움짤 저장이 불가능합니다.\n링크가 복사되었으니 Safari 또는 Chrome 주소창에 붙여넣어 주세요!');
-                    }).catch(() => {
-                      alert('현재 브라우저에서는 움짤 저장이 불가능합니다.\n화면의 [︙] 메뉴를 눌러 [다른 브라우저로 열기]를 선택해주세요.');
-                    });
-                  }
-                }
-              }}
-              className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-md hover:bg-indigo-700 hover:shadow-lg transition-all"
-            >
-              <Download size={18} />
-              다운로드
-            </a>
           </div>
           
           <button
