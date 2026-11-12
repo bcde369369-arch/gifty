@@ -25,8 +25,8 @@ export default function AdSenseBanner({
   const pushedRef = useRef(false);
 
   useEffect(() => {
-    // Only push once per mounted component
-    if (pushedRef.current) return;
+    // slot이 지정되지 않은 심사 단계에서는 푸시하지 않음
+    if (!slot || pushedRef.current) return;
 
     try {
       if (typeof window !== 'undefined') {
@@ -36,7 +36,12 @@ export default function AdSenseBanner({
     } catch (err) {
       console.warn('AdSense push error:', err);
     }
-  }, []);
+  }, [slot]);
+
+  // 애드센스 단위 광고 슬롯 ID(slot)가 지정되지 않은 심사 단계에서는 레이아웃 깨짐/빈 박스 방지를 위해 숨김
+  if (!slot) {
+    return null;
+  }
 
   return (
     <div className={`w-full overflow-hidden flex justify-center items-center text-center ${className}`}>

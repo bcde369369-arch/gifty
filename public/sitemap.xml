@@ -3,83 +3,168 @@
   <!-- 메인 홈 -->
   <url>
     <loc>https://gifty.run/</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-11-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
-  <!-- 꿀팁 가이드 백과사전 -->
+
+  <!-- 서비스 소개 및 문의 (E-E-A-T 신뢰성) -->
+  <url>
+    <loc>https://gifty.run/about</loc>
+    <lastmod>2026-11-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://gifty.run/contact</loc>
+    <lastmod>2026-11-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- 꿀팁 가이드 백과사전 메인 -->
   <url>
     <loc>https://gifty.run/guide</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-11-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
+
+  <!-- 꿀팁 개별 아티클 (총 15개) -->
+  <url>
+    <loc>https://gifty.run/guide/gif-vs-webp-mp4</loc>
+    <lastmod>2026-11-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://gifty.run/guide/ecommerce-product-gif</loc>
+    <lastmod>2026-11-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://gifty.run/guide/galaxy-motion-photo-to-gif</loc>
+    <lastmod>2026-11-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://gifty.run/guide/food-restaurant-gif</loc>
+    <lastmod>2026-11-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://gifty.run/guide/tistory-wordpress-image-seo</loc>
+    <lastmod>2026-11-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://gifty.run/guide/gif-frame-rate-optimization</loc>
+    <lastmod>2026-11-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://gifty.run/guide/gif-caption-typography</loc>
+    <lastmod>2026-11-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://gifty.run/guide/gif-copyright-fair-use</loc>
+    <lastmod>2026-11-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://gifty.run/guide/sns-gif-upload-spec</loc>
+    <lastmod>2026-11-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
   <url>
     <loc>https://gifty.run/guide/iphone-livephoto-to-gif</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-11-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://gifty.run/guide/gif-size-reduction-tips</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-11-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://gifty.run/guide/blog-thumbnail-gif</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-11-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://gifty.run/guide/naver-blog-limit</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-11-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://gifty.run/guide/gif-marketing-seo</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-11-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://gifty.run/guide/high-quality-gif</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-11-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
+
   <!-- 주요 기능 페이지 -->
   <url>
+    <loc>https://gifty.run/blog-lab</loc>
+    <lastmod>2026-11-11</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://gifty.run/neighbor</loc>
+    <lastmod>2026-11-11</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://gifty.run/community</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-11-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://gifty.run/experience-diary</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-11-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://gifty.run/sticker</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-11-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://gifty.run/remove-bg</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-11-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
+
   <!-- 법적 고지 및 약관 -->
   <url>
     <loc>https://gifty.run/legal</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-11-11</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
+    <priority>0.6</priority>
   </url>
 </urlset>

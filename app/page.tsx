@@ -154,18 +154,20 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Top Affiliate Banner */}
-      <div className="w-full bg-slate-900 border-b border-slate-800 py-0 hidden md:block">
-        <a 
-          href={isLoaded ? settings.affiliateLink : '#'} 
-          target="_blank" 
-          rel="noopener noreferrer" 
-          className="flex items-center justify-center gap-4 text-white hover:bg-slate-800 transition-colors py-3 group"
-        >
-          <span className="bg-indigo-500 text-xs font-bold px-2 py-0.5 rounded text-white">SPONSOR</span>
-          <span className="text-sm font-medium">{isLoaded ? settings.affiliateTitle : '스폰서 배너 불러오는 중...'} <strong className="text-indigo-400 group-hover:text-indigo-300">&rarr;</strong></span>
-        </a>
-      </div>
+      {/* Top Affiliate Banner (애드센스 심사 클린 모드에서는 안전하게 숨김) */}
+      {isLoaded && settings.showCoupangAds && (
+        <div className="w-full bg-slate-900 border-b border-slate-800 py-0 hidden md:block">
+          <a 
+            href={settings.affiliateLink} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="flex items-center justify-center gap-4 text-white hover:bg-slate-800 transition-colors py-3 group"
+          >
+            <span className="bg-indigo-500 text-xs font-bold px-2 py-0.5 rounded text-white">SPONSOR</span>
+            <span className="text-sm font-medium">{settings.affiliateTitle} <strong className="text-indigo-400 group-hover:text-indigo-300">&rarr;</strong></span>
+          </a>
+        </div>
+      )}
 
       {/* Hero Section */}
       <section className="relative w-full max-w-6xl mx-auto px-6 pt-16 pb-24 flex flex-col md:flex-row items-center gap-12">
@@ -570,9 +572,11 @@ export default function Home() {
             <Sparkles size={16} /> <span className="font-bold tracking-widest text-slate-200">GIFTY</span>
           </div>
           <div className="flex flex-wrap justify-center gap-6 mb-6 text-sm font-medium">
+            <a href="/" className="hover:text-white transition-colors">홈</a>
+            <a href="/about" className="hover:text-white transition-colors text-indigo-400 font-bold">서비스 소개</a>
             <a href="/guide" className="hover:text-white transition-colors">움짤·블로그 꿀팁 가이드</a>
+            <a href="/contact" className="hover:text-white transition-colors">문의하기</a>
             <a href="/legal" className="hover:text-white transition-colors">이용약관 및 개인정보처리방침</a>
-            <a href="mailto:contact@gifty.run" className="hover:text-white transition-colors">문의하기</a>
             <a href="/admin" className="text-slate-700 hover:text-white transition-colors">관리자</a>
           </div>
           <p className="text-sm mb-4">© 2026 Gifty. All rights reserved. Build your awesome meme.</p>

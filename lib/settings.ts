@@ -7,6 +7,7 @@ export interface SiteSettings {
   affiliateLink: string;
   coupangBannerHtml: string;
   coupangBannerHtmlMobile: string;
+  showCoupangAds: boolean; // 구글 애드센스 심사용 클린 모드 제어 (false: 제휴/쿠팡 전체 숨김, true: 노출)
 }
 
 const defaultSettings: SiteSettings = {
@@ -16,6 +17,7 @@ const defaultSettings: SiteSettings = {
   affiliateLink: 'http://searchcategory.co.kr/ad/cpc_open.php?app=205&custom=16&domain=adot.ai&type=1&aid=8291&browser=chrome&guid=202311057VpLO8',
   coupangBannerHtml: '<iframe src="https://ads-partners.coupang.com/widgets.html?id=1035486&template=carousel&trackingCode=AF9715762&subId=&width=680&height=140&tsource=" width="680" height="140" frameborder="0" scrolling="no" referrerpolicy="unsafe-url"></iframe>', 
   coupangBannerHtmlMobile: '<iframe src="https://ads-partners.coupang.com/widgets.html?id=1035486&template=carousel&trackingCode=AF9715762&subId=&width=320&height=100&tsource=" width="320" height="100" frameborder="0" scrolling="no" referrerpolicy="unsafe-url"></iframe>', 
+  showCoupangAds: false, // 구글 애드센스 심사를 위해 기본값은 안전하게 숨김(클린 모드) 상태로 설정
 };
 
 export function useSiteSettings() {
@@ -27,7 +29,8 @@ export function useSiteSettings() {
     const saved = localStorage.getItem('gifty_settings_v2');
     if (saved) {
       try {
-        setSettings(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        setSettings({ ...defaultSettings, ...parsed });
       } catch (e) {
         console.error('Failed to parse settings', e);
       }
@@ -42,3 +45,4 @@ export function useSiteSettings() {
 
   return { settings, saveSettings, isLoaded };
 }
+

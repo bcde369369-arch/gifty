@@ -9,10 +9,15 @@ export default function LegalPage() {
     <main className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-24">
       {/* Header */}
       <nav className="w-full bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-200">
-        <div className="max-w-4xl mx-auto px-6 h-16 flex items-center">
-          <Link href="/" className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition-colors font-semibold">
-            <ArrowLeft size={18} /> 메인으로 돌아가기
+        <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition-colors font-semibold text-sm">
+            <ArrowLeft size={16} /> 메인으로 돌아가기
           </Link>
+          <div className="flex items-center gap-4 text-xs sm:text-sm font-semibold text-slate-600">
+            <Link href="/about" className="hover:text-indigo-600 transition-colors">소개</Link>
+            <Link href="/guide" className="hover:text-indigo-600 transition-colors">가이드</Link>
+            <Link href="/contact" className="hover:text-indigo-600 transition-colors">문의하기</Link>
+          </div>
         </div>
       </nav>
 

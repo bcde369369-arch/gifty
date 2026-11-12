@@ -1267,8 +1267,54 @@ export default function AdminDashboard() {
 
           {/* Coupang Partners Settings */}
           <section className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-            <div className="flex items-center gap-2 text-fuchsia-600 font-bold text-lg mb-6 pb-4 border-b border-slate-100">
-              <Sparkles size={20} /> 쿠팡 다이내믹 배너 설정 (HTML 코드)
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-fuchsia-600 font-bold text-lg">
+                <Sparkles size={20} /> 쿠팡 다이내믹 배너 &amp; 제휴 링크 설정
+              </div>
+              <div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-200">
+                <label htmlFor="toggle-coupang-ads" className="text-xs sm:text-sm font-bold text-slate-700 cursor-pointer select-none">
+                  {formData.showCoupangAds ? (
+                    <span className="text-emerald-600 flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      쿠팡 배너 노출 중
+                    </span>
+                  ) : (
+                    <span className="text-amber-600 flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                      🛡️ 애드센스 심사 클린 모드 (전체 숨김)
+                    </span>
+                  )}
+                </label>
+                <input
+                  id="toggle-coupang-ads"
+                  type="checkbox"
+                  checked={Boolean(formData.showCoupangAds)}
+                  onChange={(e) => setFormData({ ...formData, showCoupangAds: e.target.checked })}
+                  className="w-5 h-5 accent-indigo-600 rounded cursor-pointer"
+                />
+              </div>
+            </div>
+
+            <div className={`p-4 rounded-2xl mb-6 border text-xs sm:text-sm leading-relaxed ${
+              formData.showCoupangAds 
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+                : 'bg-amber-50 border-amber-200 text-amber-900'
+            }`}>
+              {formData.showCoupangAds ? (
+                <div>
+                  <strong>✅ 현재 쿠팡 파트너스 배너 및 최저가 검색 카드가 사이트에 정상 노출되고 있습니다.</strong>
+                  <p className="text-xs text-emerald-700 mt-1">애드센스 최종 승인이 완료된 후 수익 창출을 위해 유지하시면 됩니다.</p>
+                </div>
+              ) : (
+                <div>
+                  <strong>🛡️ [애드센스 심사용 클린 모드 활성화 중]</strong>
+                  <p className="text-xs text-amber-800 mt-1">
+                    현재 사이트 전체(메인, 꿀팁, 연구소 등)에서 모든 쿠팡 배너와 제휴 검색 카드가 자동으로 숨겨집니다.
+                    구글 애드센스 심사 봇이 사이트를 검토할 때 제휴 광고로 인한 반려(가치 없는 콘텐츠)를 원천 방지합니다.
+                    구글 승인 완료 후 우측 체크박스를 켜고 저장하시면 바로 재개됩니다.
+                  </p>
+                </div>
+              )}
             </div>
             
             <div className="space-y-6">

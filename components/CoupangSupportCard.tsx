@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { ShoppingBag, Search, ExternalLink, Heart, Sparkles } from 'lucide-react';
+import { useSiteSettings } from '@/lib/settings';
 
 interface CoupangSupportCardProps {
   category?: 'gif' | 'nukki' | 'diary' | 'sticker' | 'general';
@@ -45,15 +46,18 @@ export default function CoupangSupportCard({
   category = 'general',
   className = '',
 }: CoupangSupportCardProps) {
+  const { settings, isLoaded } = useSiteSettings();
   const [searchTerm, setSearchTerm] = useState('');
   const info = CONTEXT_TIPS[category] || CONTEXT_TIPS.general;
 
-  // 쿠팡 파트너스 트래킹이 적용된 검색 바로가기
-  // 사용자의 트래킹 코드(AF9715762)가 쿠팡 세션에 걸리도록 위젯 게이트웨이 또는 쿠팡 검색 URL 생성
+  // 구글 애드센스 심사용 클린 모드: 관리자 설정에서 비활성화되어 있으면 완전 숨김
+  if (!isLoaded || !settings.showCoupangAds) {
+    return null;
+  }
+
   const handleSearch = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const query = searchTerm.trim() || info.searchKeyword;
-    // 쿠팡 파트너스 경유 검색 페이지
     const targetUrl = `https://www.coupang.com/np/search?component=&q=${encodeURIComponent(query)}&channel=user`;
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
   };

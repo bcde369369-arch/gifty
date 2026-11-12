@@ -2,20 +2,88 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { convertToGif } from '@/lib/ffmpeg';
-import { Loader2, Download, RotateCcw, Sparkles, Copy, Play, Pause, Repeat, Film, Smile } from 'lucide-react';
+import { Loader2, Download, RotateCcw, Sparkles, Copy, Play, Pause, Repeat, Film, Wand2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useSiteSettings } from '@/lib/settings';
 import CoupangBanner from '@/components/CoupangBanner';
 import CoupangSupportCard from '@/components/CoupangSupportCard';
-import {
-  getAllEmoticons,
-  CustomEmoticon,
-  convertToPngBlob,
-} from '@/lib/emoticonManager';
 
 interface VideoEditorProps {
   videoFile: File;
   onReset: () => void;
 }
+
+interface SubtitlePreset {
+  id: string;
+  name: string;
+  tag: string;
+  font: 'Jua' | 'Gaegu' | 'BlackHanSans' | 'NanumGothic';
+  size: 'small' | 'medium' | 'large' | 'xlarge';
+  color: string;
+  borderWidth: 'none' | 'thin' | 'bold' | 'heavy';
+  borderColor: string;
+  position: 'bottom' | 'center' | 'top';
+  badge?: string;
+}
+
+const SUBTITLE_PRESETS: SubtitlePreset[] = [
+  {
+    id: 'variety-yellow',
+    name: '예능 옐로우',
+    tag: '유튜브·예능',
+    font: 'BlackHanSans',
+    size: 'large',
+    color: '#FFE812',
+    borderWidth: 'heavy',
+    borderColor: '#000000',
+    position: 'bottom',
+    badge: '인기 🔥',
+  },
+  {
+    id: 'clean-white',
+    name: '깔끔 화이트',
+    tag: '넷플릭스·인터뷰',
+    font: 'NanumGothic',
+    size: 'medium',
+    color: '#FFFFFF',
+    borderWidth: 'thin',
+    borderColor: '#000000',
+    position: 'bottom',
+  },
+  {
+    id: 'shock-red',
+    name: '긴급 충격',
+    tag: '속보·강조',
+    font: 'BlackHanSans',
+    size: 'xlarge',
+    color: '#FF2A2A',
+    borderWidth: 'heavy',
+    borderColor: '#FFFFFF',
+    position: 'center',
+    badge: '강조 🚨',
+  },
+  {
+    id: 'vlog-pink',
+    name: '감성 브이로그',
+    tag: '손글씨 감성',
+    font: 'Gaegu',
+    size: 'large',
+    color: '#FF6EA7',
+    borderWidth: 'thin',
+    borderColor: '#000000',
+    position: 'bottom',
+  },
+  {
+    id: 'cute-mint',
+    name: '동글 민트',
+    tag: '귀여운 밈',
+    font: 'Jua',
+    size: 'medium',
+    color: '#00F5D4',
+    borderWidth: 'bold',
+    borderColor: '#000000',
+    position: 'bottom',
+  },
+];
 
 export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
   const { settings, isLoaded } = useSiteSettings();
@@ -41,33 +109,28 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
 
   const [quality, setQuality] = useState<'high' | 'normal' | 'low'>('normal');
   const [textOverlay, setTextOverlay] = useState<string>('');
-  const [textFont, setTextFont] = useState<'Jua' | 'Gaegu' | 'BlackHanSans' | 'NanumGothic'>('Jua');
-  const [textSize, setTextSize] = useState<'small' | 'medium' | 'large' | 'xlarge'>('medium');
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>('variety-yellow');
+  const [showCustomTextDetail, setShowCustomTextDetail] = useState<boolean>(false);
+  const [textFont, setTextFont] = useState<'Jua' | 'Gaegu' | 'BlackHanSans' | 'NanumGothic'>('BlackHanSans');
+  const [textSize, setTextSize] = useState<'small' | 'medium' | 'large' | 'xlarge'>('large');
   const [textColor, setTextColor] = useState<string>('#FFE812');
-  const [textBorderWidth, setTextBorderWidth] = useState<'none' | 'thin' | 'bold' | 'heavy'>('bold');
+  const [textBorderWidth, setTextBorderWidth] = useState<'none' | 'thin' | 'bold' | 'heavy'>('heavy');
   const [textBorderColor, setTextBorderColor] = useState<string>('#000000');
   const [textPosition, setTextPosition] = useState<'bottom' | 'center' | 'top'>('bottom');
+
+  const handleApplyPreset = (preset: SubtitlePreset) => {
+    setSelectedPresetId(preset.id);
+    setTextFont(preset.font);
+    setTextSize(preset.size);
+    setTextColor(preset.color);
+    setTextBorderWidth(preset.borderWidth);
+    setTextBorderColor(preset.borderColor);
+    setTextPosition(preset.position);
+  };
 
   const [playbackSpeed, setPlaybackSpeed] = useState<string>('1.0');
   const [videoFilter, setVideoFilter] = useState<'none' | 'grayscale' | 'sepia' | 'bright'>('none');
   const [logoFile, setLogoFile] = useState<File | null>(null);
-
-  // Custom Emoticon / Sticker State (미니툴바)
-  const [emoticons, setEmoticons] = useState<CustomEmoticon[]>([]);
-  const [selectedEmoticon, setSelectedEmoticon] = useState<CustomEmoticon | null>(null);
-  const [emoticonPosition, setEmoticonPosition] = useState<
-    'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'above-text'
-  >('top-right');
-  const [emoticonSize, setEmoticonSize] = useState<'small' | 'medium' | 'large'>('medium');
-
-  useEffect(() => {
-    setEmoticons(getAllEmoticons());
-    const handleUpdate = () => {
-      setEmoticons(getAllEmoticons());
-    };
-    window.addEventListener('gifty_emoticons_updated', handleUpdate);
-    return () => window.removeEventListener('gifty_emoticons_updated', handleUpdate);
-  }, []);
 
   const [isConverting, setIsConverting] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -358,26 +421,6 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
     const resultDuration = Math.min(endTime - startTime, 15);
 
     try {
-      let emoticonConfig: {
-        file: File;
-        position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'above-text';
-        size?: 'small' | 'medium' | 'large';
-      } | null = null;
-
-      if (selectedEmoticon) {
-        try {
-          const emoPngBlob = await convertToPngBlob(selectedEmoticon.imageUrl, 256);
-          const emoFile = new File([emoPngBlob], 'emoticon.png', { type: 'image/png' });
-          emoticonConfig = {
-            file: emoFile,
-            position: emoticonPosition,
-            size: emoticonSize,
-          };
-        } catch (err) {
-          console.warn('Failed to prepare emoticon PNG for FFmpeg:', err);
-        }
-      }
-
       const result = await convertToGif(
         videoFile,
         startTime,
@@ -399,7 +442,7 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
           setProgress(Math.round(ratio * 100));
           if (status) setStatusMessage(status);
         },
-        emoticonConfig
+        null
       );
       setGifUrl(result.url);
       setGifSize(result.size);
@@ -502,38 +545,6 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
             >
               {textOverlay}
             </span>
-          </div>
-        )}
-
-        {/* Live Emoticon / Custom Sticker Overlay Preview */}
-        {selectedEmoticon && (
-          <div
-            className={`pointer-events-none absolute z-15 transition-all duration-200 select-none ${
-              emoticonPosition === 'top-left'
-                ? 'top-4 left-4'
-                : emoticonPosition === 'top-right'
-                ? 'top-4 right-4'
-                : emoticonPosition === 'bottom-left'
-                ? 'bottom-14 left-4'
-                : emoticonPosition === 'bottom-right'
-                ? 'bottom-14 right-4'
-                : emoticonPosition === 'center'
-                ? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'
-                : 'bottom-20 left-1/2 -translate-x-1/2'
-            }`}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={selectedEmoticon.imageUrl}
-              alt={selectedEmoticon.name}
-              className={`drop-shadow-xl object-contain transition-all ${
-                emoticonSize === 'small'
-                  ? 'w-16 h-16 sm:w-20 sm:h-20'
-                  : emoticonSize === 'large'
-                  ? 'w-28 h-28 sm:w-36 sm:h-36'
-                  : 'w-20 h-20 sm:w-28 sm:h-28'
-              }`}
-            />
           </div>
         )}
 
@@ -856,130 +867,6 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
             </div>
           </div>
 
-          {/* New Feature: Custom Emoticons & Stickers Mini Toolbar */}
-          <div className="flex flex-col gap-2.5 animate-in fade-in slide-in-from-bottom-2 mb-2 p-3.5 bg-gradient-to-br from-rose-50/70 via-purple-50/40 to-indigo-50/70 border border-rose-200/80 rounded-2xl">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <Smile size={16} className="text-rose-600" />
-                <span>자체 제작 이모티콘 스티커</span>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-600 text-white shadow-xs">
-                  미니툴바 ✨
-                </span>
-              </h4>
-              {selectedEmoticon && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedEmoticon(null)}
-                  className="text-xs text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 bg-white px-2 py-0.5 rounded-lg border border-rose-200"
-                >
-                  ✕ 스티커 해제
-                </button>
-              )}
-            </div>
-
-            {/* Horizontal Scrollable Emoticon Mini Toolbar */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5 scroll-smooth">
-              <button
-                type="button"
-                onClick={() => setSelectedEmoticon(null)}
-                className={`flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold border transition-all flex flex-col items-center justify-center gap-1 ${
-                  !selectedEmoticon
-                    ? 'border-indigo-600 bg-indigo-600 text-white shadow-xs'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <span className="text-sm">🚫</span>
-                <span className="text-[10px] whitespace-nowrap">스티커 없음</span>
-              </button>
-
-              {emoticons.map((emo) => {
-                const isSelected = selectedEmoticon?.id === emo.id;
-                return (
-                  <button
-                    key={emo.id}
-                    type="button"
-                    onClick={() => setSelectedEmoticon(isSelected ? null : emo)}
-                    title={emo.name}
-                    className={`flex-shrink-0 p-1.5 px-2.5 rounded-xl border transition-all flex flex-col items-center justify-center gap-1 group ${
-                      isSelected
-                        ? 'border-rose-500 bg-white ring-2 ring-rose-400 shadow-md scale-105'
-                        : 'border-slate-200/80 bg-white/90 hover:bg-white hover:border-indigo-300 shadow-xs'
-                    }`}
-                  >
-                    <div className="w-12 h-12 flex items-center justify-center p-0.5 overflow-hidden">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={emo.imageUrl}
-                        alt={emo.name}
-                        className="max-w-full max-h-full object-contain pointer-events-none drop-shadow-sm group-hover:scale-110 transition-transform"
-                      />
-                    </div>
-                    <span
-                      className={`text-[10px] font-bold max-w-[72px] truncate ${
-                        isSelected ? 'text-rose-600' : 'text-slate-700'
-                      }`}
-                    >
-                      {emo.name}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Selected Emoticon Controls (Position & Size) */}
-            {selectedEmoticon && (
-              <div className="pt-2 border-t border-rose-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 text-xs">
-                {/* Position */}
-                <div className="flex items-center gap-1 flex-wrap">
-                  <span className="text-[11px] font-bold text-slate-500 mr-1">위치:</span>
-                  {[
-                    { id: 'top-right' as const, label: '우상단' },
-                    { id: 'top-left' as const, label: '좌상단' },
-                    { id: 'center' as const, label: '중앙' },
-                    { id: 'above-text' as const, label: '자막위' },
-                    { id: 'bottom-right' as const, label: '우하단' },
-                  ].map((pos) => (
-                    <button
-                      key={pos.id}
-                      type="button"
-                      onClick={() => setEmoticonPosition(pos.id)}
-                      className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-all ${
-                        emoticonPosition === pos.id
-                          ? 'border-indigo-600 bg-indigo-600 text-white'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      {pos.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Size */}
-                <div className="flex items-center gap-1 justify-end">
-                  <span className="text-[11px] font-bold text-slate-500 mr-1">크기:</span>
-                  {[
-                    { id: 'small' as const, label: '소' },
-                    { id: 'medium' as const, label: '중' },
-                    { id: 'large' as const, label: '대' },
-                  ].map((sz) => (
-                    <button
-                      key={sz.id}
-                      type="button"
-                      onClick={() => setEmoticonSize(sz.id)}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all ${
-                        emoticonSize === sz.id
-                          ? 'border-rose-500 bg-rose-500 text-white'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      {sz.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* New Feature: Text Overlay */}
           <div className="flex flex-col gap-2.5 animate-in fade-in slide-in-from-bottom-2 mb-2 p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl">
             <div className="flex items-center justify-between">
@@ -1012,177 +899,261 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
 
             {/* 자막 상세 스타일링 옵션 (글꼴, 색상, 크기, 테두리) */}
             <div className="space-y-3 pt-1">
-              {/* 1. 글꼴 선택 */}
-              <div>
-                <label className="text-[11px] font-bold text-slate-500 block mb-1.5">
-                  글꼴 선택
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                  {[
-                    { id: 'Jua' as const, label: '둥글 귀염', fontFam: 'Jua' },
-                    { id: 'Gaegu' as const, label: '감성 손글씨', fontFam: 'Gaegu' },
-                    { id: 'BlackHanSans' as const, label: '예능 볼드', fontFam: 'BlackHanSans' },
-                    { id: 'NanumGothic' as const, label: '깔끔 기본', fontFam: 'NanumGothic' },
-                  ].map((f) => (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => setTextFont(f.id)}
-                      disabled={isConverting}
-                      style={{ fontFamily: f.fontFam }}
-                      className={`py-2 px-2 rounded-xl border text-xs text-center transition-all ${
-                        textFont === f.id
-                          ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-bold shadow-xs ring-1 ring-indigo-500'
-                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                      } disabled:opacity-50`}
-                    >
-                      <span className="block text-[13px]">{f.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 2. 글자 색상 & 테두리 프리셋 */}
+              {/* ⚡ 1초 완성 인기 프리셋 (미리캔버스 감성 원클릭 스타일) */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-[11px] font-bold text-slate-500">
-                    인기 색상 배색
+                  <label className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
+                    <Wand2 size={13} className="text-indigo-600" />
+                    <span>1초 완성 스타일 프리셋</span>
                   </label>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-slate-400">직접 지정:</span>
-                    <input
-                      type="color"
-                      value={textColor}
-                      onChange={(e) => setTextColor(e.target.value)}
-                      disabled={isConverting}
-                      className="w-5 h-5 rounded cursor-pointer border border-slate-200 p-0 bg-transparent"
-                      title="커스텀 글자색"
-                    />
-                  </div>
+                  <span className="text-[10px] text-indigo-600 font-semibold">원클릭 방송 스타일 ✨</span>
                 </div>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-                  {[
-                    { name: '예능 옐로우', color: '#FFE812', border: '#000000', chip: 'bg-[#FFE812]' },
-                    { name: '클래식 화이트', color: '#FFFFFF', border: '#000000', chip: 'bg-white' },
-                    { name: '러블리 핑크', color: '#FF6EA7', border: '#000000', chip: 'bg-[#FF6EA7]' },
-                    { name: '네온 민트', color: '#00F5D4', border: '#000000', chip: 'bg-[#00F5D4]' },
-                    { name: '상큼 오렌지', color: '#FF7A00', border: '#000000', chip: 'bg-[#FF7A00]' },
-                    { name: '바이올렛', color: '#C084FC', border: '#000000', chip: 'bg-[#C084FC]' },
-                  ].map((c) => {
-                    const isSelected = textColor === c.color && textBorderColor === c.border;
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                  {SUBTITLE_PRESETS.map((p) => {
+                    const isSelected = selectedPresetId === p.id;
                     return (
                       <button
-                        key={c.name}
+                        key={p.id}
                         type="button"
-                        onClick={() => {
-                          setTextColor(c.color);
-                          setTextBorderColor(c.border);
-                        }}
+                        onClick={() => handleApplyPreset(p)}
                         disabled={isConverting}
-                        className={`flex items-center justify-center gap-1.5 py-1.5 px-1 rounded-xl border text-[11px] font-bold transition-all ${
+                        className={`relative flex flex-col items-center justify-center p-2 rounded-xl border text-center transition-all ${
                           isSelected
-                            ? 'border-indigo-600 bg-indigo-50/80 text-indigo-700 shadow-xs ring-1 ring-indigo-500'
-                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                            ? 'border-indigo-600 bg-indigo-50/80 shadow-xs ring-2 ring-indigo-500'
+                            : 'border-slate-200 bg-white hover:bg-slate-50'
                         } disabled:opacity-50`}
                       >
-                        <span
-                          className={`w-3 h-3 rounded-full border border-black/20 ${c.chip}`}
-                        />
-                        <span className="truncate">{c.name.split(' ')[1] || c.name}</span>
+                        {p.badge && (
+                          <span className="absolute -top-1.5 -right-1 px-1.5 py-0.2 rounded-full text-[9px] font-black bg-rose-500 text-white shadow-xs">
+                            {p.badge}
+                          </span>
+                        )}
+                        <div
+                          className="text-xs px-2 py-0.5 rounded mb-1 select-none font-bold truncate max-w-full"
+                          style={{
+                            fontFamily: p.font,
+                            color: p.color,
+                            backgroundColor: '#1E293B',
+                            textShadow:
+                              p.borderWidth === 'heavy'
+                                ? `0 0 2px ${p.borderColor}, -1px -1px 0 ${p.borderColor}, 1px -1px 0 ${p.borderColor}, -1px 1px 0 ${p.borderColor}, 1px 1px 0 ${p.borderColor}`
+                                : `0 0 1px ${p.borderColor}`,
+                          }}
+                        >
+                          자막 예시
+                        </div>
+                        <span className="text-xs font-bold text-slate-800 leading-tight">{p.name}</span>
+                        <span className="text-[10px] text-slate-400 mt-0.5">{p.tag}</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* 3. 크기 / 두께 / 위치 컨트롤 */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-slate-200/60">
-                {/* 크기 */}
-                <div>
-                  <label className="text-[11px] font-bold text-slate-500 block mb-1">
-                    글자 크기
-                  </label>
-                  <div className="grid grid-cols-4 gap-1">
-                    {[
-                      { id: 'small' as const, label: 'S' },
-                      { id: 'medium' as const, label: 'M' },
-                      { id: 'large' as const, label: 'L' },
-                      { id: 'xlarge' as const, label: 'XL' },
-                    ].map((s) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => setTextSize(s.id)}
-                        disabled={isConverting}
-                        className={`py-1.5 rounded-lg border text-xs font-bold transition-all ${
-                          textSize === s.id
-                            ? 'border-indigo-600 bg-indigo-600 text-white shadow-xs'
-                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                        } disabled:opacity-50`}
-                      >
-                        {s.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 테두리 굵기 */}
-                <div>
-                  <label className="text-[11px] font-bold text-slate-500 block mb-1">
-                    테두리 두께
-                  </label>
-                  <div className="grid grid-cols-4 gap-1">
-                    {[
-                      { id: 'none' as const, label: '없음' },
-                      { id: 'thin' as const, label: '얇게' },
-                      { id: 'bold' as const, label: '도톰' },
-                      { id: 'heavy' as const, label: '굵게' },
-                    ].map((b) => (
-                      <button
-                        key={b.id}
-                        type="button"
-                        onClick={() => setTextBorderWidth(b.id)}
-                        disabled={isConverting}
-                        className={`py-1.5 rounded-lg border text-xs font-bold transition-all ${
-                          textBorderWidth === b.id
-                            ? 'border-indigo-600 bg-indigo-600 text-white shadow-xs'
-                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                        } disabled:opacity-50`}
-                      >
-                        {b.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 위치 */}
-                <div>
-                  <label className="text-[11px] font-bold text-slate-500 block mb-1">
-                    자막 위치
-                  </label>
-                  <div className="grid grid-cols-3 gap-1">
-                    {[
-                      { id: 'top' as const, label: '상단' },
-                      { id: 'center' as const, label: '중앙' },
-                      { id: 'bottom' as const, label: '하단' },
-                    ].map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setTextPosition(p.id)}
-                        disabled={isConverting}
-                        className={`py-1.5 rounded-lg border text-xs font-bold transition-all ${
-                          textPosition === p.id
-                            ? 'border-indigo-600 bg-indigo-600 text-white shadow-xs'
-                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                        } disabled:opacity-50`}
-                      >
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              {/* 세부 조절 토글 버튼 */}
+              <div className="pt-1 border-t border-slate-200/60">
+                <button
+                  type="button"
+                  onClick={() => setShowCustomTextDetail(!showCustomTextDetail)}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-all"
+                >
+                  <span>글꼴·색상·크기 직접 미세 조절</span>
+                  {showCustomTextDetail ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
               </div>
+
+              {/* 직접 미세 조절 상세 영역 (토글형) */}
+              {showCustomTextDetail && (
+                <div className="space-y-3 pt-1 border-t border-slate-200/60 animate-in fade-in duration-150">
+                  {/* 1. 글꼴 선택 */}
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 block mb-1.5">
+                      글꼴 선택
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                      {[
+                        { id: 'Jua' as const, label: '둥글 귀염', fontFam: 'Jua' },
+                        { id: 'Gaegu' as const, label: '감성 손글씨', fontFam: 'Gaegu' },
+                        { id: 'BlackHanSans' as const, label: '예능 볼드', fontFam: 'BlackHanSans' },
+                        { id: 'NanumGothic' as const, label: '깔끔 기본', fontFam: 'NanumGothic' },
+                      ].map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => {
+                            setTextFont(f.id);
+                            setSelectedPresetId(null);
+                          }}
+                          disabled={isConverting}
+                          style={{ fontFamily: f.fontFam }}
+                          className={`py-2 px-2 rounded-xl border text-xs text-center transition-all ${
+                            textFont === f.id
+                              ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-bold shadow-xs ring-1 ring-indigo-500'
+                              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                          } disabled:opacity-50`}
+                        >
+                          <span className="block text-[13px]">{f.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 2. 글자 색상 & 테두리 프리셋 */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-[11px] font-bold text-slate-500">
+                        인기 색상 배색
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-400">직접 지정:</span>
+                        <input
+                          type="color"
+                          value={textColor}
+                          onChange={(e) => {
+                            setTextColor(e.target.value);
+                            setSelectedPresetId(null);
+                          }}
+                          disabled={isConverting}
+                          className="w-5 h-5 rounded cursor-pointer border border-slate-200 p-0 bg-transparent"
+                          title="커스텀 글자색"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                      {[
+                        { name: '예능 옐로우', color: '#FFE812', border: '#000000', chip: 'bg-[#FFE812]' },
+                        { name: '클래식 화이트', color: '#FFFFFF', border: '#000000', chip: 'bg-white' },
+                        { name: '러블리 핑크', color: '#FF6EA7', border: '#000000', chip: 'bg-[#FF6EA7]' },
+                        { name: '네온 민트', color: '#00F5D4', border: '#000000', chip: 'bg-[#00F5D4]' },
+                        { name: '상큼 오렌지', color: '#FF7A00', border: '#000000', chip: 'bg-[#FF7A00]' },
+                        { name: '바이올렛', color: '#C084FC', border: '#000000', chip: 'bg-[#C084FC]' },
+                      ].map((c) => {
+                        const isSelected = textColor === c.color && textBorderColor === c.border;
+                        return (
+                          <button
+                            key={c.name}
+                            type="button"
+                            onClick={() => {
+                              setTextColor(c.color);
+                              setTextBorderColor(c.border);
+                              setSelectedPresetId(null);
+                            }}
+                            disabled={isConverting}
+                            className={`flex items-center justify-center gap-1.5 py-1.5 px-1 rounded-xl border text-[11px] font-bold transition-all ${
+                              isSelected
+                                ? 'border-indigo-600 bg-indigo-50/80 text-indigo-700 shadow-xs ring-1 ring-indigo-500'
+                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                            } disabled:opacity-50`}
+                          >
+                            <span
+                              className={`w-3 h-3 rounded-full border border-black/20 ${c.chip}`}
+                            />
+                            <span className="truncate">{c.name.split(' ')[1] || c.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 3. 크기 / 두께 / 위치 컨트롤 */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-slate-200/60">
+                    {/* 크기 */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-500 block mb-1">
+                        글자 크기
+                      </label>
+                      <div className="grid grid-cols-4 gap-1">
+                        {[
+                          { id: 'small' as const, label: 'S' },
+                          { id: 'medium' as const, label: 'M' },
+                          { id: 'large' as const, label: 'L' },
+                          { id: 'xlarge' as const, label: 'XL' },
+                        ].map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => {
+                              setTextSize(s.id);
+                              setSelectedPresetId(null);
+                            }}
+                            disabled={isConverting}
+                            className={`py-1.5 rounded-lg border text-xs font-bold transition-all ${
+                              textSize === s.id
+                                ? 'border-indigo-600 bg-indigo-600 text-white shadow-xs'
+                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                            } disabled:opacity-50`}
+                          >
+                            {s.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 테두리 굵기 */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-500 block mb-1">
+                        테두리 두께
+                      </label>
+                      <div className="grid grid-cols-4 gap-1">
+                        {[
+                          { id: 'none' as const, label: '없음' },
+                          { id: 'thin' as const, label: '얇게' },
+                          { id: 'bold' as const, label: '도톰' },
+                          { id: 'heavy' as const, label: '굵게' },
+                        ].map((b) => (
+                          <button
+                            key={b.id}
+                            type="button"
+                            onClick={() => {
+                              setTextBorderWidth(b.id);
+                              setSelectedPresetId(null);
+                            }}
+                            disabled={isConverting}
+                            className={`py-1.5 rounded-lg border text-xs font-bold transition-all ${
+                              textBorderWidth === b.id
+                                ? 'border-indigo-600 bg-indigo-600 text-white shadow-xs'
+                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                            } disabled:opacity-50`}
+                          >
+                            {b.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 위치 */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-500 block mb-1">
+                        자막 위치
+                      </label>
+                      <div className="grid grid-cols-3 gap-1">
+                        {[
+                          { id: 'top' as const, label: '상단' },
+                          { id: 'center' as const, label: '중앙' },
+                          { id: 'bottom' as const, label: '하단' },
+                        ].map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              setTextPosition(p.id);
+                              setSelectedPresetId(null);
+                            }}
+                            disabled={isConverting}
+                            className={`py-1.5 rounded-lg border text-xs font-bold transition-all ${
+                              textPosition === p.id
+                                ? 'border-indigo-600 bg-indigo-600 text-white shadow-xs'
+                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                            } disabled:opacity-50`}
+                          >
+                            {p.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
