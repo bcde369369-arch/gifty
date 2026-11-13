@@ -197,6 +197,7 @@ export default function CommunityPage() {
       content: commentData.content,
       createdAt: dateStr,
       minutesAgo: 0,
+      timestamp: Date.now(),
     };
 
     setPosts((prevPosts) => {
@@ -230,13 +231,13 @@ export default function CommunityPage() {
     });
   };
 
-  // 🐎 천리마 라이브 피드 스트림 (유저가 머무는 동안 주기적으로 새 글 1개씩 추가 및 핑퐁 댓글 구동)
+  // 🐎 천리마 라이브 피드 스트림 (진짜 사람 커뮤니티처럼 12~20분 간격으로 은근하게 1개씩 추가)
   useEffect(() => {
     let timer: NodeJS.Timeout;
 
     const scheduleNextLive = () => {
-      // 120초(2분) ~ 210초(3.5분) 사이 랜덤 간격
-      const delay = Math.floor(Math.random() * (210000 - 120000 + 1)) + 120000;
+      // 12분(720,000ms) ~ 20분(1,200,000ms) 사이의 현실적인 체류 간격
+      const delay = Math.floor(Math.random() * (1200000 - 720000 + 1)) + 720000;
       return setTimeout(() => {
         setPosts((currentPosts) => {
           const result = fetchNextLivePost(currentPosts);
@@ -294,7 +295,8 @@ export default function CommunityPage() {
       likes: 0,
       comments: [],
       createdAt: '방금 전',
-      minutesAgo: 0
+      minutesAgo: 0,
+      timestamp: Date.now(),
     };
 
     const updated = [newPost, ...posts];
@@ -456,7 +458,8 @@ export default function CommunityPage() {
       author: commentAuthor.trim(),
       password: commentPassword.trim() || '1234',
       content: commentContent.trim(),
-      createdAt: dateStr
+      createdAt: dateStr,
+      timestamp: Date.now(),
     };
 
     const updatedPosts = posts.map(p => {

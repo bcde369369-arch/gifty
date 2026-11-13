@@ -7,6 +7,7 @@ export interface Comment {
   content: string;
   createdAt: string;
   minutesAgo?: number; // 상대 시간 계산용
+  timestamp?: number; // 실제 등록 타임스탬프 (자연스러운 시간 경과 계산용)
 }
 
 export interface Post {
@@ -20,7 +21,8 @@ export interface Post {
   likes: number;
   comments: Comment[];
   createdAt: string;
-  minutesAgo?: number; // 오늘 기준 몇 분 전 글인지 (실시간 상대 시간 생성용)
+  minutesAgo?: number; // 상대 시간 계산용
+  timestamp?: number; // 실제 등록 타임스탬프
   badge?: string; // 예: '인기', '추천', 'HOT'
 }
 
@@ -37,8 +39,22 @@ export const CATEGORY_LABELS: Record<string, string> = {
   feedback: '✍️ 기능 건의',
 };
 
-// 현재 시각 기준 상대 시간 포맷터 (예: 12분 전, 1시간 전, 오늘 14:20, 어제)
-export function formatTimeAgo(minutesAgo: number, absoluteDateStr?: string): string {
+// 현재 시각 기준 상대 시간 포맷터 (실제 타임스탬프 또는 상대 시간 기준 자연스러운 시간 경과)
+export function formatTimeAgo(minutesAgo: number, absoluteDateStr?: string, timestamp?: number): string {
+  if (timestamp) {
+    const diffMs = Date.now() - timestamp;
+    const diffMinutes = Math.max(0, Math.floor(diffMs / (60 * 1000)));
+    if (diffMinutes < 1) return '방금 전';
+    if (diffMinutes < 60) return `${diffMinutes}분 전`;
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours}시간 전`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return '어제';
+    if (diffDays < 7) return `${diffDays}일 전`;
+    const d = new Date(timestamp);
+    return `${d.getMonth() + 1}.${d.getDate()}`;
+  }
+
   if (minutesAgo < 1) return '방금 전';
   if (minutesAgo < 60) return `${minutesAgo}분 전`;
   
@@ -238,10 +254,10 @@ export function getPosts(): Post[] {
 
   // 동적 시간 반영 (언제 접속하든 현재 시간 기준 몇 분 전인지 계산)
   const formatted = loadedPosts.map((post) => {
-    const timeDisplay = formatTimeAgo(post.minutesAgo || 30, post.createdAt);
+    const timeDisplay = formatTimeAgo(post.minutesAgo || 30, post.createdAt, post.timestamp);
     const updatedComments = (post.comments || []).map((c) => ({
       ...c,
-      createdAt: formatTimeAgo(c.minutesAgo || 15, c.createdAt),
+      createdAt: formatTimeAgo(c.minutesAgo || 15, c.createdAt, c.timestamp),
     }));
     return {
       ...post,
