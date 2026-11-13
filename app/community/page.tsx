@@ -25,6 +25,11 @@ import {
   savePosts 
 } from '@/lib/community';
 import { generateSmartComments } from '@/lib/autoResponder';
+import { 
+  runChollimaCatchup, 
+  fetchNextLivePost, 
+  generateAuthorReplyForComment 
+} from '@/lib/chollimaEngine';
 import CoupangBanner from '@/components/CoupangBanner';
 import { useSiteSettings } from '@/lib/settings';
 
@@ -50,6 +55,14 @@ export default function CommunityPage() {
   const [commentAuthor, setCommentAuthor] = useState('');
   const [commentPassword, setCommentPassword] = useState('');
   const [commentContent, setCommentContent] = useState('');
+
+  // 🐎 천리마 알림 토스트
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toastMessage) return;
+    const timer = setTimeout(() => setToastMessage(null), 4500);
+    return () => clearTimeout(timer);
+  }, [toastMessage]);
 
   // 실시간 접속자 수 (38~56명 사이 자연스러운 라이브 연출)
   const [liveUserCount, setLiveUserCount] = useState(43);
@@ -81,7 +94,9 @@ export default function CommunityPage() {
   };
 
   useEffect(() => {
-    const loaded = getPosts();
+    // 🐎 천리마 Catch-up 엔진 가동 (부재 시간 비례 최신 피드 누적)
+    const raw = getPosts();
+    const loaded = runChollimaCatchup(raw);
     setPosts(loaded);
 
     // 대기 중인 스마트 자동 댓글이 있는지 확인 후 자동 주입
@@ -214,6 +229,47 @@ export default function CommunityPage() {
       return prevSelected;
     });
   };
+
+  // 🐎 천리마 라이브 피드 스트림 (유저가 머무는 동안 주기적으로 새 글 1개씩 추가 및 핑퐁 댓글 구동)
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+
+    const scheduleNextLive = () => {
+      // 120초(2분) ~ 210초(3.5분) 사이 랜덤 간격
+      const delay = Math.floor(Math.random() * (210000 - 120000 + 1)) + 120000;
+      return setTimeout(() => {
+        setPosts((currentPosts) => {
+          const result = fetchNextLivePost(currentPosts);
+          if (!result) return currentPosts;
+
+          const { post, seed } = result;
+          const updated = [post, ...currentPosts];
+          savePosts(updated);
+
+          setToastMessage(`🐎 천리마 피드 | '${post.author}'님의 새 글이 등록되었습니다!`);
+
+          // 핑퐁 댓글 체인 순차 실행
+          if (seed.commentsChain && seed.commentsChain.length > 0) {
+            seed.commentsChain.forEach((c) => {
+              setTimeout(() => {
+                addAutoCommentToPost(post.id, {
+                  author: c.author,
+                  content: c.content,
+                });
+              }, c.delaySeconds * 1000);
+            });
+          }
+
+          return updated;
+        });
+
+        timer = scheduleNextLive();
+      }, delay);
+    };
+
+    timer = scheduleNextLive();
+    return () => clearTimeout(timer);
+  }, []);
 
   // 글 작성 핸들러
   const handleCreatePost = (e: React.FormEvent) => {
@@ -422,6 +478,26 @@ export default function CommunityPage() {
 
     setCommentContent('');
     setCommentPassword('');
+
+    // 🐎 천리마 엔진: 글쓴이의 정성 가득한 맞답글(티키타카 핑퐁) 예약
+    const targetPostId = selectedPost.id;
+    const targetPostAuthor = selectedPost.author;
+    const userNick = newComment.author;
+    const userText = newComment.content;
+
+    // 만약 글쓴이가 자신이 아니라면 15~25초 후 글쓴이의 화답 댓글 자동 생성
+    if (targetPostAuthor !== userNick) {
+      const replyContent = generateAuthorReplyForComment(targetPostAuthor, userNick, userText);
+      const replyDelay = 15000 + Math.floor(Math.random() * 10000); // 15~25초 후
+
+      setTimeout(() => {
+        addAutoCommentToPost(targetPostId, {
+          author: targetPostAuthor,
+          content: replyContent,
+        });
+        setToastMessage(`🔔 [${targetPostAuthor}]님이 '${userNick}'님의 댓글에 답글을 남겼습니다!`);
+      }, replyDelay);
+    }
   };
 
   // 필터링된 게시글
@@ -494,7 +570,7 @@ export default function CommunityPage() {
                 Gifty 커뮤니티 💬
               </h1>
               <p className="text-indigo-200 text-sm md:text-base max-w-xl leading-relaxed">
-                체험단 정산 인증, 블로그 지수 상승 꿀팁부터 Gifty 기능 건의까지 자유롭게 소통해보세요!
+                블로그 지수 상승 노하우부터 체험단 합격 꿀팁, Gifty 기능 건의까지 자유롭게 소통해보세요!
               </p>
             </div>
             <button
@@ -831,8 +907,8 @@ export default function CommunityPage() {
               {/* Category */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">카테고리 선택</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(['settlement', 'tips', 'feedback', 'free'] as Post['category'][]).map(cat => (
+                <div className="grid grid-cols-3 gap-2">
+                  {(['tips', 'free', 'feedback'] as Post['category'][]).map(cat => (
                     <button
                       key={cat}
                       type="button"
@@ -919,6 +995,22 @@ export default function CommunityPage() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* 🐎 천리마 알림 토스트 (우측 하단 플로팅) */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm bg-slate-900/95 text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-indigo-500/30 backdrop-blur-md flex items-center justify-between gap-3 transition-all">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xl">🐎</span>
+            <p className="text-xs md:text-sm font-bold text-slate-100">{toastMessage}</p>
+          </div>
+          <button 
+            onClick={() => setToastMessage(null)}
+            className="text-slate-400 hover:text-white transition-colors p-1"
+          >
+            <X size={16} />
+          </button>
         </div>
       )}
     </div>

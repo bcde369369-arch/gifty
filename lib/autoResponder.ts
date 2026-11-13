@@ -56,13 +56,10 @@ export function generateSmartComments(
     ];
   }
 
-  // 2. 축하 & 당첨 & 정산 & 식비 방어
+  // 2. 축하 & 당첨 & 식비 방어 & 합격
   if (
-    category === 'settlement' ||
     text.includes('당첨') ||
     text.includes('선정') ||
-    text.includes('원고료') ||
-    text.includes('정산') ||
     text.includes('식비') ||
     text.includes('밥값') ||
     text.includes('방어') ||
@@ -76,9 +73,7 @@ export function generateSmartComments(
     const comments: AutoCommentResult[] = [
       {
         author: author1,
-        content: text.includes('원고료')
-          ? '우와 원고료까지 대박이네요 축하드려요!! 밥값 방어에 용돈까지 쏠쏠하시겠습니다 ㅎㅎ 저도 자극받고 오늘 신청하러 가야겠어요!'
-          : '우와 축하드립니다!! 요즘 경쟁률 높은데 당첨되시다니 대단하세요 ㅎㅎ 맛있게 드시고 정성 리뷰 남겨주세요!',
+        content: '우와 축하드립니다!! 요즘 경쟁률 높은데 당첨되시다니 대단하세요 ㅎㅎ 맛있게 드시고 정성 리뷰 남겨주세요!',
         minutesAgo: 1,
       },
     ];

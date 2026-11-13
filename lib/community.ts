@@ -1,3 +1,5 @@
+export type PostCategory = 'tips' | 'free' | 'feedback';
+
 export interface Comment {
   id: string;
   author: string;
@@ -9,7 +11,7 @@ export interface Comment {
 
 export interface Post {
   id: string;
-  category: 'settlement' | 'tips' | 'feedback' | 'free';
+  category: PostCategory | string;
   title: string;
   content: string;
   author: string;
@@ -24,14 +26,12 @@ export interface Post {
 
 export const CATEGORIES = [
   { id: 'all', label: '🔥 전체글' },
-  { id: 'settlement', label: '💰 체험단 정산' },
   { id: 'tips', label: '💡 블로그 꿀팁 & Q&A' },
   { id: 'free', label: '☕ 자유수다' },
   { id: 'feedback', label: '✍️ Gifty에 바란다' },
 ] as const;
 
 export const CATEGORY_LABELS: Record<string, string> = {
-  settlement: '💰 체험단 정산',
   tips: '💡 블로그 팁',
   free: '☕ 자유수다',
   feedback: '✍️ 기능 건의',
@@ -56,9 +56,9 @@ export function formatTimeAgo(minutesAgo: number, absoluteDateStr?: string): str
 export const INITIAL_POSTS: Post[] = [
   {
     id: 'post-1',
-    category: 'settlement',
-    title: '이번 달 체험단 밥값 64만원 방어 + 원고료 18만원 정산 완료! (가계부 인증)',
-    content: `안녕하세요! 맛집이랑 카페 위주로 리뷰하는 블로거입니다.\n\n이번 달에 키프티 가계부 쓰면서 지출 적어봤는데, 평소 밥값으로 90만원씩 나가던 게 이번 달엔 20만원대로 뚝 떨어졌네요 ㅋㅋㅋ\n- 리뷰노트: 맛집 6건 (32만원 상당)\n- 레뷰: 레스토랑 3건 + 배송형 2건 (원고료 18만원)\n- 강남맛집: 카페 3건 (14만원 상당)\n\n초반엔 신청해도 광탈만 당해서 접을까 했는데, 글 쓸 때 키프티로 만든 고화질 보글보글 음식 움짤 2개씩 꼭 넣고 체류시간 늘리니까 선정률이 진짜 눈에 띄게 올랐습니다. 다들 포기하지 마시고 파이팅하세요!`,
+    category: 'free',
+    title: '이번 달 체험단 밥값 60만원 방어 성공! 맛집 14곳 다녀왔네요 (가계부 후기)',
+    content: `안녕하세요! 맛집이랑 카페 위주로 리뷰하는 블로거입니다.\n\n이번 달에 키프티 가계부 쓰면서 지출 적어봤는데, 평소 밥값으로 90만원씩 나가던 게 이번 달엔 20만원대로 뚝 떨어졌네요 ㅋㅋㅋ\n- 리뷰노트: 맛집 6건 (32만원 상당)\n- 레뷰: 레스토랑 3건 + 배송형 2건\n- 강남맛집: 카페 3건 (14만원 상당)\n\n초반엔 신청해도 광탈만 당해서 접을까 했는데, 글 쓸 때 키프티로 만든 고화질 보글보글 음식 움짤 2개씩 꼭 넣고 체류시간 늘리니까 선정률이 진짜 눈에 띄게 올랐습니다. 다들 포기하지 마시고 파이팅하세요!`,
     author: '맛동산블로거',
     views: 482,
     likes: 45,
@@ -66,9 +66,9 @@ export const INITIAL_POSTS: Post[] = [
     createdAt: '14분 전',
     badge: '인기',
     comments: [
-      { id: 'c-1', author: '초보리뷰어', content: '우와 14건 대단하세요!! 원고료는 보통 신청하고 얼마 만에 입금되나요?', createdAt: '10분 전', minutesAgo: 10 },
-      { id: 'c-2', author: '맛동산블로거', content: '플랫폼마다 다른데 보통 다음 달 15일이나 말일에 3.3% 사업소득세 떼고 깔끔하게 들어옵니다 ㅎㅎ', createdAt: '6분 전', minutesAgo: 6 },
-      { id: 'c-3', author: '망원동주민', content: '식비 64만원 방어면 웬만한 월급 보너스네요 ㄷㄷ 자극받고 갑니다!', createdAt: '2분 전', minutesAgo: 2 }
+      { id: 'c-1', author: '초보리뷰어', content: '우와 14건 대단하세요!! 음식 사진이랑 움짤 어떻게 찍으시나요?', createdAt: '10분 전', minutesAgo: 10 },
+      { id: 'c-2', author: '맛동산블로거', content: '테이블 조명 바로 밑에서 연기 모락모락 날 때 3초 정도 짧게 끊어서 찍고 키프티로 변환해서 올립니다 ㅎㅎ 체류시간 확 늘어요!', createdAt: '6분 전', minutesAgo: 6 },
+      { id: 'c-3', author: '망원동주민', content: '식비 60만원 방어면 웬만한 월급 보너스네요 ㄷㄷ 자극받고 갑니다!', createdAt: '2분 전', minutesAgo: 2 }
     ]
   },
   {
@@ -137,7 +137,7 @@ export const INITIAL_POSTS: Post[] = [
   },
   {
     id: 'post-6',
-    category: 'settlement',
+    category: 'free',
     title: '주말에 부모님 모시고 8만원 고깃집 체험단 다녀왔습니다 ㅎㅎ',
     content: `소갈비 3인분에 된장찌개 시켜서 총 9만 4천원 나왔는데,\n8만원 식사권 쓰고 1만 4천원만 내돈내산 결제하고 푸짐하게 먹고 왔네요.\n\n엄마 아빠가 처음에 블로그에 사진 찍는 거 보고 뭘 그렇게 찍냐고 하시더니, 계산할 때 14,000원 찍히는 거 보시고 우리 딸 블로그 열심히 하더니 효도한다고 엄청 좋아하셨습니다 ㅋㅋㅋ\n체험단 하면서 가장 보람찬 순간이었네요!`,
     author: '효도블로거',
@@ -198,7 +198,7 @@ export const INITIAL_POSTS: Post[] = [
   }
 ];
 
-const STORAGE_KEY = 'gifty_community_posts_v3';
+const STORAGE_KEY = 'gifty_community_posts_v4';
 
 export function getPosts(): Post[] {
   if (typeof window === 'undefined') return INITIAL_POSTS;
@@ -212,9 +212,29 @@ export function getPosts(): Post[] {
       loadedPosts = INITIAL_POSTS;
     }
   } else {
-    loadedPosts = INITIAL_POSTS;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_POSTS));
+    // 이전 v3 캐시가 있는 경우 migration
+    const oldSaved = localStorage.getItem('gifty_community_posts_v3');
+    if (oldSaved) {
+      try {
+        const parsed = JSON.parse(oldSaved);
+        loadedPosts = parsed.map((p: Post) => ({
+          ...p,
+          category: p.category === 'settlement' ? 'free' : p.category,
+        }));
+      } catch {
+        loadedPosts = INITIAL_POSTS;
+      }
+    } else {
+      loadedPosts = INITIAL_POSTS;
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedPosts));
   }
+
+  // 혹시 남아있는 settlement 카테고리가 있다면 free로 정제
+  loadedPosts = loadedPosts.map((p) => ({
+    ...p,
+    category: p.category === 'settlement' ? 'free' : p.category,
+  }));
 
   // 동적 시간 반영 (언제 접속하든 현재 시간 기준 몇 분 전인지 계산)
   const formatted = loadedPosts.map((post) => {
