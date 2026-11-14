@@ -41,7 +41,14 @@ import {
   Paintbrush,
   Pipette,
   SunMedium,
-  Target
+  Target,
+  Utensils,
+  Plane,
+  Leaf,
+  Camera,
+  Sunset,
+  Gem,
+  ShoppingBag
 } from 'lucide-react';
 import { removeBackground } from '@imgly/background-removal';
 import CoupangBanner from '@/components/CoupangBanner';
@@ -68,11 +75,15 @@ const GRADIENT_PRESETS = [
 ];
 
 // 사진 감성 톤 프리셋
+type PresetCategory = 'all' | 'daily' | 'food' | 'beauty' | 'travel' | 'shop' | 'film';
+
 interface FilterPreset {
   id: string;
   name: string;
   icon: any;
   desc: string;
+  category: 'daily' | 'food' | 'beauty' | 'travel' | 'shop' | 'film';
+  badge?: string;
   values: {
     brightness: number;
     contrast: number;
@@ -82,62 +93,223 @@ interface FilterPreset {
   };
 }
 
+const PRESET_CATEGORIES = [
+  { id: 'all', label: '전체 (23)' },
+  { id: 'daily', label: '카페·일상 ☕' },
+  { id: 'food', label: '맛집·푸드 🍜' },
+  { id: 'beauty', label: '인물·뷰티 🌸' },
+  { id: 'travel', label: '여행·풍경 ✈️' },
+  { id: 'shop', label: '제품·마켓 📦' },
+  { id: 'film', label: '빈티지·필름 🎞️' },
+] as const;
+
 const PHOTO_PRESETS: FilterPreset[] = [
+  // 1. 기본 & 스마트 보정
   {
     id: 'original',
     name: '원본',
     icon: RefreshCw,
-    desc: '기본값',
+    category: 'daily',
+    desc: '필터 없는 기본 원본',
     values: { brightness: 100, contrast: 100, saturation: 100, warmth: 0, blur: 0 }
   },
   {
     id: 'auto',
     name: '자동 최적화 ✨',
     icon: Sparkles,
+    category: 'daily',
+    badge: '추천',
     desc: '밝기+대비 자동 톤업',
     values: { brightness: 108, contrast: 114, saturation: 110, warmth: 4, blur: 0 }
   },
   {
-    id: 'warm',
-    name: '카페 감성',
-    icon: Coffee,
-    desc: '따뜻한 웜톤 분위기',
-    values: { brightness: 105, contrast: 106, saturation: 96, warmth: 22, blur: 0 }
+    id: 'hdr-pop',
+    name: '선명 HDR 🌟',
+    icon: Zap,
+    category: 'daily',
+    badge: '선명',
+    desc: '역광 극복 & 깊은 입체감',
+    values: { brightness: 112, contrast: 124, saturation: 118, warmth: 2, blur: 0 }
   },
+
+  // 2. 카페 & 일상 감성 (daily)
+  {
+    id: 'warm',
+    name: '감성 카페 ☕',
+    icon: Coffee,
+    category: 'daily',
+    badge: '인기',
+    desc: '따뜻하고 포근한 웜톤 분위기',
+    values: { brightness: 106, contrast: 105, saturation: 96, warmth: 24, blur: 0 }
+  },
+  {
+    id: 'sunshine',
+    name: '골든 선샤인 ☀️',
+    icon: SunMedium,
+    category: 'daily',
+    desc: '화사한 창가 오후 햇살',
+    values: { brightness: 112, contrast: 108, saturation: 108, warmth: 28, blur: 0 }
+  },
+  {
+    id: 'espresso',
+    name: '딥 에스프레소 🟤',
+    icon: Coffee,
+    category: 'daily',
+    desc: '원두 로스팅의 묵직한 무드',
+    values: { brightness: 98, contrast: 118, saturation: 90, warmth: 30, blur: 0 }
+  },
+  {
+    id: 'milktea',
+    name: '코지 밀크티 🧋',
+    icon: Heart,
+    category: 'daily',
+    desc: '차분하고 부드러운 베이지톤',
+    values: { brightness: 108, contrast: 96, saturation: 88, warmth: 18, blur: 0 }
+  },
+
+  // 3. 맛집 & 푸드 (food)
   {
     id: 'vivid',
-    name: '생생 리뷰',
+    name: '생생 리뷰 🍜',
     icon: Flame,
-    desc: '음식·제품 쨍하고 선명하게',
-    values: { brightness: 106, contrast: 120, saturation: 132, warmth: 5, blur: 0 }
+    category: 'food',
+    badge: '추천',
+    desc: '음식·요리 쨍하고 선명하게',
+    values: { brightness: 106, contrast: 120, saturation: 132, warmth: 6, blur: 0 }
   },
   {
-    id: 'clean',
-    name: '화이트 스튜디오',
-    icon: Package,
-    desc: '쇼핑몰·체험단 깔끔한 톤',
-    values: { brightness: 115, contrast: 112, saturation: 105, warmth: -4, blur: 0 }
+    id: 'foodie',
+    name: '윤기 푸디 🍕',
+    icon: Utensils,
+    category: 'food',
+    badge: '맛집',
+    desc: '붉은기·노란기로 식욕 자극',
+    values: { brightness: 110, contrast: 116, saturation: 128, warmth: 16, blur: 0 }
   },
+  {
+    id: 'fresh',
+    name: '청량 프레시 🥗',
+    icon: Leaf,
+    category: 'food',
+    desc: '신선한 채소 & 푸른 식재료 강조',
+    values: { brightness: 108, contrast: 114, saturation: 122, warmth: -8, blur: 0 }
+  },
+
+  // 4. 인물 & 뷰티 (beauty)
   {
     id: 'soft',
-    name: '뽀샤시 인물',
+    name: '뽀샤시 인물 🌸',
     icon: Heart,
-    desc: '화사하고 부드러운 피부톤',
-    values: { brightness: 112, contrast: 94, saturation: 106, warmth: 10, blur: 0 }
+    category: 'beauty',
+    badge: '인기',
+    desc: '화사하고 부드러운 피부결',
+    values: { brightness: 114, contrast: 92, saturation: 104, warmth: 8, blur: 0 }
   },
   {
+    id: 'peach',
+    name: '러블리 피치 🍑',
+    icon: Sparkles,
+    category: 'beauty',
+    desc: '복숭아빛 화사한 생기와 혈색',
+    values: { brightness: 110, contrast: 102, saturation: 116, warmth: 16, blur: 0 }
+  },
+  {
+    id: 'pure-cool',
+    name: '퓨어 쿨톤 💎',
+    icon: Gem,
+    category: 'beauty',
+    badge: '쿨톤',
+    desc: '맑고 투명한 유리알 쿨톤 피부',
+    values: { brightness: 112, contrast: 106, saturation: 102, warmth: -14, blur: 0 }
+  },
+
+  // 5. 여행 & 풍경 (travel)
+  {
+    id: 'blue-sky',
+    name: '청명 스카이 ✈️',
+    icon: Plane,
+    category: 'travel',
+    badge: '여행',
+    desc: '푸른 하늘 & 청량 에메랄드 바다',
+    values: { brightness: 108, contrast: 118, saturation: 128, warmth: -12, blur: 0 }
+  },
+  {
+    id: 'sunset',
+    name: '노을빛 선셋 🌇',
+    icon: Sunset,
+    category: 'travel',
+    desc: '낭만적인 붉은 황혼의 오렌지빛',
+    values: { brightness: 104, contrast: 116, saturation: 124, warmth: 36, blur: 0 }
+  },
+  {
+    id: 'moody-nature',
+    name: '딥 포레스트 🌲',
+    icon: Leaf,
+    category: 'travel',
+    desc: '차분하고 짙은 녹음 & 감성 숲',
+    values: { brightness: 96, contrast: 118, saturation: 105, warmth: -6, blur: 0 }
+  },
+
+  // 6. 제품 & 쇼핑몰 (shop)
+  {
+    id: 'clean',
+    name: '화이트 스튜디오 📦',
+    icon: Package,
+    category: 'shop',
+    badge: '스마트스토어',
+    desc: '쇼핑몰·체험단 군더더기 없는 톤',
+    values: { brightness: 116, contrast: 112, saturation: 102, warmth: -4, blur: 0 }
+  },
+  {
+    id: 'minimal',
+    name: '하이엔드 모던 🖤',
+    icon: ShoppingBag,
+    category: 'shop',
+    desc: '시크하고 매트한 명품 감성',
+    values: { brightness: 104, contrast: 126, saturation: 86, warmth: -6, blur: 0 }
+  },
+  {
+    id: 'pop-candy',
+    name: '팝 비비드 🍭',
+    icon: Zap,
+    category: 'shop',
+    desc: '키치하고 톡톡 튀는 극채도',
+    values: { brightness: 110, contrast: 122, saturation: 145, warmth: 4, blur: 0 }
+  },
+
+  // 7. 빈티지 & 필름 (film)
+  {
     id: 'film',
-    name: '레트로 필름',
+    name: '클래식 필름 🎞️',
     icon: Film,
-    desc: '감성적인 아날로그 톤',
-    values: { brightness: 102, contrast: 122, saturation: 88, warmth: 16, blur: 0 }
+    category: 'film',
+    badge: '레트로',
+    desc: '감성적인 90년대 필름 톤',
+    values: { brightness: 104, contrast: 122, saturation: 88, warmth: 18, blur: 0 }
+  },
+  {
+    id: 'analog-fuji',
+    name: '아날로그 카메라 📸',
+    icon: Camera,
+    category: 'film',
+    desc: '빛바랜 빈티지 감성 필름',
+    values: { brightness: 106, contrast: 108, saturation: 92, warmth: 12, blur: 0 }
   },
   {
     id: 'bw',
-    name: '모노크롬 흑백',
+    name: '모노크롬 흑백 🌓',
     icon: Contrast,
-    desc: '클래식 흑백 대비',
-    values: { brightness: 106, contrast: 128, saturation: 0, warmth: 0, blur: 0 }
+    category: 'film',
+    desc: '클래식하고 깊은 흑백 대비',
+    values: { brightness: 106, contrast: 130, saturation: 0, warmth: 0, blur: 0 }
+  },
+  {
+    id: 'noir',
+    name: '시네마 누아르 🎬',
+    icon: Film,
+    category: 'film',
+    desc: '어둡고 묵직한 영화의 한 장면',
+    values: { brightness: 92, contrast: 142, saturation: 15, warmth: 8, blur: 0 }
   }
 ];
 
@@ -172,6 +344,7 @@ export default function ImageStudioPage() {
   const [enhanceUrl, setEnhanceUrl] = useState<string | null>(null);
   const [isEnhanceDragging, setIsEnhanceDragging] = useState(false);
   const [activePresetId, setActivePresetId] = useState<string>('original');
+  const [presetCategory, setPresetCategory] = useState<PresetCategory>('all');
   const [filterValues, setFilterValues] = useState({
     brightness: 100,
     contrast: 100,
@@ -1520,16 +1693,50 @@ export default function ImageStudioPage() {
                 {/* 컨트롤 패널 1: 원클릭 감성 프리셋 */}
                 <div className="w-full bg-slate-50/90 border border-slate-200/90 rounded-2xl p-4 sm:p-5 mb-5 space-y-4">
                   <div>
-                    <div className="flex items-center justify-between mb-2.5">
+                    <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                         <Sparkles size={15} className="text-indigo-600" />
                         <span>원클릭 감성 톤 프리셋</span>
-                        <span className="text-[11px] font-normal text-slate-400">(클릭 한 번으로 톤 완성)</span>
+                        <span className="text-[11px] font-normal text-slate-400">({PHOTO_PRESETS.length}종 맞춤 프리셋)</span>
                       </div>
+                      {activePresetId !== 'original' && (
+                        <button
+                          type="button"
+                          onClick={handleResetFilters}
+                          className="text-[11px] text-slate-400 hover:text-slate-600 flex items-center gap-1 transition-colors"
+                        >
+                          <RefreshCw size={11} />
+                          <span>기본값 초기화</span>
+                        </button>
+                      )}
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {PHOTO_PRESETS.map((p) => {
+                    {/* 카테고리 칩 탭 바 */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-3 scrollbar-thin">
+                      {PRESET_CATEGORIES.map((cat) => {
+                        const isCatSelected = presetCategory === cat.id;
+                        return (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => setPresetCategory(cat.id as PresetCategory)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1 ${
+                              isCatSelected
+                                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200 ring-2 ring-indigo-500/20'
+                                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                            }`}
+                          >
+                            <span>{cat.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* 프리셋 카드 그리드 */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
+                      {PHOTO_PRESETS.filter(
+                        (p) => presetCategory === 'all' || p.category === presetCategory
+                      ).map((p) => {
                         const IconComponent = p.icon;
                         const isSelected = activePresetId === p.id;
                         return (
@@ -1537,17 +1744,39 @@ export default function ImageStudioPage() {
                             key={p.id}
                             type="button"
                             onClick={() => applyPreset(p)}
-                            className={`p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                            className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between group relative ${
                               isSelected
-                                ? 'border-indigo-600 bg-white text-indigo-900 shadow-sm ring-2 ring-indigo-500/20'
-                                : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                                ? 'border-indigo-600 bg-indigo-50/40 text-indigo-950 shadow-sm ring-2 ring-indigo-500/25'
+                                : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:border-slate-300'
                             }`}
                           >
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-xs font-black">{p.name}</span>
-                              <IconComponent size={14} className={isSelected ? 'text-indigo-600' : 'text-slate-400'} />
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className={`text-xs font-black truncate ${isSelected ? 'text-indigo-900' : 'text-slate-800'}`}>
+                                  {p.name}
+                                </span>
+                                <IconComponent
+                                  size={15}
+                                  className={`shrink-0 transition-transform group-hover:scale-110 ${
+                                    isSelected ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'
+                                  }`}
+                                />
+                              </div>
+                              <p className="text-[10.5px] text-slate-400 leading-snug line-clamp-2">
+                                {p.desc}
+                              </p>
                             </div>
-                            <span className="text-[10px] text-slate-400 leading-tight">{p.desc}</span>
+                            {p.badge && (
+                              <div className="mt-2 flex items-center">
+                                <span className={`text-[9.5px] font-black px-1.5 py-0.5 rounded-md ${
+                                  isSelected
+                                    ? 'bg-indigo-200/70 text-indigo-800'
+                                    : 'bg-slate-100 text-slate-500 group-hover:bg-indigo-50 group-hover:text-indigo-600'
+                                }`}>
+                                  {p.badge}
+                                </span>
+                              </div>
+                            )}
                           </button>
                         );
                       })}
