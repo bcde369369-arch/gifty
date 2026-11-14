@@ -1165,6 +1165,9 @@ export default function NeighborAnalyticsPage() {
             <Link href="/community" className="hover:text-indigo-600 transition-colors">
               커뮤니티 💬
             </Link>
+            <Link href="/remove-bg" className="hover:text-indigo-600 transition-colors text-purple-600 font-extrabold">
+              이미지 스튜디오 🎨
+            </Link>
           </div>
 
           <button
@@ -1186,6 +1189,7 @@ export default function NeighborAnalyticsPage() {
             <Link href="/sticker" className="py-2 text-pink-600">블로그 스티커 🎨</Link>
             <Link href="/experience-diary" className="py-2 text-blue-600">체험단 다이어리 📓</Link>
             <Link href="/community" className="py-2 text-slate-700">커뮤니티 💬</Link>
+            <Link href="/remove-bg" className="py-2 text-purple-600 font-black">이미지 스튜디오 🎨</Link>
           </div>
         )}
       </nav>
@@ -1208,8 +1212,8 @@ export default function NeighborAnalyticsPage() {
           <Link href="/community" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-slate-100 text-slate-700 font-bold text-[12px] rounded-xl border border-slate-200 shadow-sm active:scale-95 transition-transform">
             💬 커뮤니티
           </Link>
-          <Link href="/" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-slate-100 text-slate-700 font-bold text-[12px] rounded-xl border border-slate-200 shadow-sm active:scale-95 transition-transform">
-            🏠 홈
+          <Link href="/remove-bg" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-purple-50 text-purple-700 font-bold text-[12px] rounded-xl border border-purple-200/60 shadow-sm active:scale-95 transition-transform">
+            🎨 이미지스튜디오
           </Link>
         </div>
       </div>

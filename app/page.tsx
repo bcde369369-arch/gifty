@@ -106,7 +106,7 @@ export default function Home() {
             <a href="/community" className="hover:text-indigo-600 transition-colors text-slate-600 flex items-center gap-1">커뮤니티 💬</a>
             <a href="/experience-diary" className="hover:text-indigo-600 transition-colors text-blue-600">체험단 다이어리 📓</a>
             <a href="/sticker" className="hover:text-pink-700 transition-colors text-pink-600 font-extrabold">블로그 스티커 🎨</a>
-            <a href="/remove-bg" className="hover:text-indigo-600 transition-colors text-purple-600">누끼따기(AI) ✂️</a>
+            <a href="/remove-bg" className="hover:text-indigo-600 transition-colors text-purple-600 font-extrabold">이미지 스튜디오 🎨</a>
           </div>
           <button 
             className="md:hidden text-slate-500 hover:text-slate-800"
@@ -125,7 +125,7 @@ export default function Home() {
             <a href="/community" className="text-slate-700 hover:bg-slate-50 p-3 rounded-xl">커뮤니티 💬</a>
             <a href="/experience-diary" className="text-blue-600 hover:bg-blue-50 p-3 rounded-xl">체험단 다이어리 📓</a>
             <a href="/sticker" className="text-pink-600 hover:bg-pink-50 p-3 rounded-xl">블로그 스티커 🎨</a>
-            <a href="/remove-bg" className="text-purple-600 hover:bg-purple-50 p-3 rounded-xl">누끼따기(AI) ✂️</a>
+            <a href="/remove-bg" className="text-purple-600 hover:bg-purple-50 p-3 rounded-xl font-black">이미지 스튜디오 🎨</a>
           </div>
         )}
       </nav>
@@ -149,7 +149,7 @@ export default function Home() {
             💬 커뮤니티
           </a>
           <a href="/remove-bg" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-purple-50 text-purple-700 font-bold text-[12px] rounded-xl border border-purple-200/60 shadow-sm active:scale-95 transition-transform">
-            ✂️ 누끼따기
+            🎨 이미지스튜디오
           </a>
         </div>
       </div>
