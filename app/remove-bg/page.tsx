@@ -189,15 +189,15 @@ export default function ImageStudioPage() {
   // ==========================================
   const [isShadowToolOpen, setIsShadowToolOpen] = useState<boolean>(false);
   const [isPipetteMode, setIsPipetteMode] = useState<boolean>(false);
-  // 기준 정상 조명값 (R, G, B, Luma) - 기본값은 자연스러운 백색 조명 (225)
+  // 기준 정상 조명값 (기본값: 화사하고 깨끗한 조명 245)
   const [referenceLight, setReferenceLight] = useState<{ r: number; g: number; b: number; luma: number }>({
-    r: 225,
-    g: 225,
-    b: 225,
-    luma: 225
+    r: 245,
+    g: 245,
+    b: 245,
+    luma: 245
   });
-  const [brushSize, setBrushSize] = useState<number>(45);
-  const [shadowRestoreStrength, setShadowRestoreStrength] = useState<number>(85); // 50 ~ 100%
+  const [brushSize, setBrushSize] = useState<number>(50);
+  const [shadowRestoreStrength, setShadowRestoreStrength] = useState<number>(100); // 초강력 100% 기본값!
   const [isDrawingBrush, setIsDrawingBrush] = useState<boolean>(false);
   const [historyStack, setHistoryStack] = useState<string[]>([]); // 실행 취소(Undo) 스택
 
@@ -719,7 +719,7 @@ export default function ImageStudioPage() {
     }
   };
 
-  // 핵심 물리 공식: 질감(Reflectance)을 100% 보존하고 부족한 조명(Illumination)만 역계산 주입
+  // 핵심 물리 공식: 다이렉트 조명 일치(Direct Light Match)로 질감을 100% 살리며 그림자만 시원하게 100% 제거
   const applyShadowMatteAt = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = previewCanvasRef.current;
     if (!canvas) return;
@@ -745,12 +745,12 @@ export default function ImageStudioPage() {
       const imgData = ctx.getImageData(startX, startY, width, height);
       const data = imgData.data;
 
-      // 기준 조명값 (스포이드로 찍은 밝은 곳)
-      const refLuma = referenceLight.luma || 225;
-      const refR = referenceLight.r || 225;
-      const refG = referenceLight.g || 225;
-      const refB = referenceLight.b || 225;
-      const strength = shadowRestoreStrength / 100;
+      // 기준 조명값 (기본 235: 깨끗하고 화사한 정상 배경 밝기)
+      const targetLuma = referenceLight.luma || 235;
+      const refR = referenceLight.r || 235;
+      const refG = referenceLight.g || 235;
+      const refB = referenceLight.b || 235;
+      const strength = (shadowRestoreStrength / 100);
 
       for (let py = 0; py < height; py++) {
         for (let px = 0; px < width; px++) {
@@ -758,37 +758,31 @@ export default function ImageStudioPage() {
           const curX = startX + px;
           const curY = startY + py;
 
-          // 브러시 중심으로부터의 거리 계산 (가우시안 원형 소프트 마스크)
           const dist = Math.sqrt(Math.pow(curX - x, 2) + Math.pow(curY - y, 2));
           if (dist <= radius) {
-            const brushWeight = Math.pow(1 - dist / radius, 1.4);
+            // 부드러운 원형 브러시 감쇠 (중심부는 100% 제거)
+            const brushWeight = Math.pow(1 - dist / radius, 0.9);
 
             const r = data[idx];
             const g = data[idx + 1];
             const b = data[idx + 2];
             const curLuma = 0.299 * r + 0.587 * g + 0.114 * b;
 
-            // 기준 밝기보다 어두운 그림자 영역인 경우에만 정밀 조명 역보상 실행
-            if (curLuma < refLuma) {
-              // 조명 비율 K 계산: 기준 밝기 / 현재 그림자 밝기
-              const lumaRatio = refLuma / Math.max(15, curLuma);
-              // 과도한 노이즈 폭발을 막는 안전 감쇠 거듭제곱 (물리적 빛의 확산 곡선)
-              const safeK = Math.min(3.2, Math.pow(lumaRatio, 0.9));
+            // 그림자 영역: 기준 밝기보다 어두우면 다이렉트로 부족한 조명을 100% 채워줌!
+            if (curLuma < targetLuma) {
+              const deficit = targetLuma - curLuma; // 부족한 빛의 양
+              const effectiveBoost = deficit * brushWeight * strength;
 
-              // 색조(Tint) 밸런스 유지: 기준 색상과의 자연스러운 매칭
-              const colorRatioR = refR / Math.max(20, (refLuma || 1));
-              const colorRatioG = refG / Math.max(20, (refLuma || 1));
-              const colorRatioB = refB / Math.max(20, (refLuma || 1));
+              // 본래 픽셀의 색상 비율(Chromaticity)을 완벽 보존하며 빛만 주입
+              const normRatio = curLuma > 10 ? (curLuma + effectiveBoost) / curLuma : 1.5;
+              
+              const newR = Math.min(255, Math.round(r * normRatio + (refR - targetLuma) * (effectiveBoost / 255)));
+              const newG = Math.min(255, Math.round(g * normRatio + (refG - targetLuma) * (effectiveBoost / 255)));
+              const newB = Math.min(255, Math.round(b * normRatio + (refB - targetLuma) * (effectiveBoost / 255)));
 
-              const effectiveMultiplier = 1 + (safeK - 1) * brushWeight * strength;
-
-              const restoredR = r * effectiveMultiplier * (0.85 + 0.15 * colorRatioR);
-              const restoredG = g * effectiveMultiplier * (0.85 + 0.15 * colorRatioG);
-              const restoredB = b * effectiveMultiplier * (0.85 + 0.15 * colorRatioB);
-
-              data[idx] = Math.min(255, Math.max(0, Math.round(restoredR)));
-              data[idx + 1] = Math.min(255, Math.max(0, Math.round(restoredG)));
-              data[idx + 2] = Math.min(255, Math.max(0, Math.round(restoredB)));
+              data[idx] = newR;
+              data[idx + 1] = newG;
+              data[idx + 2] = newB;
             }
           }
         }
