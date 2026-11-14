@@ -2,7 +2,7 @@
 // @ts-nocheck
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Sparkles,
@@ -35,7 +35,10 @@ import {
   Coffee,
   Heart,
   Droplets,
-  Package
+  Package,
+  Eraser,
+  Undo2,
+  Paintbrush
 } from 'lucide-react';
 import { removeBackground } from '@imgly/background-removal';
 import CoupangBanner from '@/components/CoupangBanner';
@@ -73,6 +76,7 @@ interface FilterPreset {
     saturation: number;
     warmth: number;
     blur: number;
+    shadows: number;
   };
 }
 
@@ -82,56 +86,63 @@ const PHOTO_PRESETS: FilterPreset[] = [
     name: '원본',
     icon: RefreshCw,
     desc: '보정 없음',
-    values: { brightness: 100, contrast: 100, saturation: 100, warmth: 0, blur: 0 }
+    values: { brightness: 100, contrast: 100, saturation: 100, warmth: 0, blur: 0, shadows: 0 }
+  },
+  {
+    id: 'shadow-fix',
+    name: '스마트 그림자 제거 🧹',
+    icon: Eraser,
+    desc: '핸드폰 그림자·어두운 그늘 완화',
+    values: { brightness: 105, contrast: 108, saturation: 104, warmth: 0, blur: 0, shadows: 65 }
   },
   {
     id: 'auto',
     name: '자동 최적화',
     icon: Sparkles,
     desc: '밝기+대비 자동 톤업',
-    values: { brightness: 108, contrast: 114, saturation: 110, warmth: 4, blur: 0 }
+    values: { brightness: 108, contrast: 114, saturation: 110, warmth: 4, blur: 0, shadows: 30 }
   },
   {
     id: 'warm',
     name: '카페 감성',
     icon: Coffee,
     desc: '따뜻한 웜톤 분위기',
-    values: { brightness: 105, contrast: 106, saturation: 96, warmth: 22, blur: 0 }
+    values: { brightness: 105, contrast: 106, saturation: 96, warmth: 22, blur: 0, shadows: 15 }
   },
   {
     id: 'vivid',
     name: '생생 리뷰',
     icon: Flame,
     desc: '음식·제품 쨍하고 선명하게',
-    values: { brightness: 106, contrast: 120, saturation: 132, warmth: 5, blur: 0 }
+    values: { brightness: 106, contrast: 120, saturation: 132, warmth: 5, blur: 0, shadows: 20 }
   },
   {
     id: 'clean',
     name: '화이트 스튜디오',
     icon: Package,
     desc: '쇼핑몰·체험단 깔끔한 톤',
-    values: { brightness: 115, contrast: 112, saturation: 105, warmth: -4, blur: 0 }
+    values: { brightness: 115, contrast: 112, saturation: 105, warmth: -4, blur: 0, shadows: 45 }
   },
   {
     id: 'soft',
     name: '뽀샤시 인물',
     icon: Heart,
     desc: '화사하고 부드러운 피부톤',
-    values: { brightness: 112, contrast: 94, saturation: 106, warmth: 10, blur: 0 }
+    values: { brightness: 112, contrast: 94, saturation: 106, warmth: 10, blur: 0, shadows: 25 }
   },
   {
     id: 'film',
     name: '레트로 필름',
     icon: Film,
     desc: '감성적인 아날로그 톤',
-    values: { brightness: 102, contrast: 122, saturation: 88, warmth: 16, blur: 0 }
+    values: { brightness: 102, contrast: 122, saturation: 88, warmth: 16, blur: 0, shadows: 0 }
   },
   {
     id: 'bw',
     name: '모노크롬 흑백',
     icon: Contrast,
     desc: '클래식 흑백 대비',
-    values: { brightness: 106, contrast: 128, saturation: 0, warmth: 0, blur: 0 }
+    values: { brightness: 106, contrast: 128, saturation: 0, warmth: 0, blur: 0, shadows: 0 }
   }
 ];
 
@@ -171,12 +182,27 @@ export default function ImageStudioPage() {
     contrast: 100,
     saturation: 100,
     warmth: 0,
-    blur: 0
+    blur: 0,
+    shadows: 0 // 0 ~ 100% (어두운 그림자 영역 선택적 밝기 복원)
   });
   const [rotation, setRotation] = useState<number>(0);
   const [flipH, setFlipH] = useState<boolean>(false);
   const [isComparingOriginal, setIsComparingOriginal] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
+
+  // ==========================================
+  // [그림자 지우개 브러시 전용 상태]
+  // ==========================================
+  const [isBrushMode, setIsBrushMode] = useState<boolean>(false);
+  const [brushSize, setBrushSize] = useState<number>(45); // 브러시 크기
+  const [brushStrength, setBrushStrength] = useState<number>(65); // 지우개 강도
+  const [isDrawing, setIsDrawing] = useState<boolean>(false);
+  const [brushHistory, setBrushHistory] = useState<string[]>([]); // 실행 취소(Undo) 스택
+  const [brushCursorPos, setBrushCursorPos] = useState<{ x: number; y: number } | null>(null);
+
+  // 캔버스 참조
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+  const currentImageRef = useRef<HTMLImageElement | null>(null);
 
   // 토스트 메시지
   const [copyFeedback, setCopyFeedback] = useState<string>('');
@@ -430,7 +456,7 @@ export default function ImageStudioPage() {
     }
   };
 
-  // 누끼 결과물을 사진 보정 탭으로 즉시 전송하여 추가 작업
+  // 누끼 결과물을 사진 보정 탭으로 즉시 전송
   const handleTransferToEnhance = async () => {
     setIsProcessing(true);
     setProgressText('사진 보정 스튜디오로 이동 중...');
@@ -440,7 +466,7 @@ export default function ImageStudioPage() {
       const file = new File([blob], `nukki-for-edit-${Date.now()}.png`, { type: 'image/png' });
       processEnhanceFile(file);
       setCurrentTab('enhance');
-      setCopyFeedback('누끼 이미지를 보정 탭으로 불러왔습니다! 이제 색감과 밝기를 조절해보세요.');
+      setCopyFeedback('누끼 이미지를 보정 탭으로 불러왔습니다! 이제 색감, 밝기, 그림자를 조절해보세요.');
       setTimeout(() => setCopyFeedback(''), 4000);
     } catch (e) {
       console.error(e);
@@ -450,7 +476,7 @@ export default function ImageStudioPage() {
   };
 
   // ==========================================
-  // [사진 보정 관련 핸들러 & 로직]
+  // [사진 보정 & 그림자 지우기 핸들러]
   // ==========================================
   const handleEnhanceFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -469,18 +495,30 @@ export default function ImageStudioPage() {
       alert('이미지 파일만 업로드 가능합니다.');
       return;
     }
+    const url = URL.createObjectURL(file);
     setEnhanceFile(file);
-    setEnhanceUrl(URL.createObjectURL(file));
+    setEnhanceUrl(url);
     setActivePresetId('original');
     setFilterValues({
       brightness: 100,
       contrast: 100,
       saturation: 100,
       warmth: 0,
-      blur: 0
+      blur: 0,
+      shadows: 0
     });
     setRotation(0);
     setFlipH(false);
+    setIsBrushMode(false);
+    setBrushHistory([]);
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      currentImageRef.current = img;
+      renderPreviewCanvas();
+    };
+    img.src = url;
   };
 
   const applyPreset = (preset: FilterPreset) => {
@@ -508,13 +546,25 @@ export default function ImageStudioPage() {
       contrast: 100,
       saturation: 100,
       warmth: 0,
-      blur: 0
+      blur: 0,
+      shadows: 0
     });
     setRotation(0);
     setFlipH(false);
+    setIsBrushMode(false);
+    setBrushHistory([]);
+    if (enhanceUrl) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        currentImageRef.current = img;
+        renderPreviewCanvas();
+      };
+      img.src = enhanceUrl;
+    }
   };
 
-  // CSS 필터 스타일 생성
+  // CSS 필터 스타일 문자열 생성
   const getEnhanceFilterString = (fv: typeof filterValues) => {
     if (isComparingOriginal) return 'none';
 
@@ -531,51 +581,242 @@ export default function ImageStudioPage() {
     return `brightness(${fv.brightness}%) contrast(${fv.contrast}%) saturate(${fv.saturation}%) ${warmthPart} ${blurPart}`.trim() || 'none';
   };
 
-  // 보정된 최종 이미지 Canvas Blob 생성 (고해상도 무손실)
-  const generateEnhancedBlob = async (): Promise<Blob | null> => {
-    if (!enhanceUrl) return null;
+  // 픽셀 레벨 섀도우 리프팅 (어두운 그림자 영역만 부드럽게 밝히는 핵심 알고리즘)
+  const applyShadowRecoveryToImageData = (imageData: ImageData, shadowStrength: number) => {
+    if (shadowStrength <= 0) return;
+    const data = imageData.data;
+    const strength = Math.min(100, Math.max(0, shadowStrength)) / 100;
 
-    return new Promise((resolve) => {
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+
+      // 명도 (Luminance) 계산
+      const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+
+      // 어두운 영역(Shadows & Dark Midtones)에 집중적인 가중치 부여 (0~1)
+      // 밝기가 210 이상인 하이라이트는 보존하고, 어두울수록 그림자 제거 효과 최대화
+      if (luma < 210) {
+        const shadowWeight = Math.pow((210 - luma) / 210, 1.2);
+        const boost = shadowWeight * strength * 95; // 최대 명도 리프트 폭
+
+        data[i] = Math.min(255, r + boost);
+        data[i + 1] = Math.min(255, g + boost);
+        data[i + 2] = Math.min(255, b + boost);
+      }
+    }
+  };
+
+  // 실시간 미리보기 캔버스 렌더링
+  const renderPreviewCanvas = useCallback(() => {
+    const canvas = previewCanvasRef.current;
+    const img = currentImageRef.current;
+    if (!canvas || !img) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const isRotated90or270 = rotation % 180 !== 0;
+    const natW = img.naturalWidth || img.width;
+    const natH = img.naturalHeight || img.height;
+    const targetW = isRotated90or270 ? natH : natW;
+    const targetH = isRotated90or270 ? natW : natH;
+
+    canvas.width = targetW;
+    canvas.height = targetH;
+
+    if (isComparingOriginal) {
+      // 원본 보기 상태
+      ctx.drawImage(img, 0, 0, targetW, targetH);
+      return;
+    }
+
+    // 1. CSS 필터 적용
+    const filterStr = getEnhanceFilterString(filterValues);
+    if (filterStr !== 'none') {
+      ctx.filter = filterStr;
+    } else {
+      ctx.filter = 'none';
+    }
+
+    // 2. 변환 (회전 및 좌우 반전)
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate((rotation * Math.PI) / 180);
+    if (flipH) ctx.scale(-1, 1);
+    ctx.drawImage(img, -natW / 2, -natH / 2, natW, natH);
+    ctx.restore();
+
+    ctx.filter = 'none';
+
+    // 3. 그림자 제거 슬라이더(Shadows) 적용
+    if (filterValues.shadows > 0) {
+      try {
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        applyShadowRecoveryToImageData(imgData, filterValues.shadows);
+        ctx.putImageData(imgData, 0, 0);
+      } catch (e) {
+        console.warn('Canvas pixel manipulation error:', e);
+      }
+    }
+  }, [filterValues, rotation, flipH, isComparingOriginal]);
+
+  useEffect(() => {
+    if (enhanceUrl && currentTab === 'enhance') {
+      renderPreviewCanvas();
+    }
+  }, [enhanceUrl, currentTab, renderPreviewCanvas]);
+
+  // ==========================================
+  // [그림자 지우개 브러시 터치/마우스 이벤트]
+  // ==========================================
+  const getCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = previewCanvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+      screenX: clientX - rect.left,
+      screenY: clientY - rect.top
+    };
+  };
+
+  const handleBrushStart = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isBrushMode) return;
+    setIsDrawing(true);
+
+    const canvas = previewCanvasRef.current;
+    if (canvas) {
+      // Undo를 위한 현재 상태 저장 (최대 6단계)
+      setBrushHistory(prev => [...prev.slice(-5), canvas.toDataURL()]);
+    }
+
+    applyBrushStrokeAt(e);
+  };
+
+  const handleBrushMove = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const coords = getCanvasCoords(e);
+    if (coords) {
+      setBrushCursorPos({ x: coords.screenX, y: coords.screenY });
+    }
+
+    if (!isBrushMode || !isDrawing) return;
+    applyBrushStrokeAt(e);
+  };
+
+  const handleBrushEnd = () => {
+    if (!isDrawing) return;
+    setIsDrawing(false);
+
+    // 지우개로 편집된 캔버스를 새로운 base 이미지로 반영
+    const canvas = previewCanvasRef.current;
+    if (canvas) {
+      const updatedUrl = canvas.toDataURL('image/png');
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
-        const isRotated90or270 = rotation % 180 !== 0;
-        const targetWidth = isRotated90or270 ? (img.naturalHeight || img.height) : (img.naturalWidth || img.width);
-        const targetHeight = isRotated90or270 ? (img.naturalWidth || img.width) : (img.naturalHeight || img.height);
-
-        const canvas = document.createElement('canvas');
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          resolve(null);
-          return;
-        }
-
-        // CSS filter를 캔버스 컨텍스트에 적용
-        const filterStr = getEnhanceFilterString(filterValues);
-        if (filterStr !== 'none') {
-          ctx.filter = filterStr;
-        }
-
-        // 변환(회전 및 반전) 처리
-        ctx.save();
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.rotate((rotation * Math.PI) / 180);
-        if (flipH) {
-          ctx.scale(-1, 1);
-        }
-        const drawW = img.naturalWidth || img.width;
-        const drawH = img.naturalHeight || img.height;
-        ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
-        ctx.restore();
-
-        canvas.toBlob((blob) => {
-          resolve(blob);
-        }, 'image/png', 0.95);
+        currentImageRef.current = img;
       };
-      img.onerror = () => resolve(null);
-      img.src = enhanceUrl;
+      img.src = updatedUrl;
+    }
+  };
+
+  // 국소 부위 스마트 그림자 지우개 연산
+  const applyBrushStrokeAt = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = previewCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const coords = getCanvasCoords(e);
+    if (!coords) return;
+
+    const { x, y } = coords;
+    // 캔버스 해상도에 맞춘 실제 브러시 반지름 계산
+    const rect = canvas.getBoundingClientRect();
+    const scaleFactor = canvas.width / rect.width;
+    const radius = brushSize * scaleFactor;
+
+    const startX = Math.max(0, Math.floor(x - radius));
+    const startY = Math.max(0, Math.floor(y - radius));
+    const width = Math.min(canvas.width - startX, Math.ceil(radius * 2));
+    const height = Math.min(canvas.height - startY, Math.ceil(radius * 2));
+
+    if (width <= 0 || height <= 0) return;
+
+    try {
+      const imgData = ctx.getImageData(startX, startY, width, height);
+      const data = imgData.data;
+      const strength = brushStrength / 100;
+
+      for (let py = 0; py < height; py++) {
+        for (let px = 0; px < width; px++) {
+          const idx = (py * width + px) * 4;
+          const curX = startX + px;
+          const curY = startY + py;
+
+          // 중심으로부터의 거리 계산 (원형 소프트 브러시)
+          const dist = Math.sqrt(Math.pow(curX - x, 2) + Math.pow(curY - y, 2));
+          if (dist <= radius) {
+            // 원형 외곽으로 갈수록 부드러워지는 가우시안 소프트 블렌딩 (0~1)
+            const brushWeight = Math.pow(1 - dist / radius, 1.4);
+
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+            const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+
+            // 어두운 영역(그림자)일수록 더 강력하게 밝혀줌
+            if (luma < 225) {
+              const shadowFactor = Math.pow((225 - luma) / 225, 0.9);
+              const boost = shadowFactor * brushWeight * strength * 28;
+
+              data[idx] = Math.min(255, r + boost);
+              data[idx + 1] = Math.min(255, g + boost);
+              data[idx + 2] = Math.min(255, b + boost);
+            }
+          }
+        }
+      }
+
+      ctx.putImageData(imgData, startX, startY);
+    } catch (err) {
+      console.warn('Brush manipulation error:', err);
+    }
+  };
+
+  // 실행 취소 (Undo)
+  const handleUndoBrush = () => {
+    if (brushHistory.length === 0) return;
+    const prevDataUrl = brushHistory[brushHistory.length - 1];
+    setBrushHistory(prev => prev.slice(0, -1));
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      currentImageRef.current = img;
+      renderPreviewCanvas();
+    };
+    img.src = prevDataUrl;
+  };
+
+  // 보정된 최종 이미지 Canvas Blob 생성 (고해상도 무손실)
+  const generateEnhancedBlob = async (): Promise<Blob | null> => {
+    const canvas = previewCanvasRef.current;
+    if (!canvas) return null;
+
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        resolve(blob);
+      }, 'image/png', 0.95);
     });
   };
 
@@ -690,7 +931,7 @@ export default function ImageStudioPage() {
           <p className="text-slate-500 text-sm sm:text-base max-w-lg mx-auto">
             {currentTab === 'remove-bg' 
               ? '클릭 한 번으로 깔끔하게 누끼를 따고, 원하는 배경색과 스티커 효과를 더해보세요.' 
-              : '어둡고 칙칙한 사진을 원클릭으로 화사하게! 블로그·인스타 감성 톤보정'}
+              : '어두운 핸드폰 그림자 지우기부터 화사한 감성 톤보정까지 원스톱 완성!'}
           </p>
         </div>
 
@@ -718,7 +959,7 @@ export default function ImageStudioPage() {
             }`}
           >
             <Sliders size={17} />
-            <span>사진 보정 & 필터 ✨</span>
+            <span>사진 보정 & 그림자 지우개 ✨</span>
           </button>
         </div>
 
@@ -949,7 +1190,7 @@ export default function ImageStudioPage() {
                     <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-3 rounded-xl border border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-2.5">
                       <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
                         <Sparkles size={16} className="text-indigo-600 shrink-0" />
-                        <span>누끼 딴 피사체의 밝기나 색감을 더 쨍하게 보정하고 싶으신가요?</span>
+                        <span>누끼 딴 피사체의 밝기나 색감, 그림자를 더 보정하고 싶으신가요?</span>
                       </div>
                       <button
                         type="button"
@@ -1029,7 +1270,7 @@ export default function ImageStudioPage() {
         )}
 
         {/* ========================================================= */}
-        {/* 탭 2: 사진 보정 & 감성 필터 스튜디오 */}
+        {/* 탭 2: 사진 보정 & 스마트 그림자 지우개 스튜디오 */}
         {/* ========================================================= */}
         {currentTab === 'enhance' && (
           <div className="w-full bg-white rounded-3xl shadow-sm border border-slate-200 p-5 sm:p-8 animate-in fade-in">
@@ -1046,49 +1287,80 @@ export default function ImageStudioPage() {
                 }`}
               >
                 <div className="bg-indigo-50 p-4 rounded-2xl mb-3">
-                  <Sliders className="text-indigo-600" size={36} />
+                  <Eraser className="text-indigo-600" size={36} />
                 </div>
                 <p className="text-base sm:text-lg font-bold text-slate-700">
-                  {isEnhanceDragging ? '파일을 여기에 놓아주세요' : '클릭하거나 보정할 사진을 끌어다 놓으세요'}
+                  {isEnhanceDragging ? '파일을 여기에 놓아주세요' : '클릭하거나 그림자 지울 사진을 끌어다 놓으세요'}
                 </p>
                 <div className="flex items-center gap-1.5 mt-2 px-3 py-1 bg-slate-100 rounded-full text-xs font-semibold text-slate-600">
                   <span>💡 캡처 후</span>
                   <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded shadow-xs text-indigo-600 font-extrabold">Ctrl + V</kbd>
                   <span>로 바로 붙여넣기도 가능해요!</span>
                 </div>
-                <p className="text-xs text-slate-400 mt-2">블로그 리뷰, 제품 사진, 감성 사진 등 모든 이미지 지원</p>
+                <p className="text-xs text-slate-400 mt-2">블로그 리뷰, 영수증, 책, 제품 사진 등 핸드폰 그림자 지우기 지원</p>
               </div>
             ) : (
               <div className="flex flex-col items-center">
                 {/* 메인 미리보기 및 조작 툴바 */}
                 <div className="w-full mb-6">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-600">실시간 미리보기</span>
+                      <span className="text-xs font-bold text-slate-600">실시간 스튜디오</span>
                       {activePresetId !== 'original' && (
-                        <span className="text-[11px] font-extrabold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                        <span className="text-[11px] font-extrabold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
                           {PHOTO_PRESETS.find(p => p.id === activePresetId)?.name || '사용자 정의 보정'}
                         </span>
                       )}
+                      {isBrushMode && (
+                        <span className="text-[11px] font-extrabold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-300 animate-pulse">
+                          🖌️ 그림자 지우개 브러시 활성
+                        </span>
+                      )}
                     </div>
-                    {/* 상단 보조 도구: 회전, 반전, 원본비교, 리셋 */}
-                    <div className="flex items-center gap-1.5">
+                    {/* 상단 보조 도구: 브러시 모드 토글, 회전, 반전, 원본비교, 리셋 */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => setIsBrushMode(!isBrushMode)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-xs ${
+                          isBrushMode
+                            ? 'bg-amber-500 text-white shadow-amber-200'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                        title="원하는 그림자 부분을 직접 문질러 지우기"
+                      >
+                        <Eraser size={14} />
+                        <span>{isBrushMode ? '브러시 끄기' : '그림자 지우개 브러시'}</span>
+                      </button>
+
+                      {isBrushMode && brushHistory.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleUndoBrush}
+                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors"
+                          title="마지막 브러시 실행 취소"
+                        >
+                          <Undo2 size={13} />
+                          <span>되돌리기</span>
+                        </button>
+                      )}
+
                       <button
                         type="button"
                         onMouseDown={() => setIsComparingOriginal(true)}
                         onMouseUp={() => setIsComparingOriginal(false)}
                         onTouchStart={() => setIsComparingOriginal(true)}
                         onTouchEnd={() => setIsComparingOriginal(false)}
-                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors select-none"
+                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors select-none"
                         title="누르고 있는 동안 원본 사진 표시"
                       >
                         <Eye size={13} />
-                        <span>{isComparingOriginal ? '원본 표시 중' : '꾹 눌러 원본 비교'}</span>
+                        <span>{isComparingOriginal ? '원본 표시 중' : '원본 비교'}</span>
                       </button>
                       <button
                         type="button"
                         onClick={handleRotate}
-                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
+                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors"
                         title="90도 회전"
                       >
                         <RotateCw size={15} />
@@ -1096,7 +1368,7 @@ export default function ImageStudioPage() {
                       <button
                         type="button"
                         onClick={handleFlip}
-                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
+                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors"
                         title="좌우 반전"
                       >
                         <FlipHorizontal size={15} />
@@ -1104,7 +1376,7 @@ export default function ImageStudioPage() {
                       <button
                         type="button"
                         onClick={handleResetFilters}
-                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
+                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors"
                         title="모든 설정 초기화"
                       >
                         <RefreshCw size={15} />
@@ -1112,40 +1384,93 @@ export default function ImageStudioPage() {
                     </div>
                   </div>
 
+                  {/* 브러시 설정 바 (브러시 모드 활성 시 노출) */}
+                  {isBrushMode && (
+                    <div className="w-full bg-amber-50/90 border border-amber-200 rounded-2xl p-3 mb-3 flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
+                      <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
+                        <Paintbrush size={15} className="text-amber-600" />
+                        <span>그림자가 진 어두운 부분을 마우스나 손가락으로 슥슥 문질러보세요!</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs font-bold text-slate-700">
+                        <div className="flex items-center gap-1.5">
+                          <span>크기:</span>
+                          {[
+                            { label: '작게', val: 25 },
+                            { label: '보통', val: 45 },
+                            { label: '크게', val: 75 }
+                          ].map((b) => (
+                            <button
+                              key={b.val}
+                              type="button"
+                              onClick={() => setBrushSize(b.val)}
+                              className={`px-2 py-0.5 rounded-lg border text-[11px] transition-all ${
+                                brushSize === b.val
+                                  ? 'bg-amber-600 border-amber-600 text-white shadow-xs'
+                                  : 'bg-white border-amber-200 text-slate-700 hover:bg-amber-50'
+                              }`}
+                            >
+                              {b.label}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span>지우개 세기:</span>
+                          <span className="text-amber-700 font-extrabold">{brushStrength}%</span>
+                          <input
+                            type="range"
+                            min="30"
+                            max="100"
+                            value={brushStrength}
+                            onChange={(e) => setBrushStrength(Number(e.target.value))}
+                            className="w-20 accent-amber-600 cursor-pointer h-1.5 bg-amber-200 rounded-lg"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* 캔버스/이미지 미리보기 창 */}
-                  <div className="w-full h-80 sm:h-96 bg-slate-900/5 rounded-2xl overflow-hidden border border-slate-200 relative flex items-center justify-center p-3 shadow-inner">
-                    <img 
-                      src={enhanceUrl} 
-                      alt="보정 미리보기" 
-                      style={{ 
-                        filter: getEnhanceFilterString(filterValues),
-                        transform: `rotate(${rotation}deg) scaleX(${flipH ? -1 : 1})`
-                      }}
-                      className="max-w-full max-h-full object-contain transition-all duration-100 select-none pointer-events-none" 
+                  <div 
+                    className={`w-full h-80 sm:h-96 bg-slate-900/5 rounded-2xl overflow-hidden border border-slate-200 relative flex items-center justify-center p-2 shadow-inner select-none ${
+                      isBrushMode ? 'cursor-crosshair' : 'cursor-default'
+                    }`}
+                  >
+                    <canvas 
+                      ref={previewCanvasRef}
+                      onMouseDown={handleBrushStart}
+                      onMouseMove={handleBrushMove}
+                      onMouseUp={handleBrushEnd}
+                      onMouseLeave={handleBrushEnd}
+                      onTouchStart={handleBrushStart}
+                      onTouchMove={handleBrushMove}
+                      onTouchEnd={handleBrushEnd}
+                      className="max-w-full max-h-full object-contain transition-all duration-75 shadow-sm"
                     />
+
                     {isComparingOriginal && (
-                      <div className="absolute top-3 left-3 bg-black/75 text-white text-[11px] font-bold px-2.5 py-1 rounded-full backdrop-blur-xs">
+                      <div className="absolute top-3 left-3 bg-black/75 text-white text-[11px] font-bold px-3 py-1 rounded-full backdrop-blur-xs">
                         원본 사진 확인 중
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* 컨트롤 패널 1: 원클릭 감성 프리셋 */}
+                {/* 컨트롤 패널 1: 원클릭 감성 & 그림자 제거 프리셋 */}
                 <div className="w-full bg-slate-50/90 border border-slate-200/90 rounded-2xl p-4 sm:p-5 mb-5 space-y-4">
                   <div>
                     <div className="flex items-center justify-between mb-2.5">
                       <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                         <Sparkles size={15} className="text-indigo-600" />
                         <span>원클릭 감성 프리셋</span>
-                        <span className="text-[11px] font-normal text-slate-400">(클릭 한 번으로 톤 완성)</span>
+                        <span className="text-[11px] font-normal text-slate-400">(스마트 그림자 제거 및 톤 프리셋)</span>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {PHOTO_PRESETS.map((p) => {
                         const IconComponent = p.icon;
                         const isSelected = activePresetId === p.id;
+                        const isShadowFix = p.id === 'shadow-fix';
                         return (
                           <button
                             key={p.id}
@@ -1153,13 +1478,17 @@ export default function ImageStudioPage() {
                             onClick={() => applyPreset(p)}
                             className={`p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
                               isSelected
-                                ? 'border-indigo-600 bg-white text-indigo-900 shadow-sm ring-2 ring-indigo-500/20'
+                                ? isShadowFix
+                                  ? 'border-amber-500 bg-amber-50/50 text-amber-900 shadow-sm ring-2 ring-amber-400/30'
+                                  : 'border-indigo-600 bg-white text-indigo-900 shadow-sm ring-2 ring-indigo-500/20'
+                                : isShadowFix
+                                ? 'border-amber-300/80 bg-gradient-to-r from-amber-50/70 to-orange-50/50 hover:bg-amber-100/50 text-amber-900 font-bold'
                                 : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
                             }`}
                           >
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-xs font-black">{p.name}</span>
-                              <IconComponent size={14} className={isSelected ? 'text-indigo-600' : 'text-slate-400'} />
+                              <IconComponent size={14} className={isSelected ? 'text-indigo-600' : isShadowFix ? 'text-amber-600' : 'text-slate-400'} />
                             </div>
                             <span className="text-[10px] text-slate-400 leading-tight">{p.desc}</span>
                           </button>
@@ -1168,20 +1497,40 @@ export default function ImageStudioPage() {
                     </div>
                   </div>
 
-                  {/* 컨트롤 패널 2: 정밀 슬라이더 */}
+                  {/* 컨트롤 패널 2: 정밀 슬라이더 (그림자 제거 슬라이더 포함) */}
                   <div className="pt-3 border-t border-slate-200/80">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                         <SlidersHorizontal size={15} className="text-indigo-600" />
-                        <span>세부 톤 & 밝기 정밀 조절</span>
+                        <span>세부 톤 & 그림자 정밀 조절</span>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                      {/* 스마트 그림자 제거 슬라이더 (강조 표시) */}
+                      <div className="space-y-1 sm:col-span-2 bg-amber-50/60 p-2.5 rounded-xl border border-amber-200/80">
+                        <div className="flex justify-between text-xs font-bold text-amber-900">
+                          <span className="flex items-center gap-1.5">
+                            <Eraser size={14} className="text-amber-600" />
+                            <span>🧹 그림자 제거 (어두운 곳 밝히기)</span>
+                            <span className="text-[10px] font-normal text-amber-700/80">밝은 곳 보존 + 그늘만 밝힘</span>
+                          </span>
+                          <span className="text-amber-700 font-black">{filterValues.shadows}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={filterValues.shadows}
+                          onChange={(e) => handleSliderChange('shadows', Number(e.target.value))}
+                          className="w-full accent-amber-600 cursor-pointer h-2 bg-amber-200 rounded-lg"
+                        />
+                      </div>
+
                       {/* 밝기 */}
                       <div className="space-y-1">
                         <div className="flex justify-between text-xs font-bold text-slate-600">
-                          <span className="flex items-center gap-1"><Sun size={13} className="text-amber-500" /> 밝기</span>
+                          <span className="flex items-center gap-1"><Sun size={13} className="text-amber-500" /> 전체 밝기</span>
                           <span className="text-indigo-600 font-extrabold">{filterValues.brightness}%</span>
                         </div>
                         <input
@@ -1265,7 +1614,7 @@ export default function ImageStudioPage() {
                   <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-3 rounded-xl border border-purple-100 flex flex-col sm:flex-row items-center justify-between gap-2.5">
                     <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
                       <Scissors size={16} className="text-purple-600 shrink-0" />
-                      <span>보정한 이 사진의 배경을 깔끔하게 지우고 싶으신가요?</span>
+                      <span>그림자를 지우고 보정한 이 사진의 배경을 깔끔하게 지우시겠습니까?</span>
                     </div>
                     <button
                       type="button"
