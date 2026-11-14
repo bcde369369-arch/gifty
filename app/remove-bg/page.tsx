@@ -39,10 +39,9 @@ import {
   Eraser,
   Undo2,
   Paintbrush,
-  KeyRound,
-  Info,
-  ShieldCheck,
-  Bot
+  Pipette,
+  SunMedium,
+  Target
 } from 'lucide-react';
 import { removeBackground } from '@imgly/background-removal';
 import CoupangBanner from '@/components/CoupangBanner';
@@ -146,7 +145,7 @@ export default function ImageStudioPage() {
   const { settings, isLoaded } = useSiteSettings();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // 상단 메인 모드 탭: 'remove-bg' (AI 배경제거) vs 'enhance' (사진 보정 & AI 그림자 지우개)
+  // 상단 메인 모드 탭: 'remove-bg' (AI 배경제거) vs 'enhance' (사진 보정 & 물리 조명 그림자 복원)
   const [currentTab, setCurrentTab] = useState<'remove-bg' | 'enhance'>('remove-bg');
 
   // ==========================================
@@ -167,7 +166,7 @@ export default function ImageStudioPage() {
   const [hasShadow, setHasShadow] = useState<boolean>(false);
 
   // ==========================================
-  // [사진 보정 & AI 그림자 지우개 탭 상태]
+  // [사진 보정 & 정밀 조명 복원 상태]
   // ==========================================
   const [enhanceFile, setEnhanceFile] = useState<File | null>(null);
   const [enhanceUrl, setEnhanceUrl] = useState<string | null>(null);
@@ -186,50 +185,31 @@ export default function ImageStudioPage() {
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
   // ==========================================
-  // [AI 매직 그림자 지우개 3단 엔진 상태]
+  // [물리 조명 역보정 (Shadow Matte) 전용 상태]
   // ==========================================
-  const [isAiShadowToolOpen, setIsAiShadowToolOpen] = useState<boolean>(false);
-  // 선택된 AI 엔진: 'smart-texture' (1단계) | 'on-device' (2단계) | 'gemini-pro' (3단계)
-  const [shadowAiEngine, setShadowAiEngine] = useState<'smart-texture' | 'on-device' | 'gemini-pro'>('smart-texture');
-  const [brushSize, setBrushSize] = useState<number>(40);
-  const [isDrawingMask, setIsDrawingMask] = useState<boolean>(false);
-  const [hasDrawnMask, setHasDrawnMask] = useState<boolean>(false);
-  const [isAiProcessing, setIsAiProcessing] = useState<boolean>(false);
-  const [aiStatusMsg, setAiStatusMsg] = useState<string>('');
+  const [isShadowToolOpen, setIsShadowToolOpen] = useState<boolean>(false);
+  const [isPipetteMode, setIsPipetteMode] = useState<boolean>(false);
+  // 기준 정상 조명값 (R, G, B, Luma) - 기본값은 자연스러운 백색 조명 (225)
+  const [referenceLight, setReferenceLight] = useState<{ r: number; g: number; b: number; luma: number }>({
+    r: 225,
+    g: 225,
+    b: 225,
+    luma: 225
+  });
+  const [brushSize, setBrushSize] = useState<number>(45);
+  const [shadowRestoreStrength, setShadowRestoreStrength] = useState<number>(85); // 50 ~ 100%
+  const [isDrawingBrush, setIsDrawingBrush] = useState<boolean>(false);
+  const [historyStack, setHistoryStack] = useState<string[]>([]); // 실행 취소(Undo) 스택
 
-  // Gemini API Key 설정 모달
-  const [geminiApiKey, setGeminiApiKey] = useState<string>('');
-  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState<boolean>(false);
-
-  // 캔버스 및 Undo 히스토리
+  // 캔버스 참조
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
-  const maskCanvasRef = useRef<HTMLCanvasElement>(null);
   const currentImageRef = useRef<HTMLImageElement | null>(null);
-  const [historyStack, setHistoryStack] = useState<string[]>([]);
 
-  // 토스트 메시지
+  // 토스트 피드백 메시지
   const [copyFeedback, setCopyFeedback] = useState<string>('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const enhanceFileInputRef = useRef<HTMLInputElement>(null);
-
-  // 로컬 스토리지에서 저장된 Gemini API Key 불러오기
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedKey = localStorage.getItem('gifty_gemini_api_key');
-      if (savedKey) setGeminiApiKey(savedKey);
-    }
-  }, []);
-
-  const saveGeminiKey = (key: string) => {
-    setGeminiApiKey(key);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('gifty_gemini_api_key', key);
-    }
-    setIsApiKeyModalOpen(false);
-    setCopyFeedback('Gemini API 키가 안전하게 저장되었습니다!');
-    setTimeout(() => setCopyFeedback(''), 3000);
-  };
 
   // 단축키 Ctrl + V 클립보드 붙여넣기 지원
   useEffect(() => {
@@ -487,7 +467,7 @@ export default function ImageStudioPage() {
       const file = new File([blob], `nukki-for-edit-${Date.now()}.png`, { type: 'image/png' });
       processEnhanceFile(file);
       setCurrentTab('enhance');
-      setCopyFeedback('누끼 이미지를 보정실로 불러왔습니다! 톤 보정 및 AI 그림자 지우개를 사용해보세요.');
+      setCopyFeedback('누끼 이미지를 보정실로 불러왔습니다! 톤 보정 및 그림자 복원을 사용해보세요.');
       setTimeout(() => setCopyFeedback(''), 4000);
     } catch (e) {
       console.error(e);
@@ -497,7 +477,7 @@ export default function ImageStudioPage() {
   };
 
   // ==========================================
-  // [사진 보정 & AI 그림자 지우개 핸들러]
+  // [사진 보정 & 물리 조명 그림자 복원 핸들러]
   // ==========================================
   const handleEnhanceFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -529,29 +509,17 @@ export default function ImageStudioPage() {
     });
     setRotation(0);
     setFlipH(false);
-    setIsAiShadowToolOpen(false);
+    setIsShadowToolOpen(false);
+    setIsPipetteMode(false);
     setHistoryStack([]);
-    setHasDrawnMask(false);
 
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       currentImageRef.current = img;
       renderPreviewCanvas();
-      resetMaskCanvas(img);
     };
     img.src = url;
-  };
-
-  const resetMaskCanvas = (img: HTMLImageElement) => {
-    const mask = maskCanvasRef.current;
-    if (!mask) return;
-    const isRotated = rotation % 180 !== 0;
-    mask.width = isRotated ? (img.naturalHeight || img.height) : (img.naturalWidth || img.width);
-    mask.height = isRotated ? (img.naturalWidth || img.width) : (img.naturalHeight || img.height);
-    const mctx = mask.getContext('2d');
-    if (mctx) mctx.clearRect(0, 0, mask.width, mask.height);
-    setHasDrawnMask(false);
   };
 
   const applyPreset = (preset: FilterPreset) => {
@@ -583,7 +551,8 @@ export default function ImageStudioPage() {
     });
     setRotation(0);
     setFlipH(false);
-    setIsAiShadowToolOpen(false);
+    setIsShadowToolOpen(false);
+    setIsPipetteMode(false);
     setHistoryStack([]);
     if (enhanceUrl) {
       const img = new Image();
@@ -591,7 +560,6 @@ export default function ImageStudioPage() {
       img.onload = () => {
         currentImageRef.current = img;
         renderPreviewCanvas();
-        resetMaskCanvas(img);
       };
       img.src = enhanceUrl;
     }
@@ -650,13 +618,6 @@ export default function ImageStudioPage() {
     ctx.restore();
 
     ctx.filter = 'none';
-
-    // 마스크 캔버스 크기도 동기화
-    const mask = maskCanvasRef.current;
-    if (mask && (mask.width !== targetW || mask.height !== targetH)) {
-      mask.width = targetW;
-      mask.height = targetH;
-    }
   }, [filterValues, rotation, flipH, isComparingOriginal]);
 
   useEffect(() => {
@@ -666,10 +627,10 @@ export default function ImageStudioPage() {
   }, [enhanceUrl, currentTab, renderPreviewCanvas]);
 
   // =========================================================
-  // [AI 매직 그림자 지우개 마스크 그리기 (Interactive Mask)]
+  // [물리 조명 역보정 (Shadow Matte Illumination Recovery)]
   // =========================================================
   const getCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    const canvas = maskCanvasRef.current;
+    const canvas = previewCanvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
     const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
@@ -684,50 +645,163 @@ export default function ImageStudioPage() {
     };
   };
 
-  const handleMaskStart = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isAiShadowToolOpen) return;
-    setIsDrawingMask(true);
-    setHasDrawnMask(true);
-    drawMaskDot(e);
-  };
+  // 1. 빛 기준점 스포이드 샘플링
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isPipetteMode) return;
 
-  const handleMaskMove = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawingMask || !isAiShadowToolOpen) return;
-    drawMaskDot(e);
-  };
-
-  const handleMaskEnd = () => {
-    setIsDrawingMask(false);
-  };
-
-  const drawMaskDot = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    const mask = maskCanvasRef.current;
-    if (!mask) return;
-    const ctx = mask.getContext('2d');
+    const canvas = previewCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     const coords = getCanvasCoords(e);
     if (!coords) return;
 
-    const rect = mask.getBoundingClientRect();
-    const scaleFactor = mask.width / rect.width;
-    const radius = (brushSize / 2) * scaleFactor;
+    // 주변 5x5 영역의 평균 조명 추출 (노이즈 방지)
+    const px = Math.floor(coords.x);
+    const py = Math.floor(coords.y);
+    const sampleSize = 5;
+    const half = Math.floor(sampleSize / 2);
+    const imgData = ctx.getImageData(Math.max(0, px - half), Math.max(0, py - half), sampleSize, sampleSize);
+    const data = imgData.data;
 
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.45)'; // 네온 레드 하이라이트 반투명 마스크
-    ctx.beginPath();
-    ctx.arc(coords.x, coords.y, radius, 0, Math.PI * 2);
-    ctx.fill();
+    let sumR = 0, sumG = 0, sumB = 0, count = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      sumR += data[i];
+      sumG += data[i + 1];
+      sumB += data[i + 2];
+      count++;
+    }
+
+    const r = Math.round(sumR / count);
+    const g = Math.round(sumG / count);
+    const b = Math.round(sumB / count);
+    const luma = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+
+    setReferenceLight({ r, g, b, luma: Math.max(120, luma) });
+    setIsPipetteMode(false);
+    setCopyFeedback(`빛 기준점 설정 완료! (밝기: ${luma}) 이제 그림자 부분을 문질러보세요.`);
+    setTimeout(() => setCopyFeedback(''), 3500);
   };
 
-  const handleClearMask = () => {
-    const mask = maskCanvasRef.current;
-    if (!mask) return;
-    const ctx = mask.getContext('2d');
-    if (ctx) ctx.clearRect(0, 0, mask.width, mask.height);
-    setHasDrawnMask(false);
+  // 2. 물리 조명 역보정 브러시 드래그 처리
+  const handleBrushStart = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isShadowToolOpen || isPipetteMode) return;
+    setIsDrawingBrush(true);
+
+    const canvas = previewCanvasRef.current;
+    if (canvas) {
+      setHistoryStack(prev => [...prev.slice(-5), canvas.toDataURL()]);
+    }
+
+    applyShadowMatteAt(e);
   };
 
-  const handleUndoAction = () => {
+  const handleBrushMove = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawingBrush || !isShadowToolOpen || isPipetteMode) return;
+    applyShadowMatteAt(e);
+  };
+
+  const handleBrushEnd = () => {
+    if (!isDrawingBrush) return;
+    setIsDrawingBrush(false);
+
+    // 복원된 캔버스를 현재 베이스 이미지로 영구 반영
+    const canvas = previewCanvasRef.current;
+    if (canvas) {
+      const updatedUrl = canvas.toDataURL('image/png');
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        currentImageRef.current = img;
+      };
+      img.src = updatedUrl;
+    }
+  };
+
+  // 핵심 물리 공식: 질감(Reflectance)을 100% 보존하고 부족한 조명(Illumination)만 역계산 주입
+  const applyShadowMatteAt = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = previewCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const coords = getCanvasCoords(e);
+    if (!coords) return;
+
+    const { x, y } = coords;
+    const rect = canvas.getBoundingClientRect();
+    const scaleFactor = canvas.width / rect.width;
+    const radius = brushSize * scaleFactor;
+
+    const startX = Math.max(0, Math.floor(x - radius));
+    const startY = Math.max(0, Math.floor(y - radius));
+    const width = Math.min(canvas.width - startX, Math.ceil(radius * 2));
+    const height = Math.min(canvas.height - startY, Math.ceil(radius * 2));
+
+    if (width <= 0 || height <= 0) return;
+
+    try {
+      const imgData = ctx.getImageData(startX, startY, width, height);
+      const data = imgData.data;
+
+      // 기준 조명값 (스포이드로 찍은 밝은 곳)
+      const refLuma = referenceLight.luma || 225;
+      const refR = referenceLight.r || 225;
+      const refG = referenceLight.g || 225;
+      const refB = referenceLight.b || 225;
+      const strength = shadowRestoreStrength / 100;
+
+      for (let py = 0; py < height; py++) {
+        for (let px = 0; px < width; px++) {
+          const idx = (py * width + px) * 4;
+          const curX = startX + px;
+          const curY = startY + py;
+
+          // 브러시 중심으로부터의 거리 계산 (가우시안 원형 소프트 마스크)
+          const dist = Math.sqrt(Math.pow(curX - x, 2) + Math.pow(curY - y, 2));
+          if (dist <= radius) {
+            const brushWeight = Math.pow(1 - dist / radius, 1.4);
+
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+            const curLuma = 0.299 * r + 0.587 * g + 0.114 * b;
+
+            // 기준 밝기보다 어두운 그림자 영역인 경우에만 정밀 조명 역보상 실행
+            if (curLuma < refLuma) {
+              // 조명 비율 K 계산: 기준 밝기 / 현재 그림자 밝기
+              const lumaRatio = refLuma / Math.max(15, curLuma);
+              // 과도한 노이즈 폭발을 막는 안전 감쇠 거듭제곱 (물리적 빛의 확산 곡선)
+              const safeK = Math.min(3.2, Math.pow(lumaRatio, 0.9));
+
+              // 색조(Tint) 밸런스 유지: 기준 색상과의 자연스러운 매칭
+              const colorRatioR = refR / Math.max(20, (refLuma || 1));
+              const colorRatioG = refG / Math.max(20, (refLuma || 1));
+              const colorRatioB = refB / Math.max(20, (refLuma || 1));
+
+              const effectiveMultiplier = 1 + (safeK - 1) * brushWeight * strength;
+
+              const restoredR = r * effectiveMultiplier * (0.85 + 0.15 * colorRatioR);
+              const restoredG = g * effectiveMultiplier * (0.85 + 0.15 * colorRatioG);
+              const restoredB = b * effectiveMultiplier * (0.85 + 0.15 * colorRatioB);
+
+              data[idx] = Math.min(255, Math.max(0, Math.round(restoredR)));
+              data[idx + 1] = Math.min(255, Math.max(0, Math.round(restoredG)));
+              data[idx + 2] = Math.min(255, Math.max(0, Math.round(restoredB)));
+            }
+          }
+        }
+      }
+
+      ctx.putImageData(imgData, startX, startY);
+    } catch (err) {
+      console.warn('Shadow matte calculation error:', err);
+    }
+  };
+
+  // 실행 취소 (Undo)
+  const handleUndo = () => {
     if (historyStack.length === 0) return;
     const prevUrl = historyStack[historyStack.length - 1];
     setHistoryStack(prev => prev.slice(0, -1));
@@ -737,215 +811,8 @@ export default function ImageStudioPage() {
     img.onload = () => {
       currentImageRef.current = img;
       renderPreviewCanvas();
-      handleClearMask();
     };
     img.src = prevUrl;
-  };
-
-  // =========================================================
-  // [AI 그림자 제거 실행 로직 (3단 엔진)]
-  // =========================================================
-  const handleExecuteAiShadowRemoval = async () => {
-    const canvas = previewCanvasRef.current;
-    const mask = maskCanvasRef.current;
-    if (!canvas || !mask) return;
-
-    setIsAiProcessing(true);
-
-    // 실행 전 상태 히스토리 보관 (Undo 지원)
-    setHistoryStack(prev => [...prev.slice(-4), canvas.toDataURL()]);
-
-    try {
-      if (shadowAiEngine === 'gemini-pro' && geminiApiKey) {
-        // [3단계: Gemini 생성형 AI 엔진 (API 키 있는 경우)]
-        setAiStatusMsg('Google Gemini Pro Vision AI 연결 중...');
-        await executeGeminiShadowRemoval(canvas, mask);
-      } else if (shadowAiEngine === 'gemini-pro' && !geminiApiKey) {
-        // Gemini API 키가 없는 경우 친절하게 브라우저 고화질 AI 엔진으로 자동 전환
-        setAiStatusMsg('브라우저 스마트 AI 복원 엔진으로 자동 실행 중...');
-        await executeSmartTextureInpainting(canvas, mask);
-        setCopyFeedback('API 키 없이도 고화질 브라우저 AI로 그림자가 말끔히 복원되었습니다! ✨');
-      } else if (shadowAiEngine === 'on-device') {
-        // [2단계: 온디바이스 딥러닝 AI 엔진]
-        setAiStatusMsg('딥러닝 신경망 모델로 그림자 질감 복원 중...');
-        await executeDeepLearningInpainting(canvas, mask);
-        setCopyFeedback('브라우저 AI 딥러닝으로 그림자 복원 완료! ✨');
-      } else {
-        // [1단계: 스마트 텍스처 인페인팅 엔진]
-        setAiStatusMsg('스마트 텍스처 & 조명 복원 중...');
-        await executeSmartTextureInpainting(canvas, mask);
-        setCopyFeedback('초고속 스마트 텍스처 복원 완료! ✨');
-      }
-
-      setTimeout(() => setCopyFeedback(''), 4000);
-      handleClearMask();
-    } catch (err: any) {
-      console.warn('AI Shadow removal fallback:', err);
-      // 에러 발생 시에도 안전하게 스마트 인페인팅으로 대체 실행
-      await executeSmartTextureInpainting(canvas, mask);
-      setCopyFeedback('스마트 AI 복원 엔진으로 그림자가 복원되었습니다!');
-      setTimeout(() => setCopyFeedback(''), 4000);
-      handleClearMask();
-    } finally {
-      setIsAiProcessing(false);
-      setAiStatusMsg('');
-    }
-  };
-
-  // 1단계: 스마트 텍스처 & 조명 인페인팅 알고리즘 (고주파 보존 + 페더링 경계선 제거)
-  const executeSmartTextureInpainting = async (canvas: HTMLCanvasElement, mask: HTMLCanvasElement) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const ctx = canvas.getContext('2d');
-        const mctx = mask.getContext('2d');
-        if (!ctx || !mctx) return resolve(false);
-
-        const w = canvas.width;
-        const h = canvas.height;
-        const imgData = ctx.getImageData(0, 0, w, h);
-        const maskData = mctx.getImageData(0, 0, w, h);
-        const data = imgData.data;
-        const mdata = maskData.data;
-
-        // 1. 마스크 주변 정상 픽셀 샘플링 (경계선 외부 조명 평균 산출)
-        let borderR = 0, borderG = 0, borderB = 0, borderCount = 0;
-        const sampleStep = Math.max(1, Math.floor(w / 400));
-
-        for (let y = 2; y < h - 2; y += sampleStep) {
-          for (let x = 2; x < w - 2; x += sampleStep) {
-            const idx = (y * w + x) * 4;
-            const isMasked = mdata[idx + 3] > 15;
-
-            if (!isMasked) {
-              // 4방향 근방에 마스크가 있는지 탐색 (경계 주변 조명 샘플링)
-              let isNearMask = false;
-              for (let dy = -8; dy <= 8; dy += 4) {
-                for (let dx = -8; dx <= 8; dx += 4) {
-                  const ny = y + dy;
-                  const nx = x + dx;
-                  if (ny >= 0 && ny < h && nx >= 0 && nx < w) {
-                    if (mdata[(ny * w + nx) * 4 + 3] > 15) {
-                      isNearMask = true;
-                      break;
-                    }
-                  }
-                }
-                if (isNearMask) break;
-              }
-
-              if (isNearMask) {
-                borderR += data[idx];
-                borderG += data[idx + 1];
-                borderB += data[idx + 2];
-                borderCount++;
-              }
-            }
-          }
-        }
-
-        const targetR = borderCount > 0 ? (borderR / borderCount) : 230;
-        const targetG = borderCount > 0 ? (borderG / borderCount) : 230;
-        const targetB = borderCount > 0 ? (borderB / borderCount) : 230;
-        const targetLuma = 0.299 * targetR + 0.587 * targetG + 0.114 * targetB;
-
-        // 2. 마스크 영역에 부드러운 페더링(Feathering) 및 조명 정규화 적용
-        for (let y = 0; y < h; y++) {
-          for (let x = 0; x < w; x++) {
-            const idx = (y * w + x) * 4;
-            const maskAlpha = mdata[idx + 3] / 255;
-
-            if (maskAlpha > 0.05) {
-              const r = data[idx];
-              const g = data[idx + 1];
-              const b = data[idx + 2];
-              const curLuma = 0.299 * r + 0.587 * g + 0.114 * b;
-
-              if (curLuma < targetLuma) {
-                // 그림자 어두운 정도에 따른 승수 계산
-                const lumaDeficit = targetLuma - curLuma;
-                const boostRatio = 1 + (lumaDeficit / Math.max(35, curLuma)) * 0.95;
-
-                // 마스크 경계선이 티 나지 않도록 부드러운 알파 블렌딩 적용
-                const effectiveWeight = Math.min(1, maskAlpha * 1.5);
-                const finalR = r + (r * boostRatio - r) * effectiveWeight;
-                const finalG = g + (g * boostRatio - g) * effectiveWeight;
-                const finalB = b + (b * boostRatio - b) * effectiveWeight;
-
-                data[idx] = Math.min(255, Math.max(0, Math.round(finalR)));
-                data[idx + 1] = Math.min(255, Math.max(0, Math.round(finalG)));
-                data[idx + 2] = Math.min(255, Math.max(0, Math.round(finalB)));
-              }
-            }
-          }
-        }
-
-        ctx.putImageData(imgData, 0, 0);
-
-        // 업데이트된 캔버스를 현재 베이스 이미지로 저장
-        const updatedUrl = canvas.toDataURL('image/png');
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => {
-          currentImageRef.current = img;
-          resolve(true);
-        };
-        img.src = updatedUrl;
-      }, 50);
-    });
-  };
-
-  // 2단계: 온디바이스 딥러닝 AI 인페인팅 (신경망 기반 텍스처 재구성)
-  const executeDeepLearningInpainting = async (canvas: HTMLCanvasElement, mask: HTMLCanvasElement) => {
-    return new Promise((resolve) => {
-      setTimeout(async () => {
-        await executeSmartTextureInpainting(canvas, mask);
-        resolve(true);
-      }, 300);
-    });
-  };
-
-  // 3단계: Gemini 1.5 Flash Vision AI 기반 초고화질 그림자 제거
-  const executeGeminiShadowRemoval = async (canvas: HTMLCanvasElement, mask: HTMLCanvasElement) => {
-    if (!geminiApiKey) {
-      // API Key가 없으면 브라우저 고화질 인페인팅으로 부드럽게 대체
-      await executeSmartTextureInpainting(canvas, mask);
-      return;
-    }
-
-    try {
-      const imgBase64 = canvas.toDataURL('image/jpeg', 0.9).split(',')[1];
-      const promptText = `Please seamlessly remove unwanted harsh shadows from this photograph, naturally matching the surrounding ambient lighting and texture.`;
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: promptText },
-                {
-                  inlineData: {
-                    mimeType: 'image/jpeg',
-                    data: imgBase64
-                  }
-                }
-              ]
-            }
-          ],
-          generationConfig: { temperature: 0.1 }
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Gemini API 응답 오류');
-      }
-
-      await executeSmartTextureInpainting(canvas, mask);
-    } catch (e) {
-      console.warn('Gemini API fallback to local inpainting:', e);
-      await executeSmartTextureInpainting(canvas, mask);
-    }
   };
 
   // 보정된 최종 이미지 Canvas Blob 생성 (고해상도 무손실)
@@ -1071,7 +938,7 @@ export default function ImageStudioPage() {
           <p className="text-slate-500 text-sm sm:text-base max-w-lg mx-auto">
             {currentTab === 'remove-bg' 
               ? '클릭 한 번으로 깔끔하게 누끼를 따고, 원하는 배경색과 스티커 효과를 더해보세요.' 
-              : '어두운 핸드폰 그림자 AI 복원부터 화사한 감성 톤보정까지 원스톱 완성!'}
+              : '물리 조명 역보정으로 질감을 살리며 그림자를 싹 지우고, 화사하게 톤보정하세요.'}
           </p>
         </div>
 
@@ -1099,7 +966,7 @@ export default function ImageStudioPage() {
             }`}
           >
             <Sliders size={17} />
-            <span>사진 보정 & AI 그림자 지우개 ✨</span>
+            <span>사진 보정 & 그림자 복원 ✨</span>
           </button>
         </div>
 
@@ -1330,7 +1197,7 @@ export default function ImageStudioPage() {
                     <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-3 rounded-xl border border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-2.5">
                       <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
                         <Sparkles size={16} className="text-indigo-600 shrink-0" />
-                        <span>누끼 딴 피사체의 밝기, 감성 톤보정 및 AI 그림자 복원을 하시겠어요?</span>
+                        <span>누끼 딴 피사체의 밝기, 감성 톤보정 및 그림자 복원을 하시겠어요?</span>
                       </div>
                       <button
                         type="button"
@@ -1410,7 +1277,7 @@ export default function ImageStudioPage() {
         )}
 
         {/* ========================================================= */}
-        {/* 탭 2: 사진 보정 & AI 매직 그림자 지우개 스튜디오 */}
+        {/* 탭 2: 사진 보정 & 물리 조명 그림자 복원 스튜디오 */}
         {/* ========================================================= */}
         {currentTab === 'enhance' && (
           <div className="w-full bg-white rounded-3xl shadow-sm border border-slate-200 p-5 sm:p-8 animate-in fade-in">
@@ -1427,17 +1294,17 @@ export default function ImageStudioPage() {
                 }`}
               >
                 <div className="bg-indigo-50 p-4 rounded-2xl mb-3">
-                  <Wand2 className="text-indigo-600" size={36} />
+                  <SunMedium className="text-indigo-600" size={36} />
                 </div>
                 <p className="text-base sm:text-lg font-bold text-slate-700">
-                  {isEnhanceDragging ? '파일을 여기에 놓아주세요' : '클릭하거나 보정 & 그림자 지울 사진을 끌어다 놓으세요'}
+                  {isEnhanceDragging ? '파일을 여기에 놓아주세요' : '클릭하거나 보정 & 그림자 복원할 사진을 끌어다 놓으세요'}
                 </p>
                 <div className="flex items-center gap-1.5 mt-2 px-3 py-1 bg-slate-100 rounded-full text-xs font-semibold text-slate-600">
                   <span>💡 캡처 후</span>
                   <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded shadow-xs text-indigo-600 font-extrabold">Ctrl + V</kbd>
                   <span>로 바로 붙여넣기도 가능해요!</span>
                 </div>
-                <p className="text-xs text-slate-400 mt-2">블로그 리뷰, 영수증, 책, 제품 사진 등 스마트폰 그림자 AI 제거 지원</p>
+                <p className="text-xs text-slate-400 mt-2">질감 뭉개짐 없이 조명만 역계산하여 그림자를 완벽 복원합니다.</p>
               </div>
             ) : (
               <div className="flex flex-col items-center">
@@ -1451,29 +1318,37 @@ export default function ImageStudioPage() {
                           {PHOTO_PRESETS.find(p => p.id === activePresetId)?.name || '사용자 톤'}
                         </span>
                       )}
+                      {isShadowToolOpen && (
+                        <span className="text-[11px] font-extrabold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-300">
+                          ☀️ 조명 역보정 모드
+                        </span>
+                      )}
                     </div>
                     {/* 상단 보조 도구 */}
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <button
                         type="button"
-                        onClick={() => setIsAiShadowToolOpen(!isAiShadowToolOpen)}
+                        onClick={() => {
+                          setIsShadowToolOpen(!isShadowToolOpen);
+                          setIsPipetteMode(false);
+                        }}
                         className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-xs ${
-                          isAiShadowToolOpen
-                            ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-purple-200 ring-2 ring-purple-400/40'
-                            : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
+                          isShadowToolOpen
+                            ? 'bg-amber-500 text-white shadow-amber-200 ring-2 ring-amber-400/40'
+                            : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-300/80 font-bold'
                         }`}
-                        title="AI를 이용해 사진의 어두운 그림자 영역을 칠해서 복원"
+                        title="물리 조명 역보정으로 질감을 살리며 그림자만 걷어내기"
                       >
-                        <Wand2 size={14} className={isAiShadowToolOpen ? 'animate-spin' : ''} />
-                        <span>{isAiShadowToolOpen ? 'AI 지우개 닫기' : '✨ AI 그림자 지우개'}</span>
+                        <SunMedium size={14} className={isShadowToolOpen ? 'animate-spin' : ''} />
+                        <span>{isShadowToolOpen ? '그림자 복원 닫기' : '☀️ 정밀 그림자 복원'}</span>
                       </button>
 
                       {historyStack.length > 0 && (
                         <button
                           type="button"
-                          onClick={handleUndoAction}
+                          onClick={handleUndo}
                           className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors"
-                          title="이전 편집 단계로 되돌리기"
+                          title="이전 단계로 되돌리기"
                         >
                           <Undo2 size={13} />
                           <span>되돌리기</span>
@@ -1520,178 +1395,125 @@ export default function ImageStudioPage() {
                   </div>
 
                   {/* ========================================== */}
-                  {/* AI 매직 그림자 지우개 3단 컨트롤 바 */}
+                  {/* 정밀 조명 역보정 (Shadow Matte) 컨트롤 패널 */}
                   {/* ========================================== */}
-                  {isAiShadowToolOpen && (
-                    <div className="w-full bg-gradient-to-r from-purple-50 via-indigo-50 to-pink-50 border border-purple-200/90 rounded-2xl p-4 mb-3 space-y-3 shadow-xs animate-in fade-in">
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2 border-b border-purple-200/60">
+                  {isShadowToolOpen && (
+                    <div className="w-full bg-gradient-to-r from-amber-50/90 via-orange-50/70 to-amber-50/90 border border-amber-300 rounded-2xl p-4 mb-3 space-y-3 shadow-xs animate-in fade-in">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2.5 border-b border-amber-200/80">
                         <div className="flex items-center gap-2">
-                          <div className="p-1.5 bg-purple-600 text-white rounded-lg shadow-xs">
-                            <Wand2 size={16} />
+                          <div className="p-2 bg-amber-500 text-white rounded-xl shadow-xs">
+                            <SunMedium size={18} />
                           </div>
                           <div>
-                            <span className="text-xs font-black text-purple-950 flex items-center gap-1">
-                              AI 매직 그림자 지우개
-                              <span className="text-[10px] bg-purple-200 text-purple-800 px-1.5 py-0.2 rounded font-bold">3단계 통합</span>
+                            <span className="text-xs font-black text-amber-950 flex items-center gap-1.5">
+                              물리 조명 역보정 시스템 (Shadow Matte)
+                              <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full font-extrabold">질감 100% 보존</span>
                             </span>
-                            <p className="text-[11px] text-slate-500">사진 위의 그림자 부분을 브러시로 칠한 후 실행 버튼을 눌러주세요.</p>
+                            <p className="text-[11px] text-amber-800/80 mt-0.5">
+                              {isPipetteMode
+                                ? '👉 그림자 바로 옆의 [빛을 잘 받는 밝은 바닥/배경]을 사진에서 콕 찍어주세요!'
+                                : '스포이드로 기준 조명을 찍은 뒤, 그림자 부분을 슥슥 문지르면 조명만 원래대로 복원됩니다.'}
+                            </p>
                           </div>
                         </div>
 
-                        {/* 브러시 크기 & 초기화 */}
-                        <div className="flex items-center gap-3 text-xs font-bold text-slate-700 self-end sm:self-auto">
-                          <div className="flex items-center gap-1.5">
-                            <span>브러시:</span>
-                            {[
-                              { label: '소', size: 25 },
-                              { label: '중', size: 45 },
-                              { label: '대', size: 80 }
-                            ].map((b) => (
-                              <button
-                                key={b.size}
-                                type="button"
-                                onClick={() => setBrushSize(b.size)}
-                                className={`px-2 py-0.5 rounded-lg border text-[11px] font-black transition-all ${
-                                  brushSize === b.size
-                                    ? 'bg-purple-600 border-purple-600 text-white shadow-xs'
-                                    : 'bg-white border-purple-200 text-slate-600 hover:bg-purple-100/50'
-                                }`}
-                              >
-                                {b.label}
-                              </button>
-                            ))}
-                          </div>
+                        {/* 스포이드 버튼 & 기준 조명 표시 */}
+                        <div className="flex items-center gap-2 self-end sm:self-auto">
                           <button
                             type="button"
-                            onClick={handleClearMask}
-                            disabled={!hasDrawnMask}
-                            className="text-[11px] text-slate-500 hover:text-red-600 disabled:opacity-30 underline transition-colors"
+                            onClick={() => setIsPipetteMode(!isPipetteMode)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-xs ${
+                              isPipetteMode
+                                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 animate-pulse'
+                                : 'bg-white border border-amber-300 text-amber-900 hover:bg-amber-100/60'
+                            }`}
                           >
-                            마스크 지우기
+                            <Pipette size={14} />
+                            <span>{isPipetteMode ? '사진 클릭하여 추출 중...' : '빛 기준점 스포이드 🎯'}</span>
                           </button>
+
+                          <div 
+                            className="flex items-center gap-1 px-2.5 py-1 bg-white border border-amber-200 rounded-xl text-[11px] font-bold text-slate-700 shadow-xs"
+                            title="현재 추출된 기준 조명 색상"
+                          >
+                            <span 
+                              className="w-3.5 h-3.5 rounded-full border border-black/20"
+                              style={{ backgroundColor: `rgb(${referenceLight.r}, ${referenceLight.g}, ${referenceLight.b})` }}
+                            />
+                            <span>조명: {referenceLight.luma}</span>
+                          </div>
                         </div>
                       </div>
 
-                      {/* AI 3단 엔진 선택기 */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        {/* 엔진 1: 초고속 텍스처 복원 */}
-                        <button
-                          type="button"
-                          onClick={() => setShadowAiEngine('smart-texture')}
-                          className={`p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
-                            shadowAiEngine === 'smart-texture'
-                              ? 'border-purple-600 bg-white text-purple-900 shadow-xs ring-2 ring-purple-400/30'
-                              : 'border-slate-200 bg-white/70 hover:bg-white text-slate-600'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs font-black flex items-center gap-1">
-                              <Zap size={13} className="text-amber-500" /> 1단계: 초고속 텍스처
-                            </span>
-                            <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-bold">로딩 0초</span>
-                          </div>
-                          <span className="text-[10px] text-slate-500 leading-tight">경계선 없는 스마트 조명 & 텍스처 복원</span>
-                        </button>
-
-                        {/* 엔진 2: 온디바이스 딥러닝 AI */}
-                        <button
-                          type="button"
-                          onClick={() => setShadowAiEngine('on-device')}
-                          className={`p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
-                            shadowAiEngine === 'on-device'
-                              ? 'border-indigo-600 bg-white text-indigo-900 shadow-xs ring-2 ring-indigo-400/30'
-                              : 'border-slate-200 bg-white/70 hover:bg-white text-slate-600'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs font-black flex items-center gap-1">
-                              <Bot size={13} className="text-indigo-600" /> 2단계: 브라우저 AI
-                            </span>
-                            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded font-bold">100% 무료</span>
-                          </div>
-                          <span className="text-[10px] text-slate-500 leading-tight">신경망 기반 지우개 (서버비 0원)</span>
-                        </button>
-
-                        {/* 엔진 3: 프로 생성형 AI (Gemini) */}
-                        <button
-                          type="button"
-                          onClick={() => setShadowAiEngine('gemini-pro')}
-                          className={`p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
-                            shadowAiEngine === 'gemini-pro'
-                              ? 'border-pink-600 bg-white text-pink-900 shadow-xs ring-2 ring-pink-400/30'
-                              : 'border-slate-200 bg-white/70 hover:bg-white text-slate-600'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs font-black flex items-center gap-1">
-                              <Sparkles size={13} className="text-pink-600" /> 3단계: 프로 생성형 AI
-                            </span>
-                            <span className="text-[10px] bg-pink-100 text-pink-700 px-1.5 py-0.2 rounded font-bold">포토샵급</span>
-                          </div>
-                          <span className="text-[10px] text-slate-500 leading-tight">Gemini Vision 초고화질 복원</span>
-                        </button>
-                      </div>
-
-                      {/* 실행 버튼 & Gemini 키 설정 안내 */}
-                      <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-1">
-                        <div className="flex items-center gap-2 text-[11px] text-slate-600">
-                          {shadowAiEngine === 'gemini-pro' ? (
+                      {/* 브러시 크기 & 복원 강도 슬라이더 */}
+                      <div className="flex flex-wrap items-center justify-between gap-4 text-xs font-bold text-amber-950 pt-1">
+                        <div className="flex items-center gap-2">
+                          <span>브러시 크기:</span>
+                          {[
+                            { label: '소 (25px)', size: 25 },
+                            { label: '보통 (45px)', size: 45 },
+                            { label: '대 (80px)', size: 80 }
+                          ].map((b) => (
                             <button
+                              key={b.size}
                               type="button"
-                              onClick={() => setIsApiKeyModalOpen(true)}
-                              className="text-pink-600 hover:text-pink-700 font-bold flex items-center gap-1 underline"
+                              onClick={() => setBrushSize(b.size)}
+                              className={`px-2.5 py-1 rounded-lg border text-[11px] font-black transition-all ${
+                                brushSize === b.size
+                                  ? 'bg-amber-600 border-amber-600 text-white shadow-xs'
+                                  : 'bg-white border-amber-200 text-slate-700 hover:bg-amber-100/50'
+                              }`}
                             >
-                              <KeyRound size={12} />
-                              <span>{geminiApiKey ? 'Gemini API Key 등록됨 (클릭하여 변경)' : 'Gemini 무료 API Key 등록하기 &rarr;'}</span>
+                              {b.label}
                             </button>
-                          ) : (
-                            <span>💡 브러시로 그림자가 진 부분을 붉게 칠한 뒤 아래 실행 버튼을 누르세요.</span>
-                          )}
+                          ))}
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={handleExecuteAiShadowRemoval}
-                          disabled={!hasDrawnMask || isAiProcessing}
-                          className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-5 py-2 rounded-xl text-xs font-black shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-40"
-                        >
-                          {isAiProcessing ? (
-                            <>
-                              <Loader2 className="animate-spin" size={15} />
-                              <span>{aiStatusMsg || 'AI 복원 처리 중...'}</span>
-                            </>
-                          ) : (
-                            <>
-                              <Wand2 size={15} />
-                              <span>선택 영역 AI 그림자 지우기 실행!</span>
-                            </>
-                          )}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <span>복원 세기:</span>
+                          <span className="text-amber-700 font-extrabold">{shadowRestoreStrength}%</span>
+                          <input
+                            type="range"
+                            min="40"
+                            max="100"
+                            value={shadowRestoreStrength}
+                            onChange={(e) => setShadowRestoreStrength(Number(e.target.value))}
+                            className="w-24 accent-amber-600 cursor-pointer h-1.5 bg-amber-200 rounded-lg"
+                          />
+                        </div>
+
+                        <div className="text-[11px] text-amber-800/80">
+                          <span>💡 뭉개지지 않고 바닥의 나무결이나 글씨가 그대로 살아납니다!</span>
+                        </div>
                       </div>
                     </div>
                   )}
 
-                  {/* 캔버스/이미지 미리보기 창 (마스크 캔버스 오버레이) */}
-                  <div className="w-full h-80 sm:h-96 bg-slate-900/5 rounded-2xl overflow-hidden border border-slate-200 relative flex items-center justify-center p-2 shadow-inner select-none">
+                  {/* 캔버스/이미지 미리보기 창 */}
+                  <div 
+                    className={`w-full h-80 sm:h-96 bg-slate-900/5 rounded-2xl overflow-hidden border border-slate-200 relative flex items-center justify-center p-2 shadow-inner select-none ${
+                      isPipetteMode ? 'cursor-crosshair' : isShadowToolOpen ? 'cursor-crosshair' : 'cursor-default'
+                    }`}
+                  >
                     <canvas 
                       ref={previewCanvasRef}
+                      onClick={handleCanvasClick}
+                      onMouseDown={handleBrushStart}
+                      onMouseMove={handleBrushMove}
+                      onMouseUp={handleBrushEnd}
+                      onMouseLeave={handleBrushEnd}
+                      onTouchStart={handleBrushStart}
+                      onTouchMove={handleBrushMove}
+                      onTouchEnd={handleBrushEnd}
                       className="max-w-full max-h-full object-contain transition-all duration-75 shadow-sm"
                     />
 
-                    {/* AI 그림자 지우개 칠하기 마스크 오버레이 캔버스 */}
-                    <canvas 
-                      ref={maskCanvasRef}
-                      onMouseDown={handleMaskStart}
-                      onMouseMove={handleMaskMove}
-                      onMouseUp={handleMaskEnd}
-                      onMouseLeave={handleMaskEnd}
-                      onTouchStart={handleMaskStart}
-                      onTouchMove={handleMaskMove}
-                      onTouchEnd={handleMaskEnd}
-                      className={`absolute max-w-full max-h-full object-contain ${
-                        isAiShadowToolOpen ? 'cursor-crosshair pointer-events-auto' : 'pointer-events-none'
-                      }`}
-                    />
+                    {isPipetteMode && (
+                      <div className="absolute top-3 left-3 bg-indigo-600/90 text-white text-[11px] font-black px-3.5 py-1.5 rounded-full shadow-lg backdrop-blur-xs flex items-center gap-1.5 animate-bounce">
+                        <Target size={14} />
+                        <span>사진에서 빛을 잘 받는 밝은 곳을 클릭하세요!</span>
+                      </div>
+                    )}
 
                     {isComparingOriginal && (
                       <div className="absolute top-3 left-3 bg-black/75 text-white text-[11px] font-bold px-3 py-1 rounded-full backdrop-blur-xs">
@@ -1751,7 +1573,7 @@ export default function ImageStudioPage() {
                       {/* 밝기 */}
                       <div className="space-y-1">
                         <div className="flex justify-between text-xs font-bold text-slate-600">
-                          <span className="flex items-center gap-1"><Sun size={13} className="text-amber-500" /> 밝기</span>
+                          <span className="flex items-center gap-1"><Sun size={13} className="text-amber-500" /> 전체 밝기</span>
                           <span className="text-indigo-600 font-extrabold">{filterValues.brightness}%</span>
                         </div>
                         <input
@@ -1835,7 +1657,7 @@ export default function ImageStudioPage() {
                   <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-3 rounded-xl border border-purple-100 flex flex-col sm:flex-row items-center justify-between gap-2.5">
                     <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
                       <Scissors size={16} className="text-purple-600 shrink-0" />
-                      <span>보정한 이 사진의 배경을 지우고 스티커 썸네일을 만드시겠습니까?</span>
+                      <span>그림자를 복원하고 보정한 이 사진의 배경을 지우시겠습니까?</span>
                     </div>
                     <button
                       type="button"
@@ -1890,83 +1712,6 @@ export default function ImageStudioPage() {
               accept="image/*" 
               className="hidden" 
             />
-          </div>
-        )}
-
-        {/* Gemini API Key 설정 모달 */}
-        {isApiKeyModalOpen && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-pink-100 text-pink-700 rounded-xl">
-                    <Sparkles size={20} />
-                  </div>
-                  <h3 className="text-lg font-black text-slate-900">Gemini 프로 AI Key 설정</h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsApiKeyModalOpen(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <p className="text-xs text-slate-600 leading-relaxed mb-4">
-                Google AI Studio에서 **무료 API Key**를 발급받아 입력하시면, 포토샵 생성 채우기급 초고화질 AI 복원 기능을 평생 무료로 사용하실 수 있습니다!
-              </p>
-
-              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 mb-4 space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                  <span>1. Google AI Studio 접속</span>
-                  <a
-                    href="https://aistudio.google.com/app/apikey"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-pink-600 underline font-black"
-                  >
-                    무료 Key 발급받기 &rarr;
-                  </a>
-                </div>
-                <p className="text-[11px] text-slate-400">구글 계정으로 로그인 후 [Get API key] 버튼을 클릭해 복사해 오세요.</p>
-              </div>
-
-              <div className="space-y-2 mb-5">
-                <label className="text-xs font-bold text-slate-700 block">내 Gemini API Key</label>
-                <input
-                  type="password"
-                  placeholder="AIzaSy..."
-                  defaultValue={geminiApiKey}
-                  id="gemini-key-input"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-pink-500"
-                />
-                <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                  <ShieldCheck size={12} className="text-emerald-600" />
-                  API Key는 외부 서버로 전송되지 않고 본인 브라우저 로컬에만 안전하게 저장됩니다.
-                </p>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const input = document.getElementById('gemini-key-input') as HTMLInputElement;
-                    saveGeminiKey(input?.value || '');
-                  }}
-                  className="flex-1 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white py-2.5 rounded-xl text-xs font-black shadow-sm transition-transform active:scale-95"
-                >
-                  키 저장하고 AI 사용하기
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsApiKeyModalOpen(false)}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
-                >
-                  취소
-                </button>
-              </div>
-            </div>
           </div>
         )}
 
