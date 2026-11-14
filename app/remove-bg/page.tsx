@@ -374,6 +374,14 @@ export default function ImageStudioPage() {
   const [isDrawingBrush, setIsDrawingBrush] = useState<boolean>(false);
   const [historyStack, setHistoryStack] = useState<string[]>([]); // 실행 취소(Undo) 스택
 
+  // ==========================================
+  // [원클릭 자연스러운 그림자 제거 전용 상태]
+  // ==========================================
+  const [isAutoShadowProcessing, setIsAutoShadowProcessing] = useState<boolean>(false);
+  const [shadowStrengthLevel, setShadowStrengthLevel] = useState<'soft' | 'natural' | 'strong'>('natural');
+  const [hasAutoShadowApplied, setHasAutoShadowApplied] = useState<boolean>(false);
+  const shadowBaseImgRef = useRef<HTMLImageElement | null>(null); // 원클릭 적용 직전의 베이스 이미지
+
   // 캔버스 참조
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const currentImageRef = useRef<HTMLImageElement | null>(null);
@@ -685,11 +693,14 @@ export default function ImageStudioPage() {
     setIsShadowToolOpen(false);
     setIsPipetteMode(false);
     setHistoryStack([]);
+    setHasAutoShadowApplied(false);
+    setShadowStrengthLevel('natural');
 
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       currentImageRef.current = img;
+      shadowBaseImgRef.current = img;
       renderPreviewCanvas();
     };
     img.src = url;
@@ -727,11 +738,14 @@ export default function ImageStudioPage() {
     setIsShadowToolOpen(false);
     setIsPipetteMode(false);
     setHistoryStack([]);
+    setHasAutoShadowApplied(false);
+    setShadowStrengthLevel('natural');
     if (enhanceUrl) {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
         currentImageRef.current = img;
+        shadowBaseImgRef.current = img;
         renderPreviewCanvas();
       };
       img.src = enhanceUrl;
@@ -774,7 +788,15 @@ export default function ImageStudioPage() {
     canvas.height = targetH;
 
     if (isComparingOriginal) {
-      ctx.drawImage(img, 0, 0, targetW, targetH);
+      const origImg = shadowBaseImgRef.current || img;
+      const oW = origImg.naturalWidth || origImg.width;
+      const oH = origImg.naturalHeight || origImg.height;
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((rotation * Math.PI) / 180);
+      if (flipH) ctx.scale(-1, 1);
+      ctx.drawImage(origImg, -oW / 2, -oH / 2, oW, oH);
+      ctx.restore();
       return;
     }
 
@@ -798,6 +820,236 @@ export default function ImageStudioPage() {
       renderPreviewCanvas();
     }
   }, [enhanceUrl, currentTab, renderPreviewCanvas]);
+
+  // =========================================================
+  // [원클릭 자연스러운 스마트 그림자 제거 (Adaptive Shadow Lifting)]
+  // =========================================================
+  const applyAutoShadowRemoval = (intensityLevel: 'soft' | 'natural' | 'strong' = 'natural') => {
+    const canvas = previewCanvasRef.current;
+    if (!canvas || !currentImageRef.current) return;
+
+    setIsAutoShadowProcessing(true);
+
+    // 0. 베이스 원본 이미지가 없으면 현재 이미지를 베이스로 저장
+    if (!shadowBaseImgRef.current) {
+      shadowBaseImgRef.current = currentImageRef.current;
+    }
+    const baseImg = shadowBaseImgRef.current;
+
+    // 되돌리기(Undo) 스택에 현재 캔버스 상태 저장
+    try {
+      const currentSnapshot = canvas.toDataURL('image/png');
+      setHistoryStack(prev => [...prev.slice(-4), currentSnapshot]);
+    } catch (e) {
+      console.warn('History save failed:', e);
+    }
+
+    setTimeout(() => {
+      try {
+        const natW = baseImg.naturalWidth || baseImg.width;
+        const natH = baseImg.naturalHeight || baseImg.height;
+
+        // 원본 해상도 작업용 오프스크린 캔버스
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = natW;
+        offCanvas.height = natH;
+        const offCtx = offCanvas.getContext('2d');
+        if (!offCtx) {
+          setIsAutoShadowProcessing(false);
+          return;
+        }
+
+        offCtx.drawImage(baseImg, 0, 0, natW, natH);
+        const imgData = offCtx.getImageData(0, 0, natW, natH);
+        const data = imgData.data;
+
+        // 1. 초고속 조명 맵(Illumination Map) 추정:
+        // 저주파 배경 조명을 구하기 위해 가로/세로 약 160px 수준으로 다운스케일
+        const maxSmallDim = 160;
+        const sScale = Math.min(1, maxSmallDim / Math.max(natW, natH));
+        const sw = Math.max(20, Math.floor(natW * sScale));
+        const sh = Math.max(20, Math.floor(natH * sScale));
+
+        const smallCanvas = document.createElement('canvas');
+        smallCanvas.width = sw;
+        smallCanvas.height = sh;
+        const sctx = smallCanvas.getContext('2d');
+        if (!sctx) {
+          setIsAutoShadowProcessing(false);
+          return;
+        }
+
+        sctx.drawImage(baseImg, 0, 0, sw, sh);
+        const sImgData = sctx.getImageData(0, 0, sw, sh);
+        const sData = sImgData.data;
+
+        // 스몰 맵의 Luma 배열 계산
+        const sLuma = new Float32Array(sw * sh);
+        for (let i = 0; i < sw * sh; i++) {
+          const r = sData[i * 4];
+          const g = sData[i * 4 + 1];
+          const b = sData[i * 4 + 2];
+          sLuma[i] = 0.299 * r + 0.587 * g + 0.114 * b;
+        }
+
+        // 상위 8% 밝기를 기준 정상 조명(refLuma)으로 추정
+        const sortedLuma = Array.from(sLuma).sort((a, b) => b - a);
+        const refIndex = Math.floor(sortedLuma.length * 0.08);
+        const refLuma = Math.min(240, Math.max(185, sortedLuma[refIndex]));
+
+        // 조명 스무딩 (Illumination Smoothing): 박스 블러 2회 2-Pass 실행
+        const blurredLuma = new Float32Array(sw * sh);
+        const blurRadius = Math.max(3, Math.floor(sw * 0.09));
+
+        for (let pass = 0; pass < 2; pass++) {
+          // Horizontal pass
+          for (let y = 0; y < sh; y++) {
+            const yOffset = y * sw;
+            for (let x = 0; x < sw; x++) {
+              let sum = 0;
+              let count = 0;
+              for (let dx = -blurRadius; dx <= blurRadius; dx++) {
+                const nx = x + dx;
+                if (nx >= 0 && nx < sw) {
+                  sum += sLuma[yOffset + nx];
+                  count++;
+                }
+              }
+              blurredLuma[yOffset + x] = sum / count;
+            }
+          }
+          // Vertical pass
+          for (let x = 0; x < sw; x++) {
+            for (let y = 0; y < sh; y++) {
+              let sum = 0;
+              let count = 0;
+              for (let dy = -blurRadius; dy <= blurRadius; dy++) {
+                const ny = y + dy;
+                if (ny >= 0 && ny < sh) {
+                  sum += blurredLuma[ny * sw + x];
+                  count++;
+                }
+              }
+              sLuma[y * sw + x] = sum / count;
+            }
+          }
+        }
+
+        // 강도 레벨별 계수
+        const factorMap = {
+          soft: 0.60,
+          natural: 0.85,
+          strong: 1.08
+        };
+        const factor = factorMap[intensityLevel] || 0.85;
+
+        // 2. 픽셀별 적응형 그림자 조명 보정 (Bilinear 보간)
+        for (let y = 0; y < natH; y++) {
+          const sy = Math.min(sh - 1, Math.max(0, (y / natH) * sh));
+          const sy0 = Math.floor(sy);
+          const sy1 = Math.min(sh - 1, sy0 + 1);
+          const ty = sy - sy0;
+
+          const rowOffset = y * natW * 4;
+
+          for (let x = 0; x < natW; x++) {
+            const sx = Math.min(sw - 1, Math.max(0, (x / natW) * sw));
+            const sx0 = Math.floor(sx);
+            const sx1 = Math.min(sw - 1, sx0 + 1);
+            const tx = sx - sx0;
+
+            // 4-point bilinear interpolation
+            const l00 = sLuma[sy0 * sw + sx0];
+            const l10 = sLuma[sy0 * sw + sx1];
+            const l01 = sLuma[sy1 * sw + sx0];
+            const l11 = sLuma[sy1 * sw + sx1];
+            const localIllum = (1 - ty) * ((1 - tx) * l00 + tx * l10) + ty * ((1 - tx) * l01 + tx * l11);
+
+            const pIdx = rowOffset + x * 4;
+            const r = data[pIdx];
+            const g = data[pIdx + 1];
+            const b = data[pIdx + 2];
+            const pLuma = 0.299 * r + 0.587 * g + 0.114 * b;
+
+            // 그림자 영역 판단: 주변 조명이 기준치보다 낮거나 픽셀 밝기가 어두운 부분
+            const illumDeficit = Math.max(0, refLuma - localIllum);
+            if (illumDeficit > 5 && pLuma < refLuma) {
+              // 부드러운 섀도우 마스크 가중치 (어두울수록 높고, 하이라이트(>225)는 0으로 수렴)
+              const shadowWeight = Math.min(1, Math.max(0, (refLuma - pLuma) / (refLuma - 40)));
+
+              // 조명 역보정 배율 (Shadow Gain)
+              const rawRatio = refLuma / (localIllum + 14);
+              const clampedRatio = Math.min(2.85, Math.max(1.0, rawRatio));
+
+              // 최종 블렌딩 게인
+              const gain = 1 + (clampedRatio - 1) * factor * shadowWeight;
+
+              if (gain > 1.01) {
+                // 그림자 영역 색온도 & 채도 밸런스:
+                // 그림자 속 푸르스름하고 칙칙한 느낌을 자연스러운 온기(약간의 웜톤)로 보정
+                let nr = r * gain * 1.025;
+                let ng = g * gain * 1.005;
+                let nb = b * gain * 0.975;
+
+                // 약간의 채도 증폭 (그림자가 걷힌 영역이 바래지 않도록 보존)
+                const newLuma = 0.299 * nr + 0.587 * ng + 0.114 * nb;
+                const satBoost = 1.06;
+                nr = newLuma + (nr - newLuma) * satBoost;
+                ng = newLuma + (ng - newLuma) * satBoost;
+                nb = newLuma + (nb - newLuma) * satBoost;
+
+                data[pIdx] = Math.min(255, Math.max(0, Math.round(nr)));
+                data[pIdx + 1] = Math.min(255, Math.max(0, Math.round(ng)));
+                data[pIdx + 2] = Math.min(255, Math.max(0, Math.round(nb)));
+              }
+            }
+          }
+        }
+
+        offCtx.putImageData(imgData, 0, 0);
+
+        // 보정된 새 이미지를 생성하여 currentImageRef에 설정
+        const resultDataUrl = offCanvas.toDataURL('image/png');
+        const newImg = new Image();
+        newImg.crossOrigin = 'anonymous';
+        newImg.onload = () => {
+          currentImageRef.current = newImg;
+          setHasAutoShadowApplied(true);
+          setShadowStrengthLevel(intensityLevel);
+          setIsAutoShadowProcessing(false);
+          renderPreviewCanvas();
+          setCopyFeedback(
+            intensityLevel === 'soft'
+              ? '은은하게 그림자가 제거되었습니다 ✨'
+              : intensityLevel === 'strong'
+              ? '강력하게 그림자가 제거되었습니다 🔥'
+              : '자연스러운 원클릭 그림자 제거가 완료되었습니다 ✨'
+          );
+          setTimeout(() => setCopyFeedback(''), 3000);
+        };
+        newImg.src = resultDataUrl;
+      } catch (err) {
+        console.error('Auto shadow removal failed:', err);
+        setIsAutoShadowProcessing(false);
+      }
+    }, 50);
+  };
+
+  // 그림자 제거 취소 및 원래 이미지로 복귀
+  const handleResetAutoShadow = () => {
+    if (!shadowBaseImgRef.current) return;
+    const canvas = previewCanvasRef.current;
+    if (canvas) {
+      try {
+        setHistoryStack(prev => [...prev.slice(-4), canvas.toDataURL('image/png')]);
+      } catch (e) {}
+    }
+    currentImageRef.current = shadowBaseImgRef.current;
+    setHasAutoShadowApplied(false);
+    renderPreviewCanvas();
+    setCopyFeedback('그림자 제거 효과가 취소되었습니다.');
+    setTimeout(() => setCopyFeedback(''), 2500);
+  };
 
   // =========================================================
   // [물리 조명 역보정 (Shadow Matte Illumination Recovery)]
@@ -1493,6 +1745,18 @@ export default function ImageStudioPage() {
                     </div>
                     {/* 상단 보조 도구 */}
                     <div className="flex items-center gap-1.5 flex-wrap">
+                      {/* 원클릭 그림자 지우기 버튼 */}
+                      <button
+                        type="button"
+                        onClick={() => applyAutoShadowRemoval('natural')}
+                        disabled={isAutoShadowProcessing}
+                        className="px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-xs active:scale-95 cursor-pointer disabled:opacity-50"
+                        title="클릭 한 번으로 전체 사진의 그림자를 자연스럽게 걷어냅니다"
+                      >
+                        <Sparkles size={13} />
+                        <span>원클릭 그림자 지우기</span>
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => {
@@ -1504,10 +1768,10 @@ export default function ImageStudioPage() {
                             ? 'bg-amber-500 text-white shadow-amber-200 ring-2 ring-amber-400/40'
                             : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-300/80 font-bold'
                         }`}
-                        title="물리 조명 역보정으로 질감을 살리며 그림자만 걷어내기"
+                        title="물리 조명 역보정 브러시로 특정 구역을 직접 문질러 복원"
                       >
                         <SunMedium size={14} className={isShadowToolOpen ? 'animate-spin' : ''} />
-                        <span>{isShadowToolOpen ? '그림자 복원 닫기' : '☀️ 정밀 그림자 복원'}</span>
+                        <span>{isShadowToolOpen ? '브러시 닫기' : '🖌️ 수동 브러시'}</span>
                       </button>
 
                       {historyStack.length > 0 && (
@@ -1558,6 +1822,88 @@ export default function ImageStudioPage() {
                       >
                         <RefreshCw size={15} />
                       </button>
+                    </div>
+                  </div>
+
+                  {/* ========================================== */}
+                  {/* [원클릭 스마트 그림자 지우기 전용 배너 & 컨트롤] */}
+                  {/* ========================================== */}
+                  <div className="w-full bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border-2 border-amber-300 rounded-2xl p-3.5 mb-3.5 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-sm shadow-amber-500/20 shrink-0">
+                        <Sun size={22} className={isAutoShadowProcessing ? 'animate-spin' : ''} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs sm:text-sm font-black text-amber-950">
+                            원클릭 자연스러운 그림자 지우기
+                          </span>
+                          <span className="text-[10px] font-black bg-amber-500 text-white px-2 py-0.5 rounded-full shadow-xs">
+                            ONE-CLICK
+                          </span>
+                          {hasAutoShadowApplied && (
+                            <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                              <Check size={11} /> 적용됨
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-amber-800/80 mt-0.5">
+                          주변의 밝은 곳은 그대로 보존하고, 어두운 그림자 영역만 <b>클릭 한 번</b>으로 감쪽같이 밝혀줍니다.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end">
+                      {/* 강도 선택 칩 */}
+                      <div className="flex items-center bg-white/90 border border-amber-200 rounded-xl p-1 gap-1 shadow-2xs">
+                        {(['soft', 'natural', 'strong'] as const).map((lvl) => (
+                          <button
+                            key={lvl}
+                            type="button"
+                            onClick={() => applyAutoShadowRemoval(lvl)}
+                            disabled={isAutoShadowProcessing}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                              shadowStrengthLevel === lvl && hasAutoShadowApplied
+                                ? 'bg-amber-500 text-white shadow-xs'
+                                : 'text-slate-600 hover:bg-amber-100/60'
+                            }`}
+                          >
+                            {lvl === 'soft' ? '은은하게' : lvl === 'natural' ? '자연스럽게 ✨' : '강력하게'}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* 실행 메인 버튼 */}
+                      <button
+                        type="button"
+                        disabled={isAutoShadowProcessing}
+                        onClick={() => applyAutoShadowRemoval(shadowStrengthLevel)}
+                        className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 active:scale-95 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm shadow-amber-500/25 transition-all whitespace-nowrap cursor-pointer disabled:opacity-50"
+                      >
+                        {isAutoShadowProcessing ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" />
+                            <span>그림자 걷어내는 중...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles size={14} />
+                            <span>{hasAutoShadowApplied ? '강도 재적용' : '그림자 한 번에 지우기'}</span>
+                          </>
+                        )}
+                      </button>
+
+                      {/* 복원 취소 버튼 */}
+                      {hasAutoShadowApplied && (
+                        <button
+                          type="button"
+                          onClick={handleResetAutoShadow}
+                          className="px-2.5 py-2 bg-white hover:bg-slate-100 text-slate-600 border border-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                          title="그림자 제거 효과를 취소하고 원본으로 되돌립니다"
+                        >
+                          취소
+                        </button>
+                      )}
                     </div>
                   </div>
 
