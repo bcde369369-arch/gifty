@@ -83,6 +83,39 @@ export default function BlogAnalyticsLabPage() {
   const [rankingSubTab, setRankingSubTab] = useState<'all' | 'my'>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('전체');
   const [selectedSource, setSelectedSource] = useState<string>('전체');
+
+  // 발행일 YYYY.MM.DD (년.월.일) 정밀 포맷터 (예: 2026.11.03)
+  const formatDateToDot = (dateStr?: string): string => {
+    if (!dateStr) return '2026.11.03';
+    if (/^\d{4}\.\d{2}\.\d{2}$/.test(dateStr)) return dateStr;
+    try {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}.${m}.${day}`;
+      }
+    } catch {}
+
+    const now = new Date();
+    if (dateStr.includes('시간 전') || dateStr.includes('분 전') || dateStr.includes('방금')) {
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      return `${y}.${m}.${day}`;
+    }
+    const matchDays = dateStr.match(/(\d+)일 전/);
+    if (matchDays) {
+      const days = parseInt(matchDays[1], 10);
+      now.setDate(now.getDate() - days);
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      return `${y}.${m}.${day}`;
+    }
+    return dateStr;
+  };
   const [surgeRangeFilter, setSurgeRangeFilter] = useState<'100' | '1000' | 'all'>('100');
   const [rankingSearchQuery, setRankingSearchQuery] = useState<string>('');
   const [selectedRankingBlog, setSelectedRankingBlog] = useState<RankingBlogItem | null>(null);
@@ -1079,8 +1112,8 @@ export default function BlogAnalyticsLabPage() {
                         </td>
 
                         {/* 발행일 */}
-                        <td className="py-3.5 px-3 text-center text-slate-400 whitespace-nowrap text-xs">
-                          {post.publishedAt}
+                        <td className="py-3.5 px-3 text-center text-slate-500 whitespace-nowrap text-xs font-semibold">
+                          {formatDateToDot(post.publishedAt)}
                         </td>
 
                         {/* 글자수 */}
@@ -1165,7 +1198,7 @@ export default function BlogAnalyticsLabPage() {
                   {selectedPost.title}
                 </h3>
                 <div className="flex items-center gap-2 mt-2 text-xs text-indigo-100 flex-wrap">
-                  <span>발행: {selectedPost.publishedAt}</span>
+                  <span>발행: {formatDateToDot(selectedPost.publishedAt)}</span>
                   <span>•</span>
                   <span>본문: {selectedPost.charCount.toLocaleString()}자</span>
                   <span>•</span>

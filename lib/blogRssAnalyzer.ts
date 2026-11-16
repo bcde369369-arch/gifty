@@ -93,30 +93,31 @@ export function extractNaverBlogId(rawInput: string): string {
   return str.replace(/[^a-zA-Z0-9_-]/g, '');
 }
 
-/** 상대 시간 계산 */
-function formatRelativeTime(pubDateStr: string): string {
+/** 발행일 날짜 포맷 (YYYY.MM.DD 형식: 예: 2026.11.03) */
+export function formatPublishDate(pubDateStr: string, fallbackOffsetDays = 0): string {
   try {
-    const pubDate = new Date(pubDateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - pubDate.getTime();
-    if (diffMs < 0) return '방금 전';
+    if (pubDateStr) {
+      const pubDate = new Date(pubDateStr);
+      if (!isNaN(pubDate.getTime())) {
+        const y = pubDate.getFullYear();
+        const m = String(pubDate.getMonth() + 1).padStart(2, '0');
+        const d = String(pubDate.getDate()).padStart(2, '0');
+        return `${y}.${m}.${d}`;
+      }
+    }
+  } catch {}
 
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    if (diffMins < 60) return `${Math.max(1, diffMins)}분 전`;
+  const target = new Date();
+  target.setDate(target.getDate() - fallbackOffsetDays);
+  const y = target.getFullYear();
+  const m = String(target.getMonth() + 1).padStart(2, '0');
+  const d = String(target.getDate()).padStart(2, '0');
+  return `${y}.${m}.${d}`;
+}
 
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    if (diffHours < 24) return `${diffHours}시간 전`;
-
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays <= 7) return `${diffDays}일 전`;
-
-    const y = pubDate.getFullYear();
-    const m = String(pubDate.getMonth() + 1).padStart(2, '0');
-    const d = String(pubDate.getDate()).padStart(2, '0');
-    return `${y}.${m}.${d}`;
-  } catch {
-    return '최근';
-  }
+/** 하위 호환용 상대 시간 함수 (YYYY.MM.DD 형식 반환) */
+function formatRelativeTime(pubDateStr: string, fallbackOffsetDays = 0): string {
+  return formatPublishDate(pubDateStr, fallbackOffsetDays);
 }
 
 /** 텍스트에서 명사/키워드 추출 */
@@ -450,7 +451,7 @@ export function generateSmartBlogAnalysis(blogId: string): BlogAnalysisResult {
       : '일상') as '맛집/여행' | '경제/재테크' | 'IT/리뷰' | '일상';
 
     const pDaysAgo = Math.floor(idx * 0.8) + 1;
-    const publishedAt = idx === 0 ? '2시간 전' : idx === 1 ? '14시간 전' : `${pDaysAgo}일 전`;
+    const publishedAt = formatPublishDate('', pDaysAgo);
 
     const searchKeyword = extractMainSearchKeyword(title);
     const naverRank = idx === 0 ? 1 : idx < 7 ? 2 + (pHash % 6) : null;
