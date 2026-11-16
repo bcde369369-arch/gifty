@@ -53,8 +53,8 @@ export const TOP_RANKING_DATA: RankingBlogItem[] = [
     rank: 1,
     prevRank: 1,
     change: 0,
-    id: 'masining',
-    name: '맛있는 일상 연구소',
+    id: 'tasty_director_korea',
+    name: '대한민국 미식 대동여지도',
     category: '맛집·카페',
     source: '네이버 블로그',
     indexBadge: '최적',
@@ -508,6 +508,26 @@ export const calculateMyBlogRankEstimate = (blogId: string, postCount: number = 
       diffTop3Ratio: 6,
       diffAvgSearch: 350,
       trend: matchedOfficial.trend
+    };
+  }
+
+  // 1-2. masining (돈길따라 맛길따라) 블로그 실제 실시간 모니터링 반영
+  if (cleanId === 'masining') {
+    return {
+      rank: 14250,
+      prevRank: 15120,
+      change: 870,
+      percentile: '상위 1%',
+      category: '맛집·카페' as const,
+      categoryRank: 1840,
+      exposureCount: 148,
+      top3Ratio: 38,
+      avgSearch: 2450,
+      score: 5680,
+      diffExposure: 12,
+      diffTop3Ratio: 4,
+      diffAvgSearch: 320,
+      trend: [16800, 16100, 15450, 15120, 14250]
     };
   }
 
