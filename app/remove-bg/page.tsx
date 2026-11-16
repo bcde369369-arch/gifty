@@ -48,7 +48,12 @@ import {
   Camera,
   Sunset,
   Gem,
-  ShoppingBag
+  ShoppingBag,
+  Grid,
+  Square,
+  Smile,
+  ShieldAlert,
+  EyeOff
 } from 'lucide-react';
 import { removeBackground } from '@imgly/background-removal';
 import CoupangBanner from '@/components/CoupangBanner';
@@ -92,6 +97,9 @@ interface FilterPreset {
     blur: number;
   };
 }
+
+// 모자이크 스티커용 이모지 프리셋
+const MOSAIC_EMOJIS = ['😊', '😎', '🐱', '✨', '🙈', '😷', '❤️', '🔥', '🌸', '🐻', '👑', '⭐'];
 
 const PRESET_CATEGORIES = [
   { id: 'all', label: '전체 (23)' },
@@ -381,6 +389,21 @@ export default function ImageStudioPage() {
   const [shadowStrengthLevel, setShadowStrengthLevel] = useState<'soft' | 'natural' | 'strong'>('natural');
   const [hasAutoShadowApplied, setHasAutoShadowApplied] = useState<boolean>(false);
   const shadowBaseImgRef = useRef<HTMLImageElement | null>(null); // 원클릭 적용 직전의 베이스 이미지
+
+  // ==========================================
+  // [모자이크 / 블러 마스킹 전용 상태]
+  // ==========================================
+  const [isMosaicToolOpen, setIsMosaicToolOpen] = useState<boolean>(false);
+  const [mosaicMode, setMosaicMode] = useState<'box' | 'brush'>('box'); // 'box'(영역 드래그) vs 'brush'(문지르기)
+  const [mosaicStyle, setMosaicStyle] = useState<'pixel' | 'blur' | 'emoji'>('pixel'); // 'pixel' vs 'blur' vs 'emoji'
+  const [mosaicPixelSize, setMosaicPixelSize] = useState<number>(14); // 픽셀 크기 (8~36)
+  const [mosaicBlurRadius, setMosaicBlurRadius] = useState<number>(14); // 가우시안 블러 세기 (6~30)
+  const [mosaicBrushSize, setMosaicBrushSize] = useState<number>(40); // 브러시 지름 (15~80)
+  const [selectedEmoji, setSelectedEmoji] = useState<string>('😊');
+  const [isMosaicInteracting, setIsMosaicInteracting] = useState<boolean>(false);
+  const [mosaicDragStart, setMosaicDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [mosaicDragCurrent, setMosaicDragCurrent] = useState<{ x: number; y: number } | null>(null);
+  const [mosaicBoxOffset, setMosaicBoxOffset] = useState<{ startX: number; startY: number; curX: number; curY: number } | null>(null);
 
   // 캔버스 참조
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -1219,6 +1242,260 @@ export default function ImageStudioPage() {
     }
   };
 
+  // 캔버스 변경 내용을 현재 베이스 이미지로 동기화
+  const syncCanvasToCurrentImage = () => {
+    const canvas = previewCanvasRef.current;
+    if (!canvas) return;
+    const updatedUrl = canvas.toDataURL('image/png');
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      currentImageRef.current = img;
+      // 베이스에 모자이크가 반영되었으므로 필터 중복 누적 방지
+      setFilterValues({
+        brightness: 100,
+        contrast: 100,
+        saturation: 100,
+        warmth: 0,
+        blur: 0
+      });
+      setActivePresetId('original');
+    };
+    img.src = updatedUrl;
+  };
+
+  // =========================================================
+  // [모자이크 / 가우시안 블러 / 스티커 마스킹 엔진]
+  // =========================================================
+  const getClientOffsetCoords = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = previewCanvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top
+    };
+  };
+
+  const applyPixelateArea = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    pixelSize: number
+  ) => {
+    if (w <= 0 || h <= 0) return;
+    const offCanvas = document.createElement('canvas');
+    const smallW = Math.max(1, Math.floor(w / pixelSize));
+    const smallH = Math.max(1, Math.floor(h / pixelSize));
+    offCanvas.width = smallW;
+    offCanvas.height = smallH;
+    const offCtx = offCanvas.getContext('2d');
+    if (!offCtx) return;
+
+    offCtx.drawImage(ctx.canvas, x, y, w, h, 0, 0, smallW, smallH);
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(offCanvas, 0, 0, smallW, smallH, x, y, w, h);
+    ctx.restore();
+  };
+
+  const applyBlurArea = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    blurRadius: number
+  ) => {
+    if (w <= 0 || h <= 0) return;
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = ctx.canvas.width;
+    offCanvas.height = ctx.canvas.height;
+    const offCtx = offCanvas.getContext('2d');
+    if (!offCtx) return;
+
+    offCtx.drawImage(ctx.canvas, 0, 0);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+    ctx.filter = `blur(${blurRadius}px)`;
+    ctx.drawImage(offCanvas, 0, 0);
+    ctx.restore();
+    ctx.filter = 'none';
+  };
+
+  const applyEmojiArea = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    emoji: string
+  ) => {
+    if (w <= 0 || h <= 0) return;
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    const size = Math.min(w, h) * 0.88;
+    if (size < 8) return;
+
+    ctx.save();
+    ctx.font = `${Math.floor(size)}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(emoji, cx, cy);
+    ctx.restore();
+  };
+
+  const applyBoxMosaic = (
+    start: { x: number; y: number },
+    end: { x: number; y: number }
+  ) => {
+    const canvas = previewCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const x = Math.max(0, Math.min(start.x, end.x));
+    const y = Math.max(0, Math.min(start.y, end.y));
+    const w = Math.min(canvas.width - x, Math.abs(end.x - start.x));
+    const h = Math.min(canvas.height - y, Math.abs(end.y - start.y));
+
+    if (w < 4 || h < 4) return;
+
+    if (mosaicStyle === 'pixel') {
+      applyPixelateArea(ctx, x, y, w, h, mosaicPixelSize);
+    } else if (mosaicStyle === 'blur') {
+      applyBlurArea(ctx, x, y, w, h, mosaicBlurRadius);
+    } else if (mosaicStyle === 'emoji') {
+      applyEmojiArea(ctx, x, y, w, h, selectedEmoji);
+    }
+
+    syncCanvasToCurrentImage();
+    setCopyFeedback('모자이크가 적용되었습니다.');
+    setTimeout(() => setCopyFeedback(''), 2000);
+  };
+
+  const applyBrushMosaicAt = (coords: { x: number; y: number }) => {
+    const canvas = previewCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleFactor = canvas.width / rect.width;
+    const radius = (mosaicBrushSize / 2) * scaleFactor;
+    const startX = Math.max(0, Math.floor(coords.x - radius));
+    const startY = Math.max(0, Math.floor(coords.y - radius));
+    const w = Math.min(canvas.width - startX, Math.ceil(radius * 2));
+    const h = Math.min(canvas.height - startY, Math.ceil(radius * 2));
+
+    if (w <= 0 || h <= 0) return;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(coords.x, coords.y, radius, 0, Math.PI * 2);
+    ctx.clip();
+
+    if (mosaicStyle === 'pixel') {
+      applyPixelateArea(ctx, startX, startY, w, h, mosaicPixelSize);
+    } else if (mosaicStyle === 'blur') {
+      applyBlurArea(ctx, startX, startY, w, h, mosaicBlurRadius);
+    } else if (mosaicStyle === 'emoji') {
+      ctx.restore();
+      applyEmojiArea(ctx, startX, startY, w, h, selectedEmoji);
+      return;
+    }
+    ctx.restore();
+  };
+
+  // 포인터 통합 이벤트 핸들러
+  const handleCanvasPointerDown = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (isPipetteMode) {
+      if ('clientX' in e) handleCanvasClick(e as React.MouseEvent<HTMLCanvasElement>);
+      return;
+    }
+
+    if (isMosaicToolOpen) {
+      const coords = getCanvasCoords(e);
+      const clientOffset = getClientOffsetCoords(e);
+      if (!coords) return;
+
+      const canvas = previewCanvasRef.current;
+      if (canvas) {
+        setHistoryStack(prev => [...prev.slice(-6), canvas.toDataURL('image/png')]);
+      }
+
+      setIsMosaicInteracting(true);
+      if (mosaicMode === 'box') {
+        setMosaicDragStart(coords);
+        setMosaicDragCurrent(coords);
+        if (clientOffset) {
+          setMosaicBoxOffset({
+            startX: clientOffset.x,
+            startY: clientOffset.y,
+            curX: clientOffset.x,
+            curY: clientOffset.y
+          });
+        }
+      } else {
+        applyBrushMosaicAt(coords);
+      }
+      return;
+    }
+
+    if (isShadowToolOpen) {
+      handleBrushStart(e);
+    }
+  };
+
+  const handleCanvasPointerMove = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (isMosaicToolOpen && isMosaicInteracting) {
+      const coords = getCanvasCoords(e);
+      const clientOffset = getClientOffsetCoords(e);
+      if (!coords) return;
+
+      if (mosaicMode === 'box') {
+        setMosaicDragCurrent(coords);
+        if (clientOffset) {
+          setMosaicBoxOffset(prev => prev ? { ...prev, curX: clientOffset.x, curY: clientOffset.y } : null);
+        }
+      } else {
+        applyBrushMosaicAt(coords);
+      }
+      return;
+    }
+
+    if (isShadowToolOpen) {
+      handleBrushMove(e);
+    }
+  };
+
+  const handleCanvasPointerUp = () => {
+    if (isMosaicToolOpen && isMosaicInteracting) {
+      setIsMosaicInteracting(false);
+      if (mosaicMode === 'box' && mosaicDragStart && mosaicDragCurrent) {
+        applyBoxMosaic(mosaicDragStart, mosaicDragCurrent);
+      } else if (mosaicMode === 'brush') {
+        syncCanvasToCurrentImage();
+      }
+      setMosaicDragStart(null);
+      setMosaicDragCurrent(null);
+      setMosaicBoxOffset(null);
+      return;
+    }
+
+    if (isShadowToolOpen) {
+      handleBrushEnd();
+    }
+  };
+
   // 실행 취소 (Undo)
   const handleUndo = () => {
     if (historyStack.length === 0) return;
@@ -1742,6 +2019,11 @@ export default function ImageStudioPage() {
                           ☀️ 조명 역보정 모드
                         </span>
                       )}
+                      {isMosaicToolOpen && (
+                        <span className="text-[11px] font-extrabold text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-300">
+                          🔲 모자이크·블러 모드
+                        </span>
+                      )}
                     </div>
                     {/* 상단 보조 도구 */}
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -1762,6 +2044,7 @@ export default function ImageStudioPage() {
                         onClick={() => {
                           setIsShadowToolOpen(!isShadowToolOpen);
                           setIsPipetteMode(false);
+                          if (!isShadowToolOpen) setIsMosaicToolOpen(false);
                         }}
                         className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-xs ${
                           isShadowToolOpen
@@ -1772,6 +2055,27 @@ export default function ImageStudioPage() {
                       >
                         <SunMedium size={14} className={isShadowToolOpen ? 'animate-spin' : ''} />
                         <span>{isShadowToolOpen ? '브러시 닫기' : '🖌️ 수동 브러시'}</span>
+                      </button>
+
+                      {/* 모자이크 & 블러 마스킹 도구 버튼 */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMosaicToolOpen(!isMosaicToolOpen);
+                          if (!isMosaicToolOpen) {
+                            setIsShadowToolOpen(false);
+                            setIsPipetteMode(false);
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-xs ${
+                          isMosaicToolOpen
+                            ? 'bg-purple-600 text-white shadow-purple-200 ring-2 ring-purple-400/40'
+                            : 'bg-purple-50 text-purple-900 hover:bg-purple-100 border border-purple-300/80 font-bold'
+                        }`}
+                        title="초상권 및 개인정보 가리기 (픽셀 모자이크 / 가우시안 블러 / 스티커)"
+                      >
+                        <Grid size={14} className={isMosaicToolOpen ? 'animate-pulse' : ''} />
+                        <span>{isMosaicToolOpen ? '모자이크 닫기' : '🔲 모자이크·블러'}</span>
                       </button>
 
                       {historyStack.length > 0 && (
@@ -2002,24 +2306,200 @@ export default function ImageStudioPage() {
                     </div>
                   )}
 
+                  {/* ========================================== */}
+                  {/* 모자이크 & 블러 마스킹 컨트롤 패널 */}
+                  {/* ========================================== */}
+                  {isMosaicToolOpen && (
+                    <div className="w-full bg-gradient-to-r from-purple-50/95 via-indigo-50/80 to-purple-50/95 border border-purple-300 rounded-2xl p-4 mb-3 space-y-3.5 shadow-xs animate-in fade-in">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2.5 border-b border-purple-200/80">
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 bg-purple-600 text-white rounded-xl shadow-xs">
+                            <Grid size={18} />
+                          </div>
+                          <div>
+                            <span className="text-xs font-black text-purple-950 flex items-center gap-1.5">
+                              초상권 & 개인정보 모자이크 스튜디오
+                              <span className="text-[10px] bg-purple-200 text-purple-900 px-2 py-0.5 rounded-full font-extrabold">100% 로컬 프라이버시 보호</span>
+                            </span>
+                            <p className="text-[11px] text-purple-800/80 mt-0.5">
+                              {mosaicMode === 'box'
+                                ? '👉 마우스나 손가락으로 가릴 영역을 드래그하세요 (얼굴, 번호판, 영수증, 택배 송장)'
+                                : '👉 브러시로 슥슥 문지르면 해당 부위만 자연스럽게 마스킹됩니다.'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* 방식 선택 (사각형 드래그 vs 브러시 문지르기) */}
+                        <div className="flex items-center bg-white border border-purple-200 rounded-xl p-1 gap-1 shadow-2xs self-stretch sm:self-auto justify-center">
+                          <button
+                            type="button"
+                            onClick={() => setMosaicMode('box')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                              mosaicMode === 'box'
+                                ? 'bg-purple-600 text-white shadow-xs'
+                                : 'text-slate-600 hover:bg-purple-50'
+                            }`}
+                          >
+                            <Square size={13} />
+                            <span>사각형 선택</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setMosaicMode('brush')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                              mosaicMode === 'brush'
+                                ? 'bg-purple-600 text-white shadow-xs'
+                                : 'text-slate-600 hover:bg-purple-50'
+                            }`}
+                          >
+                            <Paintbrush size={13} />
+                            <span>브러시 문지르기</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 모자이크 스타일 선택 (픽셀 vs 블러 vs 이모지) & 세부 슬라이더 */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-bold text-purple-950 pt-0.5">
+                        {/* 스타일 탭 */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-500 font-semibold mr-1">스타일:</span>
+                          {[
+                            { id: 'pixel', label: '⬛ 픽셀 모자이크' },
+                            { id: 'blur', label: '💧 부드러운 블러' },
+                            { id: 'emoji', label: '😊 스티커 가리기' },
+                          ].map((s) => (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => setMosaicStyle(s.id as 'pixel' | 'blur' | 'emoji')}
+                              className={`px-2.5 py-1.5 rounded-lg border text-xs font-black transition-all ${
+                                mosaicStyle === s.id
+                                  ? 'bg-purple-700 border-purple-700 text-white shadow-xs'
+                                  : 'bg-white border-purple-200 text-slate-700 hover:bg-purple-100/50'
+                              }`}
+                            >
+                              {s.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* 세부 옵션 컨트롤 */}
+                        {mosaicStyle === 'pixel' && (
+                          <div className="flex items-center gap-2">
+                            <span>픽셀 크기:</span>
+                            <span className="text-purple-700 font-extrabold">{mosaicPixelSize}px</span>
+                            <input
+                              type="range"
+                              min="6"
+                              max="36"
+                              value={mosaicPixelSize}
+                              onChange={(e) => setMosaicPixelSize(Number(e.target.value))}
+                              className="w-24 accent-purple-600 cursor-pointer h-1.5 bg-purple-200 rounded-lg"
+                            />
+                          </div>
+                        )}
+
+                        {mosaicStyle === 'blur' && (
+                          <div className="flex items-center gap-2">
+                            <span>흐림 강도:</span>
+                            <span className="text-purple-700 font-extrabold">{mosaicBlurRadius}px</span>
+                            <input
+                              type="range"
+                              min="4"
+                              max="32"
+                              value={mosaicBlurRadius}
+                              onChange={(e) => setMosaicBlurRadius(Number(e.target.value))}
+                              className="w-24 accent-purple-600 cursor-pointer h-1.5 bg-purple-200 rounded-lg"
+                            />
+                          </div>
+                        )}
+
+                        {mosaicStyle === 'emoji' && (
+                          <div className="flex items-center gap-1 bg-white border border-purple-200 rounded-xl px-2 py-1 overflow-x-auto max-w-full">
+                            <span className="text-[11px] text-slate-500 font-normal mr-1">이모지:</span>
+                            {MOSAIC_EMOJIS.map((emoji) => (
+                              <button
+                                key={emoji}
+                                type="button"
+                                onClick={() => setSelectedEmoji(emoji)}
+                                className={`w-7 h-7 flex items-center justify-center rounded-lg text-sm transition-transform ${
+                                  selectedEmoji === emoji
+                                    ? 'bg-purple-100 ring-2 ring-purple-500 scale-110'
+                                    : 'hover:bg-slate-100'
+                                }`}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {mosaicMode === 'brush' && (
+                          <div className="flex items-center gap-2">
+                            <span>브러시 크기:</span>
+                            {[
+                              { label: '소 (20px)', size: 20 },
+                              { label: '보통 (40px)', size: 40 },
+                              { label: '대 (70px)', size: 70 },
+                            ].map((b) => (
+                              <button
+                                key={b.size}
+                                type="button"
+                                onClick={() => setMosaicBrushSize(b.size)}
+                                className={`px-2 py-1 rounded-lg border text-[11px] font-black transition-all ${
+                                  mosaicBrushSize === b.size
+                                    ? 'bg-purple-700 border-purple-700 text-white shadow-xs'
+                                    : 'bg-white border-purple-200 text-slate-700 hover:bg-purple-100/50'
+                                }`}
+                              >
+                                {b.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* 캔버스/이미지 미리보기 창 */}
                   <div 
                     className={`w-full h-80 sm:h-96 bg-slate-900/5 rounded-2xl overflow-hidden border border-slate-200 relative flex items-center justify-center p-2 shadow-inner select-none ${
-                      isPipetteMode ? 'cursor-crosshair' : isShadowToolOpen ? 'cursor-crosshair' : 'cursor-default'
+                      isPipetteMode ? 'cursor-crosshair' : isShadowToolOpen || isMosaicToolOpen ? 'cursor-crosshair' : 'cursor-default'
                     }`}
+                    style={{ touchAction: isMosaicToolOpen || isShadowToolOpen ? 'none' : 'auto' }}
                   >
                     <canvas 
                       ref={previewCanvasRef}
-                      onClick={handleCanvasClick}
-                      onMouseDown={handleBrushStart}
-                      onMouseMove={handleBrushMove}
-                      onMouseUp={handleBrushEnd}
-                      onMouseLeave={handleBrushEnd}
-                      onTouchStart={handleBrushStart}
-                      onTouchMove={handleBrushMove}
-                      onTouchEnd={handleBrushEnd}
+                      onClick={handleCanvasPointerDown}
+                      onMouseDown={handleCanvasPointerDown}
+                      onMouseMove={handleCanvasPointerMove}
+                      onMouseUp={handleCanvasPointerUp}
+                      onMouseLeave={handleCanvasPointerUp}
+                      onTouchStart={handleCanvasPointerDown}
+                      onTouchMove={handleCanvasPointerMove}
+                      onTouchEnd={handleCanvasPointerUp}
                       className="max-w-full max-h-full object-contain transition-all duration-75 shadow-sm"
                     />
+
+                    {/* 사각형 드래그 가이드라인 점선 박스 */}
+                    {isMosaicToolOpen && mosaicMode === 'box' && mosaicBoxOffset && (
+                      <div
+                        className="absolute border-2 border-dashed border-purple-600 bg-purple-500/25 pointer-events-none rounded-xs z-20 transition-none"
+                        style={{
+                          left: Math.min(mosaicBoxOffset.startX, mosaicBoxOffset.curX),
+                          top: Math.min(mosaicBoxOffset.startY, mosaicBoxOffset.curY),
+                          width: Math.abs(mosaicBoxOffset.curX - mosaicBoxOffset.startX),
+                          height: Math.abs(mosaicBoxOffset.curY - mosaicBoxOffset.startY)
+                        }}
+                      />
+                    )}
+
+                    {isMosaicToolOpen && (
+                      <div className="absolute top-3 left-3 bg-purple-700/95 text-white text-[11px] font-black px-3.5 py-1.5 rounded-full shadow-lg backdrop-blur-xs flex items-center gap-1.5">
+                        <Grid size={13} />
+                        <span>{mosaicMode === 'box' ? '영역을 드래그하여 모자이크' : '문질러서 모자이크 마스킹'}</span>
+                      </div>
+                    )}
 
                     {isPipetteMode && (
                       <div className="absolute top-3 left-3 bg-indigo-600/90 text-white text-[11px] font-black px-3.5 py-1.5 rounded-full shadow-lg backdrop-blur-xs flex items-center gap-1.5 animate-bounce">

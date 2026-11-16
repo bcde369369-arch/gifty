@@ -37,9 +37,20 @@ export interface EmoticonOverlayConfig {
 
 export type QualityPreset = 'high' | 'normal' | 'community' | 'low';
 
+export interface MosaicBox {
+  id: string;
+  xPercent: number; // 0 ~ 100
+  yPercent: number; // 0 ~ 100
+  widthPercent: number; // 0 ~ 100
+  heightPercent: number; // 0 ~ 100
+  type?: 'blur' | 'pixel';
+  label?: string;
+}
+
 export interface ExtraConvertOptions {
   isBoomerang?: boolean;
   textWatermark?: string;
+  mosaicBoxes?: MosaicBox[];
 }
 
 export const convertToGif = async (
@@ -184,6 +195,35 @@ export const convertToGif = async (
       filterGraph += `${basePipeline}[v_base];`;
     }
     let currentNode = '[v_base]';
+
+    // 0. Mosaic & Blur Masking Boxes (얼굴/번호판/정보 가리기)
+    const mosaicBoxes = options?.mosaicBoxes || [];
+    if (mosaicBoxes.length > 0) {
+      mosaicBoxes.forEach((box, idx) => {
+        const xFrac = (Math.max(0, Math.min(99, box.xPercent)) / 100).toFixed(4);
+        const yFrac = (Math.max(0, Math.min(99, box.yPercent)) / 100).toFixed(4);
+        const wFrac = (Math.max(1, Math.min(100 - box.xPercent, box.widthPercent)) / 100).toFixed(4);
+        const hFrac = (Math.max(1, Math.min(100 - box.yPercent, box.heightPercent)) / 100).toFixed(4);
+
+        const nextNode = `[v_mosaic_${idx}]`;
+        const splitMain = `[m_main_${idx}]`;
+        const splitCrop = `[m_crop_${idx}]`;
+        const blurred = `[m_blur_${idx}]`;
+
+        if (box.type === 'pixel') {
+          // 픽셀 모자이크: 영역 축소 후 최근접 이웃 보간으로 복원
+          filterGraph += `${currentNode}split${splitMain}${splitCrop};`;
+          filterGraph += `${splitCrop}crop=w='max(8,round(iw*${wFrac}))':h='max(8,round(ih*${hFrac}))':x='round(iw*${xFrac})':y='round(ih*${yFrac})',scale=iw/7:ih/7:flags=neighbor,scale='max(8,round(iw*7))':'max(8,round(ih*7))':flags=neighbor${blurred};`;
+          filterGraph += `${splitMain}${blurred}overlay=x='round(main_w*${xFrac})':y='round(main_h*${yFrac})'${nextNode};`;
+        } else {
+          // 가우시안/박스 블러: 부드러운 흐림 효과
+          filterGraph += `${currentNode}split${splitMain}${splitCrop};`;
+          filterGraph += `${splitCrop}crop=w='max(8,round(iw*${wFrac}))':h='max(8,round(ih*${hFrac}))':x='round(iw*${xFrac})':y='round(ih*${yFrac})',boxblur=12:2${blurred};`;
+          filterGraph += `${splitMain}${blurred}overlay=x='round(main_w*${xFrac})':y='round(main_h*${yFrac})'${nextNode};`;
+        }
+        currentNode = nextNode;
+      });
+    }
 
     // 1. Text Subtitle
     if (hasValidFont && rawText.trim()) {

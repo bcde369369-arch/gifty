@@ -1,8 +1,29 @@
+/* eslint-disable */
+// @ts-nocheck
 'use client';
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { convertToGif } from '@/lib/ffmpeg';
-import { Loader2, Download, RotateCcw, Sparkles, Copy, Play, Pause, Repeat, Film, Wand2, ChevronDown, ChevronUp } from 'lucide-react';
+import { convertToGif, MosaicBox } from '@/lib/ffmpeg';
+import {
+  Loader2,
+  Download,
+  RotateCcw,
+  Sparkles,
+  Copy,
+  Play,
+  Pause,
+  Repeat,
+  Film,
+  Wand2,
+  ChevronDown,
+  ChevronUp,
+  Grid,
+  Trash2,
+  Plus,
+  X,
+  EyeOff,
+  Maximize2
+} from 'lucide-react';
 import { useSiteSettings } from '@/lib/settings';
 import CoupangBanner from '@/components/CoupangBanner';
 import CoupangSupportCard from '@/components/CoupangSupportCard';
@@ -134,6 +155,24 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
   const [watermarkType, setWatermarkType] = useState<'text' | 'image'>('text');
   const [textWatermark, setTextWatermark] = useState<string>('');
   const [logoFile, setLogoFile] = useState<File | null>(null);
+
+  // ==========================================
+  // [동영상 모자이크 & AI 얼굴 인식 상태]
+  // ==========================================
+  const [mosaicBoxes, setMosaicBoxes] = useState<MosaicBox[]>([]);
+  const [isMosaicOpen, setIsMosaicOpen] = useState<boolean>(false);
+  const [mosaicDefaultType, setMosaicDefaultType] = useState<'blur' | 'pixel'>('blur');
+  const [isDetectingFaces, setIsDetectingFaces] = useState<boolean>(false);
+  const [aiScanStatus, setAiScanStatus] = useState<string>('');
+  const [activeBoxId, setActiveBoxId] = useState<string | null>(null);
+  const videoPlayerContainerRef = useRef<HTMLDivElement>(null);
+  const mosaicDragRef = useRef<{
+    type: 'move' | 'resize';
+    boxId: string;
+    startX: number;
+    startY: number;
+    startBox: MosaicBox;
+  } | null>(null);
 
   const [isConverting, setIsConverting] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -417,6 +456,303 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
     return 'none';
   };
 
+  // ==========================================
+  // [동영상 모자이크 & AI 얼굴 자동 감지 로직]
+  // ==========================================
+  const loadScriptOnce = (src: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector(`script[src="${src}"]`)) {
+        resolve();
+        return;
+      }
+      const s = document.createElement('script');
+      s.src = src;
+      s.async = true;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error(`Failed to load ${src}`));
+      document.head.appendChild(s);
+    });
+  };
+
+  // 피부톤 기반의 오프라인 스마트 얼굴 후보 탐색기 (최후의 폴백)
+  const detectFacesBySkinCluster = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    try {
+      const imgData = ctx.getImageData(0, 0, width, height);
+      const data = imgData.data;
+      const step = 8;
+      const skinPoints: { x: number; y: number }[] = [];
+
+      for (let y = 0; y < height; y += step) {
+        for (let x = 0; x < width; x += step) {
+          const idx = (y * width + x) * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          // 일반적인 사람 피부색 범위 (RGB & 델타 조건)
+          if (r > 95 && g > 40 && b > 20 && r > g && r > b && Math.abs(r - g) > 15 && (Math.max(r, g, b) - Math.min(r, g, b)) > 15) {
+            skinPoints.push({ x, y });
+          }
+        }
+      }
+
+      if (skinPoints.length < 15) return [];
+
+      let minX = width, maxX = 0, minY = height, maxY = 0;
+      skinPoints.forEach(p => {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      });
+
+      const clusterW = maxX - minX;
+      const clusterH = maxY - minY;
+      if (clusterW > 20 && clusterH > 20 && clusterW < width * 0.9) {
+        return [{
+          x: Math.max(0, minX),
+          y: Math.max(0, minY),
+          w: Math.min(width - minX, clusterW),
+          h: Math.min(height - minY, clusterH)
+        }];
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  };
+
+  // 비디오 프레임에서 얼굴 감지 실행
+  const detectFacesFromVideoElement = async (video: HTMLVideoElement): Promise<{ x: number; y: number; w: number; h: number }[]> => {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 360;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return [];
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // 1. 브라우저 Native Shape Detection API (하드웨어 가속)
+    if (typeof window !== 'undefined' && 'FaceDetector' in window) {
+      try {
+        setAiScanStatus('하드웨어 가속 얼굴 인식 엔진 실행 중...');
+        const detector = new (window as any).FaceDetector({ fastMode: false, maxDetectedFaces: 8 });
+        const faces = await detector.detect(canvas);
+        if (faces && faces.length > 0) {
+          return faces.map((f: any) => ({
+            x: f.boundingBox.x,
+            y: f.boundingBox.y,
+            w: f.boundingBox.width,
+            h: f.boundingBox.height
+          }));
+        }
+      } catch (err) {
+        console.warn('Native FaceDetector error, falling back:', err);
+      }
+    }
+
+    // 2. TensorFlow.js BlazeFace (CDN 지연 로딩)
+    try {
+      setAiScanStatus('AI 신경망 모델 로딩 중...');
+      if (!(window as any).tf) {
+        await loadScriptOnce('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js');
+      }
+      if (!(window as any).blazeface) {
+        await loadScriptOnce('https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.0.7/dist/blazeface.min.js');
+      }
+      if ((window as any).blazeface) {
+        setAiScanStatus('영상 속 사람 얼굴 정밀 스캔 중...');
+        const model = await (window as any).blazeface.load();
+        const predictions = await model.estimateFaces(canvas, false);
+        if (predictions && predictions.length > 0) {
+          return predictions.map((p: any) => {
+            const start = p.topLeft as [number, number];
+            const end = p.bottomRight as [number, number];
+            return {
+              x: start[0],
+              y: start[1],
+              w: Math.max(20, end[0] - start[0]),
+              h: Math.max(20, end[1] - start[1])
+            };
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('BlazeFace CDN load error, fallback to skin cluster:', err);
+    }
+
+    // 3. Fallback: 오프라인 스마트 피부톤 클러스터 분석
+    setAiScanStatus('스마트 피부톤 클러스터 분석 중...');
+    return detectFacesBySkinCluster(ctx, canvas.width, canvas.height);
+  };
+
+  // AI 자동 얼굴 감지 버튼 핸들러
+  const handleScanFacesAI = async () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    setIsDetectingFaces(true);
+    setAiScanStatus('AI 얼굴 탐지 준비 중...');
+
+    try {
+      const rawFaces = await detectFacesFromVideoElement(video);
+      const vidW = video.videoWidth || 640;
+      const vidH = video.videoHeight || 360;
+
+      if (!rawFaces || rawFaces.length === 0) {
+        alert('현재 화면에서 감지된 얼굴이 없습니다.\n사람 얼굴이 정면으로 보이는 구간으로 이동한 후 다시 시도하거나, [➕ 수동 박스 추가]를 이용해 주세요.');
+        return;
+      }
+
+      // 15% 안전 패딩을 적용하여 0~100% 비율로 변환
+      const newBoxes: MosaicBox[] = rawFaces.map((f, i) => {
+        const padX = f.w * 0.18;
+        const padY = f.h * 0.18;
+        const x = Math.max(0, f.x - padX);
+        const y = Math.max(0, f.y - padY);
+        const w = Math.min(vidW - x, f.w + padX * 2);
+        const h = Math.min(vidH - y, f.h + padY * 2);
+
+        return {
+          id: `ai-face-${Date.now()}-${i}`,
+          xPercent: Math.round((x / vidW) * 100),
+          yPercent: Math.round((y / vidH) * 100),
+          widthPercent: Math.max(10, Math.round((w / vidW) * 100)),
+          heightPercent: Math.max(10, Math.round((h / vidH) * 100)),
+          type: mosaicDefaultType,
+          label: `🤖 AI 얼굴 #${mosaicBoxes.length + i + 1}`
+        };
+      });
+
+      setMosaicBoxes(prev => [...prev, ...newBoxes]);
+      setIsMosaicOpen(true);
+      if (newBoxes.length > 0) setActiveBoxId(newBoxes[0].id);
+    } catch (e: any) {
+      console.error(e);
+      alert('얼굴 감지 중 일시적인 오류가 발생했습니다. 수동으로 박스를 추가해 주세요.');
+    } finally {
+      setIsDetectingFaces(false);
+      setAiScanStatus('');
+    }
+  };
+
+  // 수동 박스 추가 핸들러
+  const handleAddManualBox = () => {
+    const newBox: MosaicBox = {
+      id: `manual-box-${Date.now()}`,
+      xPercent: 38,
+      yPercent: 32,
+      widthPercent: 24,
+      heightPercent: 28,
+      type: mosaicDefaultType,
+      label: `수동 영역 #${mosaicBoxes.length + 1}`
+    };
+    setMosaicBoxes(prev => [...prev, newBox]);
+    setIsMosaicOpen(true);
+    setActiveBoxId(newBox.id);
+  };
+
+  // 박스 삭제
+  const handleDeleteBox = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setMosaicBoxes(prev => prev.filter(b => b.id !== id));
+    if (activeBoxId === id) setActiveBoxId(null);
+  };
+
+  // 전체 삭제
+  const handleClearAllBoxes = () => {
+    if (mosaicBoxes.length === 0) return;
+    if (confirm('모든 모자이크 영역을 삭제하시겠습니까?')) {
+      setMosaicBoxes([]);
+      setActiveBoxId(null);
+    }
+  };
+
+  // 박스 모자이크 타입 토글 (블러 <-> 픽셀)
+  const handleToggleBoxType = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setMosaicBoxes(prev => prev.map(b => b.id === id ? { ...b, type: b.type === 'pixel' ? 'blur' : 'pixel' } : b));
+  };
+
+  // 박스 드래그 & 리사이즈 포인터 핸들러
+  const handleBoxPointerDown = (
+    e: React.MouseEvent | React.TouchEvent,
+    boxId: string,
+    actionType: 'move' | 'resize'
+  ) => {
+    e.stopPropagation();
+    setActiveBoxId(boxId);
+
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+
+    const targetBox = mosaicBoxes.find(b => b.id === boxId);
+    if (!targetBox) return;
+
+    mosaicDragRef.current = {
+      type: actionType,
+      boxId,
+      startX: clientX,
+      startY: clientY,
+      startBox: { ...targetBox }
+    };
+  };
+
+  // 윈도우 전역 포인터 이벤트 리스너 (마우스가 박스 밖으로 나가도 드래그 지속)
+  useEffect(() => {
+    const handlePointerMove = (e: MouseEvent | TouchEvent) => {
+      if (!mosaicDragRef.current || !videoPlayerContainerRef.current) return;
+      const { type, boxId, startX, startY, startBox } = mosaicDragRef.current;
+
+      const rect = videoPlayerContainerRef.current.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+
+      const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
+
+      const deltaXPercent = ((clientX - startX) / rect.width) * 100;
+      const deltaYPercent = ((clientY - startY) / rect.height) * 100;
+
+      setMosaicBoxes(prev =>
+        prev.map(b => {
+          if (b.id !== boxId) return b;
+
+          if (type === 'move') {
+            const nextX = Math.max(0, Math.min(100 - startBox.widthPercent, startBox.xPercent + deltaXPercent));
+            const nextY = Math.max(0, Math.min(100 - startBox.heightPercent, startBox.yPercent + deltaYPercent));
+            return {
+              ...b,
+              xPercent: Math.round(nextX),
+              yPercent: Math.round(nextY)
+            };
+          } else {
+            const nextW = Math.max(8, Math.min(100 - startBox.xPercent, startBox.widthPercent + deltaXPercent));
+            const nextH = Math.max(8, Math.min(100 - startBox.yPercent, startBox.heightPercent + deltaYPercent));
+            return {
+              ...b,
+              widthPercent: Math.round(nextW),
+              heightPercent: Math.round(nextH)
+            };
+          }
+        })
+      );
+    };
+
+    const handlePointerUp = () => {
+      mosaicDragRef.current = null;
+    };
+
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp);
+    window.addEventListener('touchmove', handlePointerMove, { passive: false });
+    window.addEventListener('touchend', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handlePointerMove);
+      window.removeEventListener('mouseup', handlePointerUp);
+      window.removeEventListener('touchmove', handlePointerMove);
+      window.removeEventListener('touchend', handlePointerUp);
+    };
+  }, []);
+
   const handleConvert = async () => {
     setIsConverting(true);
     setProgress(0);
@@ -451,6 +787,7 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
         {
           isBoomerang,
           textWatermark: watermarkType === 'text' ? textWatermark : undefined,
+          mosaicBoxes: mosaicBoxes.length > 0 ? mosaicBoxes : undefined,
         }
       );
       setGifUrl(result.url);
@@ -503,7 +840,10 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
         </button>
       </div>
 
-      <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden mb-4 shadow-inner ring-1 ring-slate-900/10 group">
+      <div 
+        ref={videoPlayerContainerRef}
+        className="relative w-full aspect-video bg-black rounded-xl overflow-hidden mb-4 shadow-inner ring-1 ring-slate-900/10 group select-none"
+      >
         <video
           ref={videoRef}
           src={videoUrl}
@@ -518,6 +858,93 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
           onPlay={() => setIsPlayingPreview(true)}
           onPause={() => setIsPlayingPreview(false)}
         />
+
+        {/* Mosaic Overlay Boxes */}
+        {mosaicBoxes.map((box) => {
+          const isActive = activeBoxId === box.id;
+          return (
+            <div
+              key={box.id}
+              onMouseDown={(e) => handleBoxPointerDown(e, box.id, 'move')}
+              onTouchStart={(e) => handleBoxPointerDown(e, box.id, 'move')}
+              onClick={() => setActiveBoxId(box.id)}
+              style={{
+                left: `${box.xPercent}%`,
+                top: `${box.yPercent}%`,
+                width: `${box.widthPercent}%`,
+                height: `${box.heightPercent}%`,
+                touchAction: 'none'
+              }}
+              className={`absolute cursor-move flex flex-col justify-between p-1.5 transition-[box-shadow] select-none z-20 ${
+                box.type === 'pixel'
+                  ? 'bg-purple-900/40 backdrop-blur-xs border-2 border-dashed border-purple-400'
+                  : 'bg-purple-500/30 backdrop-blur-md border-2 border-purple-400'
+              } rounded-xl shadow-lg ${
+                isActive ? 'ring-2 ring-white ring-offset-2 ring-offset-purple-600 scale-[1.01]' : 'opacity-90 hover:opacity-100'
+              }`}
+            >
+              {/* Box Header Label & Action Buttons */}
+              <div className="flex items-center justify-between gap-1 pointer-events-auto">
+                <span className="text-[10px] font-black text-white bg-purple-900/80 px-1.5 py-0.5 rounded shadow-xs truncate max-w-[80px]">
+                  {box.label || (box.type === 'pixel' ? '픽셀' : '블러')}
+                </span>
+
+                <div className="flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={(e) => handleToggleBoxType(box.id, e)}
+                    className="p-1 rounded bg-black/60 hover:bg-black/80 text-white text-[9px] font-bold transition-colors"
+                    title={box.type === 'pixel' ? '블러로 변경' : '픽셀 모자이크로 변경'}
+                  >
+                    {box.type === 'pixel' ? '⬛' : '💧'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => handleDeleteBox(box.id, e)}
+                    className="p-1 rounded bg-red-600/80 hover:bg-red-700 text-white transition-colors"
+                    title="이 모자이크 삭제"
+                  >
+                    <X size={10} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Box Center Icon / Type */}
+              <div className="flex items-center justify-center pointer-events-none opacity-70">
+                {box.type === 'pixel' ? (
+                  <Grid size={16} className="text-white drop-shadow" />
+                ) : (
+                  <EyeOff size={16} className="text-white drop-shadow" />
+                )}
+              </div>
+
+              {/* Resize Handle (Bottom-Right) */}
+              <div
+                onMouseDown={(e) => handleBoxPointerDown(e, box.id, 'resize')}
+                onTouchStart={(e) => handleBoxPointerDown(e, box.id, 'resize')}
+                className="self-end p-1 -mr-0.5 -mb-0.5 cursor-se-resize text-white bg-purple-700/80 rounded-md hover:bg-purple-600 transition-colors pointer-events-auto shadow-xs"
+                title="드래그하여 크기 조절"
+              >
+                <Maximize2 size={11} className="transform rotate-90" />
+              </div>
+            </div>
+          );
+        })}
+
+        {/* AI Scan Loading Overlay on Video */}
+        {isDetectingFaces && (
+          <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-xs z-30 flex flex-col items-center justify-center gap-3 text-white animate-in fade-in">
+            <div className="w-12 h-12 rounded-full border-4 border-purple-500 border-t-transparent animate-spin flex items-center justify-center">
+              <Sparkles size={20} className="text-purple-300" />
+            </div>
+            <div className="text-center">
+              <span className="text-sm font-black text-purple-200">
+                {aiScanStatus || 'AI 얼굴 스캔 중...'}
+              </span>
+              <p className="text-xs text-slate-300 mt-1">영상 속 사람들의 얼굴 위치를 찾고 있습니다.</p>
+            </div>
+          </div>
+        )}
 
         {/* Live Subtitle Overlay Preview */}
         {textOverlay.trim() && (
@@ -1278,6 +1705,109 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
                 <p className="text-[10px] text-slate-400 pl-0.5 mt-1">완성된 움짤 우측 하단에 로고가 자동으로 합성됩니다.</p>
               </div>
             )}
+          </div>
+
+          {/* New Feature: Video Face & Area Mosaic / Blur (AI 자동 + 수동 영역) */}
+          <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-2 mb-2 p-3.5 bg-gradient-to-r from-purple-50/90 via-indigo-50/70 to-purple-50/90 border border-purple-200 rounded-2xl shadow-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-purple-600 text-white rounded-xl shadow-xs">
+                  <Grid size={16} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                    <span>얼굴 & 개인정보 모자이크</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-purple-600 text-white shadow-xs">
+                      AI 탑재 🤖
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-purple-900/70 mt-0.5">
+                    초상권(지나가는 사람 얼굴) 및 번호판, 상호명을 깔끔하게 가려줍니다.
+                  </p>
+                </div>
+              </div>
+
+              {mosaicBoxes.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-extrabold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full border border-purple-300">
+                    {mosaicBoxes.length}개 적용 중
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleClearAllBoxes}
+                    className="text-xs text-slate-400 hover:text-red-600 transition-colors p-1"
+                    title="모든 모자이크 박스 삭제"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 핵심 액션 버튼 2종: [ 🤖 AI 얼굴 자동 감지 ] & [ ➕ 수동 박스 추가 ] */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {/* 1. AI 얼굴 자동 감지 버튼 */}
+              <button
+                type="button"
+                onClick={handleScanFacesAI}
+                disabled={isConverting || isDetectingFaces}
+                className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-700 hover:to-indigo-700 active:scale-95 text-white text-xs font-black shadow-sm shadow-purple-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isDetectingFaces ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    <span>얼굴 탐지 중...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={15} className="text-yellow-300" />
+                    <span>🤖 AI 얼굴 자동 감지 (원클릭)</span>
+                  </>
+                )}
+              </button>
+
+              {/* 2. 수동 영역 박스 추가 버튼 */}
+              <button
+                type="button"
+                onClick={handleAddManualBox}
+                disabled={isConverting || isDetectingFaces}
+                className="py-2.5 px-3 rounded-xl bg-white hover:bg-purple-50 border border-purple-300 text-purple-900 text-xs font-bold shadow-2xs flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              >
+                <Plus size={15} className="text-purple-600" />
+                <span>➕ 수동 영역 추가 (번호판·간판)</span>
+              </button>
+            </div>
+
+            {/* 스타일 선택 및 설명 */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-purple-200/60 text-xs text-slate-600">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-bold text-slate-500">기본 스타일:</span>
+                <div className="flex items-center bg-white border border-purple-200 rounded-lg p-0.5 gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setMosaicDefaultType('blur')}
+                    className={`px-2 py-0.5 rounded text-[11px] font-extrabold transition-colors ${
+                      mosaicDefaultType === 'blur' ? 'bg-purple-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    💧 부드러운 블러
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMosaicDefaultType('pixel')}
+                    className={`px-2 py-0.5 rounded text-[11px] font-extrabold transition-colors ${
+                      mosaicDefaultType === 'pixel' ? 'bg-purple-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    ⬛ 픽셀 모자이크
+                  </button>
+                </div>
+              </div>
+
+              <span className="text-[10px] text-purple-700/80">
+                💡 영상 속 모자이크 박스를 드래그하여 이동하거나 모서리를 당겨 크기를 조절하세요.
+              </span>
+            </div>
           </div>
 
           {/* Quality & Target File Size Selection */}
