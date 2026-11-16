@@ -484,10 +484,37 @@ export const STEADY_GROWTH_BLOGS_DATA: RankingBlogItem[] = [
 
 // 내 블로그 랭킹 시뮬레이션 계산기
 export const calculateMyBlogRankEstimate = (blogId: string, postCount: number = 30) => {
-  // 아이디 해시 기반 결정론적 순위 산출 (유저가 같은 아이디 입력 시 일관된 신뢰성 높은 결과 제공)
+  const cleanId = (blogId || '').toLowerCase().trim();
+
+  // 1. 만약 TOP_RANKING_DATA나 급등/신규 목록에 등록된 공식 블로그라면, 그 순위와 스펙을 100% 동일하게 반환!
+  const matchedOfficial = TOP_RANKING_DATA.find(b => b.id.toLowerCase() === cleanId)
+    || RISING_BLOGS_DATA.find(b => b.id.toLowerCase() === cleanId)
+    || NEW_ENTRY_BLOGS_DATA.find(b => b.id.toLowerCase() === cleanId);
+
+  if (matchedOfficial) {
+    const changeNum = typeof matchedOfficial.change === 'number' ? matchedOfficial.change : 12;
+    return {
+      rank: matchedOfficial.rank,
+      prevRank: matchedOfficial.prevRank || Math.max(1, matchedOfficial.rank - changeNum),
+      change: changeNum,
+      percentile: matchedOfficial.percentile,
+      category: matchedOfficial.category,
+      categoryRank: Math.max(1, Math.round(matchedOfficial.rank * 0.2)),
+      exposureCount: matchedOfficial.totalExposure,
+      top3Ratio: matchedOfficial.top3Ratio,
+      avgSearch: matchedOfficial.avgSearchVolume,
+      score: matchedOfficial.score,
+      diffExposure: 14,
+      diffTop3Ratio: 6,
+      diffAvgSearch: 350,
+      trend: matchedOfficial.trend
+    };
+  }
+
+  // 2. 일반 블로그의 경우 해시 기반 일관된 랭킹 산출
   let hash = 0;
-  for (let i = 0; i < blogId.length; i++) {
-    hash = (hash << 5) - hash + blogId.charCodeAt(i);
+  for (let i = 0; i < cleanId.length; i++) {
+    hash = (hash << 5) - hash + cleanId.charCodeAt(i);
     hash |= 0;
   }
   const positiveHash = Math.abs(hash);

@@ -571,21 +571,43 @@ export default function BlogAnalyticsLabPage() {
                 </div>
               </div>
 
-              {/* 1-2. G-Score™ 전국 통합 랭킹 & 레거시 지수 게이지 차트 (4 cols) */}
+              {/* 1-2. G-Power™ 전국 통합 랭킹 & 레거시 지수 게이지 차트 (4 cols) */}
               <div className="lg:col-span-4 bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-xs font-bold text-slate-400">G-Score™ 전국 통합 랭킹</div>
-                    <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
-                      상위 14%
-                    </span>
-                  </div>
-                  <div className="text-2xl sm:text-3xl font-black text-slate-900">
-                    {(blogData.gScoreRank || blogData.blaiRank || 0).toLocaleString()}<span className="text-lg font-bold text-slate-400">위</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-0.5 mb-4">
-                    스마트블록 및 통합검색 <strong>{blogData.exposedKeywords}개 키워드</strong> 점유 중
-                  </p>
+                  {(() => {
+                    const unifiedRank = calculateMyBlogRankEstimate(blogData.blogId);
+                    return (
+                      <>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-xs font-bold text-slate-400">G-Power™ 전국 통합 랭킹</div>
+                          <span className="text-xs font-black text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                            {unifiedRank.percentile}
+                          </span>
+                        </div>
+                        <div className="flex items-baseline justify-between">
+                          <div className="text-2xl sm:text-3xl font-black text-slate-900">
+                            {unifiedRank.rank.toLocaleString()}<span className="text-lg font-bold text-slate-400">위</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMyRankingIdInput(blogData.blogId);
+                              setMyRankingData(unifiedRank);
+                              setRankingSubTab('my');
+                              setLabMainTab('ranking');
+                            }}
+                            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 bg-indigo-50/80 hover:bg-indigo-100/80 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <span>랭킹 분석 보기</span>
+                            <ChevronRight size={13} />
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-1 mb-4">
+                          {unifiedRank.category} 주제 <strong>{unifiedRank.categoryRank}위</strong> ｜ 점수 {unifiedRank.score.toLocaleString()}점
+                        </p>
+                      </>
+                    );
+                  })()}
 
                   {/* 반원형 게이지 미터기 SVG */}
                   <div className="relative flex flex-col items-center justify-center pt-2">

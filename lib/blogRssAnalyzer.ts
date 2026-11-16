@@ -3,6 +3,8 @@
  * (정적 export 빌드 완벽 호환, 외부 프록시 체인 + 스마트 분석 엔진)
  */
 
+import { calculateMyBlogRankEstimate } from '@/lib/blogRankingData';
+
 export interface PostAnalysisItem {
   id: string;
   status: 'good' | 'warning' | 'bad';
@@ -495,8 +497,8 @@ export function generateSmartBlogAnalysis(blogId: string): BlogAnalysisResult {
     scraps: 3 + (absHash % 5),
     createdDate: `${2015 + (absHash % 8)}.${String((absHash % 12) + 1).padStart(2, '0')}.12`,
     firstPostDate: `${2026 - (absHash % 2)}.${String((absHash % 12) + 1).padStart(2, '0')}.10`,
-    gScoreRank: 12000 + (absHash % 18000),
-    blaiRank: 12000 + (absHash % 18000),
+    gScoreRank: calculateMyBlogRankEstimate(blogId).rank,
+    blaiRank: calculateMyBlogRankEstimate(blogId).rank,
     exposedKeywords: 40 + (absHash % 60),
     legacyLevel,
     legacyLevelScore,
@@ -706,8 +708,8 @@ export function parseNaverRssXml(
       scraps: 5,
       createdDate: '2016.03.15',
       firstPostDate: posts[posts.length - 1]?.publishedAt || '2026.01.10',
-      gScoreRank: blogId.toLowerCase() === 'masining' ? 14058 : 28410,
-      blaiRank: blogId.toLowerCase() === 'masining' ? 14058 : 28410,
+      gScoreRank: calculateMyBlogRankEstimate(blogId).rank,
+      blaiRank: calculateMyBlogRankEstimate(blogId).rank,
       exposedKeywords: Math.max(20, Math.floor(neighborCount / 80)),
       legacyLevel,
       legacyLevelScore,
