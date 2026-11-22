@@ -350,6 +350,10 @@ export default function ImageStudioPage() {
   const [badgeType, setBadgeType] = useState<'none' | 'nandn' | 'honest' | 'best' | 'must'>('nandn');
   const [titleColor, setTitleColor] = useState<string>('#FFFFFF');
   const [hasOutline, setHasOutline] = useState<boolean>(true);
+  const [fontScale, setFontScale] = useState<number>(100); // 70 ~ 150% 글자 크기
+  const [fontFamily, setFontFamily] = useState<'sans' | 'serif' | 'impact' | 'round'>('sans');
+  const [textOffsetY, setTextOffsetY] = useState<number>(0); // -150 ~ 150px 위치 미세 조절
+  const [extraDeco, setExtraDeco] = useState<'none' | 'stars' | 'check' | 'heart' | 'arrow' | 'hot'>('none');
   const [isExportingDesign, setIsExportingDesign] = useState<boolean>(false);
 
   // ==========================================
@@ -1873,16 +1877,22 @@ export default function ImageStudioPage() {
     ctx.save();
     ctx.textAlign = 'center';
 
-    const mainFontSize = Math.round(cw * 0.068);
-    const subFontSize = Math.round(cw * 0.036);
+    const scaleFactor = fontScale / 100;
+    const mainFontSize = Math.round(cw * 0.068 * scaleFactor);
+    const subFontSize = Math.round(cw * 0.036 * scaleFactor);
 
-    if (designTemplate === 'cafe') {
-      ctx.font = `600 ${mainFontSize}px "Noto Serif KR", "Batang", -apple-system, serif`;
-    } else {
-      ctx.font = `900 ${mainFontSize}px -apple-system, BlinkMacSystemFont, "Pretendard", "Noto Sans KR", sans-serif`;
+    let chosenFontFamily = '-apple-system, BlinkMacSystemFont, "Pretendard", "Noto Sans KR", sans-serif';
+    if (fontFamily === 'serif' || designTemplate === 'cafe') {
+      chosenFontFamily = '"Noto Serif KR", "Batang", -apple-system, serif';
+    } else if (fontFamily === 'impact') {
+      chosenFontFamily = '"Arial Black", "Impact", "Pretendard", sans-serif';
+    } else if (fontFamily === 'round') {
+      chosenFontFamily = '"Pretendard", "Apple SD Gothic Neo", sans-serif';
     }
 
-    const titleY = subTitle ? centerY - mainFontSize * 0.35 : centerY;
+    ctx.font = `900 ${mainFontSize}px ${chosenFontFamily}`;
+
+    const titleY = (subTitle ? centerY - mainFontSize * 0.35 : centerY) + textOffsetY;
 
     ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
     ctx.shadowBlur = 14;
@@ -1914,9 +1924,12 @@ export default function ImageStudioPage() {
       ctx.stroke();
     }
 
+    let nextY = titleY;
+
     if (subTitle) {
       const subY = titleY + mainFontSize * 0.98;
-      ctx.font = `600 ${subFontSize}px -apple-system, BlinkMacSystemFont, "Pretendard", "Noto Sans KR", sans-serif`;
+      nextY = subY;
+      ctx.font = `600 ${subFontSize}px ${chosenFontFamily}`;
 
       if (hasOutline || designTemplate === 'food') {
         ctx.strokeStyle = '#000000';
@@ -1929,8 +1942,42 @@ export default function ImageStudioPage() {
       ctx.fillText(subTitle, cw / 2, subY);
     }
 
+    // 8. 추가 스티커/장식 (별점, 하트, 체크 등)
+    if (extraDeco !== 'none') {
+      let decoText = '';
+      let decoColor = '#FDE047';
+      if (extraDeco === 'stars') {
+        decoText = '★★★★★ (5.0)';
+        decoColor = '#FBBF24';
+      } else if (extraDeco === 'check') {
+        decoText = '✔ 블로거 실사용 검증 완료';
+        decoColor = '#34D399';
+      } else if (extraDeco === 'heart') {
+        decoText = '💖 인생 취향저격 맛집';
+        decoColor = '#F472B6';
+      } else if (extraDeco === 'arrow') {
+        decoText = '👉 솔직 상세 후기 확인하기';
+        decoColor = '#60A5FA';
+      } else if (extraDeco === 'hot') {
+        decoText = '🔥 실시간 화제의 핫플레이스';
+        decoColor = '#FB923C';
+      }
+
+      const decoFontSize = Math.round(cw * 0.032 * scaleFactor);
+      const decoY = nextY + mainFontSize * 0.75;
+      ctx.font = `bold ${decoFontSize}px -apple-system, BlinkMacSystemFont, "Pretendard", sans-serif`;
+
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = Math.max(2, Math.round(decoFontSize * 0.12));
+      ctx.lineJoin = 'round';
+      ctx.strokeText(decoText, cw / 2, decoY);
+
+      ctx.fillStyle = decoColor;
+      ctx.fillText(decoText, cw / 2, decoY);
+    }
+
     ctx.restore();
-  }, [designRatio, designDim, mainTitle, subTitle, designTemplate, textPosition, badgeType, titleColor, hasOutline]);
+  }, [designRatio, designDim, mainTitle, subTitle, designTemplate, textPosition, badgeType, titleColor, hasOutline, fontScale, fontFamily, textOffsetY, extraDeco]);
 
   useEffect(() => {
     if (designUrl && currentTab === 'design') {
@@ -3440,14 +3487,88 @@ export default function ImageStudioPage() {
                       </div>
                     </div>
 
-                    {/* 3. 텍스트 위치 & 스타일 */}
+                    {/* 3. 글꼴 & 글자 크기 */}
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">글씨 위치</label>
+                        <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">글꼴(폰트) 스타일</label>
+                        <select
+                          value={fontFamily}
+                          onChange={(e) => setFontFamily(e.target.value as any)}
+                          className="w-full px-2.5 py-1.5 text-xs font-bold bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"
+                        >
+                          <option value="sans">깔끔 고딕 (Pretendard)</option>
+                          <option value="serif">감성 명조 (Noto Serif)</option>
+                          <option value="impact">볼드 임팩트 (Impact)</option>
+                          <option value="round">둥근 고딕 (Round)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[11px] font-extrabold text-slate-700">글자 크기</label>
+                          <span className="text-[10px] font-bold text-slate-500">{fontScale}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="70"
+                          max="150"
+                          value={fontScale}
+                          onChange={(e) => setFontScale(Number(e.target.value))}
+                          className="w-full accent-rose-600 mt-1"
+                        />
+                      </div>
+                    </div>
+
+                    {/* 4. 글씨 색상 팔레트 & 외곽선 */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[11px] font-extrabold text-slate-700">글씨 색상</label>
+                        <button
+                          type="button"
+                          onClick={() => setHasOutline(!hasOutline)}
+                          className={`text-[10px] px-2 py-0.5 rounded-lg border font-bold transition-all ${
+                            hasOutline ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-300'
+                          }`}
+                        >
+                          {hasOutline ? '검은 외곽선 ✓' : '외곽선 없음'}
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {[
+                          { color: '#FFFFFF', name: '화이트' },
+                          { color: '#FDE047', name: '옐로우' },
+                          { color: '#A3E635', name: '라임' },
+                          { color: '#F472B6', name: '핑크' },
+                          { color: '#38BDF8', name: '스카이' },
+                          { color: '#FB923C', name: '오렌지' },
+                          { color: '#0F172A', name: '블랙' },
+                        ].map((c) => (
+                          <button
+                            key={c.color}
+                            type="button"
+                            onClick={() => setTitleColor(c.color)}
+                            title={c.name}
+                            className={`w-7 h-7 rounded-xl border flex items-center justify-center transition-all ${
+                              titleColor === c.color ? 'ring-2 ring-rose-500 ring-offset-1 scale-110 shadow-sm' : 'border-slate-300'
+                            }`}
+                            style={{ backgroundColor: c.color }}
+                          >
+                            {titleColor === c.color && (
+                              <Check size={12} className={c.color === '#FFFFFF' || c.color === '#FDE047' || c.color === '#A3E635' ? 'text-slate-900' : 'text-white'} />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 5. 텍스트 위치 & 상하 미세 조절 */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">기준 위치</label>
                         <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs font-bold">
                           <button
                             type="button"
-                            onClick={() => setTextPosition('top')}
+                            onClick={() => { setTextPosition('top'); setTextOffsetY(0); }}
                             className={`flex-1 py-1 rounded-lg text-center ${
                               textPosition === 'top' ? 'bg-rose-100 text-rose-700' : 'text-slate-600'
                             }`}
@@ -3456,7 +3577,7 @@ export default function ImageStudioPage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => setTextPosition('center')}
+                            onClick={() => { setTextPosition('center'); setTextOffsetY(0); }}
                             className={`flex-1 py-1 rounded-lg text-center ${
                               textPosition === 'center' ? 'bg-rose-100 text-rose-700' : 'text-slate-600'
                             }`}
@@ -3465,7 +3586,7 @@ export default function ImageStudioPage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => setTextPosition('bottom')}
+                            onClick={() => { setTextPosition('bottom'); setTextOffsetY(0); }}
                             className={`flex-1 py-1 rounded-lg text-center ${
                               textPosition === 'bottom' ? 'bg-rose-100 text-rose-700' : 'text-slate-600'
                             }`}
@@ -3476,20 +3597,52 @@ export default function ImageStudioPage() {
                       </div>
 
                       <div>
-                        <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">검은 외곽선</label>
-                        <button
-                          type="button"
-                          onClick={() => setHasOutline(!hasOutline)}
-                          className={`w-full py-1.5 px-3 rounded-xl border text-xs font-bold transition-all ${
-                            hasOutline ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-300'
-                          }`}
-                        >
-                          {hasOutline ? '외곽선 켜짐 ✓' : '외곽선 없음'}
-                        </button>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[11px] font-extrabold text-slate-700">위치 미세조절</label>
+                          <span className="text-[10px] font-bold text-slate-500">{textOffsetY}px</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="-120"
+                          max="120"
+                          value={textOffsetY}
+                          onChange={(e) => setTextOffsetY(Number(e.target.value))}
+                          className="w-full accent-rose-600 mt-1"
+                        />
                       </div>
                     </div>
 
-                    {/* 4. 블로그 인증 뱃지 */}
+                    {/* 6. 추가 스티커/데코 장식 */}
+                    <div>
+                      <label className="text-[11px] font-extrabold text-slate-700 mb-1.5 flex items-center gap-1">
+                        <Sparkles size={13} className="text-amber-500" /> 추가 스티커 / 별점 데코
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { id: 'none', label: '없음' },
+                          { id: 'stars', label: '★★★★★ 별점' },
+                          { id: 'check', label: '✔ 검증완료' },
+                          { id: 'heart', label: '💖 인생맛집' },
+                          { id: 'arrow', label: '👉 상세후기' },
+                          { id: 'hot', label: '🔥 핫플레이스' },
+                        ].map((d) => (
+                          <button
+                            key={d.id}
+                            type="button"
+                            onClick={() => setExtraDeco(d.id as any)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
+                              extraDeco === d.id
+                                ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {d.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 7. 블로그 인증 뱃지 */}
                     <div>
                       <label className="text-xs font-black text-slate-800 flex items-center gap-1.5 mb-1.5">
                         <BookmarkCheck size={14} className="text-emerald-600" /> 블로그 인증 뱃지 (원클릭 부착)
@@ -3543,7 +3696,7 @@ export default function ImageStudioPage() {
                       </div>
                     </div>
 
-                    {/* 5. 배경 어두운 딤(Dim) 조절 */}
+                    {/* 8. 배경 어두운 딤(Dim) 조절 */}
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="text-[11px] font-extrabold text-slate-700">배경 어둡기 (글씨 가독성)</label>
