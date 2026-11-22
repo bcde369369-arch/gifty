@@ -372,6 +372,7 @@ export default function ImageStudioPage() {
   const [fontFamily, setFontFamily] = useState<string>('blackhan');
   const [extraDeco, setExtraDeco] = useState<'none' | 'stars' | 'check' | 'heart' | 'arrow' | 'hot'>('none');
   const [isExportingDesign, setIsExportingDesign] = useState<boolean>(false);
+  const [isDesignSaved, setIsDesignSaved] = useState<boolean>(false);
 
   // ==========================================
   // [공통 & 누끼 탭 상태]
@@ -2069,20 +2070,41 @@ export default function ImageStudioPage() {
 
   const handleDownloadDesign = async () => {
     const canvas = designCanvasRef.current;
-    if (!canvas) return;
+    if (!canvas || isExportingDesign) return;
     setIsExportingDesign(true);
     try {
-      canvas.toBlob((blob) => {
-        if (!blob) return;
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `gifty-studio-thumbnail-${Date.now()}.jpg`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 'image/jpeg', 0.92);
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.92);
+      });
+
+      if (!blob) {
+        alert('썸네일 생성에 실패했습니다. 다시 시도해 주세요.');
+        return;
+      }
+
+      // 사용자가 저장이 일어남을 인지할 수 있도록 최소 450ms 로딩 보장
+      await new Promise((r) => setTimeout(r, 450));
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `gifty-studio-thumbnail-${Date.now()}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setIsDesignSaved(true);
+      setCopyFeedback('🎉 네이버 블로그 최적화 썸네일 다운로드 완료! (다운로드 폴더를 확인하세요)');
+      setTimeout(() => {
+        setIsDesignSaved(false);
+      }, 3000);
+      setTimeout(() => {
+        setCopyFeedback('');
+      }, 3500);
+    } catch (e) {
+      console.error(e);
+      alert('썸네일 저장 중 오류가 발생했습니다.');
     } finally {
       setIsExportingDesign(false);
     }
@@ -3858,10 +3880,28 @@ export default function ImageStudioPage() {
                   <button 
                     onClick={handleDownloadDesign}
                     disabled={isExportingDesign}
-                    className="bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                    className={`font-bold py-3 px-6 rounded-xl shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2 text-sm disabled:opacity-60 ${
+                      isDesignSaved
+                        ? 'bg-emerald-600 text-white shadow-emerald-200 shadow-md ring-2 ring-emerald-400'
+                        : 'bg-rose-600 hover:bg-rose-700 text-white'
+                    }`}
                   >
-                    {isExportingDesign ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
-                    <span>블로그 최적화 썸네일 저장 (JPG)</span>
+                    {isExportingDesign ? (
+                      <>
+                        <Loader2 className="animate-spin" size={17} />
+                        <span>썸네일 압축 & 저장 중...</span>
+                      </>
+                    ) : isDesignSaved ? (
+                      <>
+                        <Check size={17} className="stroke-[3]" />
+                        <span>저장 완료! ✓</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download size={17} />
+                        <span>블로그 최적화 썸네일 저장 (JPG)</span>
+                      </>
+                    )}
                   </button>
 
                   <button 
