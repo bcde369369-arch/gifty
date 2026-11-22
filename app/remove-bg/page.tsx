@@ -539,28 +539,47 @@ export default function ImageStudioPage() {
     return filters.length > 0 ? filters.join(' ') : 'none';
   };
 
-  // 합성된 최종 누끼 Blob 생성
-  const generateFinalBlob = async (): Promise<Blob | null> => {
-    if (!resultUrl) return null;
+  // 합성된 최종 누끼 Blob 생성 (네이버 블로그 20MB 이하 자동 최적화)
+  const generateFinalBlob = async (forClipboard = false): Promise<{ blob: Blob | null; ext: string }> => {
+    if (!resultUrl) return { blob: null, ext: 'png' };
 
     return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
+        const origW = img.naturalWidth || img.width;
+        const origH = img.naturalHeight || img.height;
+
+        // 가로/세로 최대 2560px로 안전 조절하여 20MB 초과 방지
+        const maxDim = 2560;
+        let targetW = origW;
+        let targetH = origH;
+        if (targetW > maxDim || targetH > maxDim) {
+          if (targetW >= targetH) {
+            targetH = Math.round((targetH * maxDim) / targetW);
+            targetW = maxDim;
+          } else {
+            targetW = Math.round((targetW * maxDim) / targetH);
+            targetH = maxDim;
+          }
+        }
+
         const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth || img.width;
-        canvas.height = img.naturalHeight || img.height;
+        canvas.width = targetW;
+        canvas.height = targetH;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          resolve(null);
+          resolve({ blob: null, ext: 'png' });
           return;
         }
+
+        const isTransparent = selectedBgId === 'transparent';
 
         // 1. 배경 채우기
         if (selectedBgId === 'custom') {
           ctx.fillStyle = customBgColor;
           ctx.fillRect(0, 0, canvas.width, canvas.height);
-        } else if (selectedBgId !== 'transparent') {
+        } else if (!isTransparent) {
           const colorPreset = COLOR_PRESETS.find(p => p.id === selectedBgId);
           if (colorPreset) {
             ctx.fillStyle = colorPreset.bg;
@@ -624,22 +643,28 @@ export default function ImageStudioPage() {
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         }
 
-        canvas.toBlob((blob) => {
-          resolve(blob);
-        }, 'image/png');
+        if (forClipboard || isTransparent) {
+          canvas.toBlob((blob) => {
+            resolve({ blob, ext: 'png' });
+          }, 'image/png');
+        } else {
+          canvas.toBlob((blob) => {
+            resolve({ blob, ext: 'jpg' });
+          }, 'image/jpeg', 0.92);
+        }
       };
-      img.onerror = () => resolve(null);
+      img.onerror = () => resolve({ blob: null, ext: 'png' });
       img.src = resultUrl;
     });
   };
 
   const handleDownload = async () => {
-    const blob = await generateFinalBlob();
+    const { blob, ext } = await generateFinalBlob(false);
     if (!blob) return;
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `gifty-studio-nukki-${Date.now()}.png`;
+    a.download = `gifty-studio-nukki-${Date.now()}.${ext}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -648,7 +673,7 @@ export default function ImageStudioPage() {
 
   const handleCopyClipboard = async () => {
     try {
-      const blob = await generateFinalBlob();
+      const { blob } = await generateFinalBlob(true);
       if (!blob) return;
 
       const item = new ClipboardItem({ 'image/png': blob });
@@ -666,7 +691,7 @@ export default function ImageStudioPage() {
     setIsProcessing(true);
     setProgressText('사진 보정 스튜디오로 이동 중...');
     try {
-      const blob = await generateFinalBlob();
+      const { blob } = await generateFinalBlob(true);
       if (!blob) return;
       const file = new File([blob], `nukki-for-edit-${Date.now()}.png`, { type: 'image/png' });
       processEnhanceFile(file);
@@ -1511,27 +1536,60 @@ export default function ImageStudioPage() {
     img.src = prevUrl;
   };
 
-  // 보정된 최종 이미지 Canvas Blob 생성 (고해상도 무손실)
-  const generateEnhancedBlob = async (): Promise<Blob | null> => {
-    const canvas = previewCanvasRef.current;
-    if (!canvas) return null;
+  // 보정된 최종 이미지 Canvas Blob 생성 (네이버 블로그 20MB 이하 자동 최적화)
+  const generateEnhancedBlob = async (forClipboard = false): Promise<{ blob: Blob | null; ext: string }> => {
+    const srcCanvas = previewCanvasRef.current;
+    if (!srcCanvas) return { blob: null, ext: 'jpg' };
 
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => {
-        resolve(blob);
-      }, 'image/png', 0.95);
+    // 가로/세로 최대 2560px로 안전 조절하여 용량 폭증 방지 (블로그 최적)
+    const maxDim = 2560;
+    let targetW = srcCanvas.width;
+    let targetH = srcCanvas.height;
+
+    if (targetW > maxDim || targetH > maxDim) {
+      if (targetW >= targetH) {
+        targetH = Math.round((targetH * maxDim) / targetW);
+        targetW = maxDim;
+      } else {
+        targetW = Math.round((targetW * maxDim) / targetH);
+        targetH = maxDim;
+      }
+    }
+
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = targetW;
+    outCanvas.height = targetH;
+    const outCtx = outCanvas.getContext('2d');
+    if (!outCtx) return { blob: null, ext: 'jpg' };
+
+    outCtx.imageSmoothingEnabled = true;
+    outCtx.imageSmoothingQuality = 'high';
+    outCtx.drawImage(srcCanvas, 0, 0, targetW, targetH);
+
+    if (forClipboard) {
+      // 클립보드는 브라우저 표준상 image/png 필수
+      const blob = await new Promise<Blob | null>((resolve) => {
+        outCanvas.toBlob((b) => resolve(b), 'image/png');
+      });
+      return { blob, ext: 'png' };
+    }
+
+    // 파일 다운로드는 고품질 JPG(92%)로 저장하여 20MB 제한 완벽 통과 (보통 2~3MB)
+    const blob = await new Promise<Blob | null>((resolve) => {
+      outCanvas.toBlob((b) => resolve(b), 'image/jpeg', 0.92);
     });
+    return { blob, ext: 'jpg' };
   };
 
   const handleDownloadEnhanced = async () => {
     setIsExporting(true);
     try {
-      const blob = await generateEnhancedBlob();
+      const { blob, ext } = await generateEnhancedBlob(false);
       if (!blob) return;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `gifty-studio-enhanced-${Date.now()}.png`;
+      a.download = `gifty-studio-enhanced-${Date.now()}.${ext}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1544,7 +1602,7 @@ export default function ImageStudioPage() {
   const handleCopyEnhancedClipboard = async () => {
     setIsExporting(true);
     try {
-      const blob = await generateEnhancedBlob();
+      const { blob } = await generateEnhancedBlob(true);
       if (!blob) return;
       const item = new ClipboardItem({ 'image/png': blob });
       await navigator.clipboard.write([item]);
@@ -1934,7 +1992,7 @@ export default function ImageStudioPage() {
                         className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2 text-sm"
                       >
                         <Download size={16} />
-                        <span>{selectedBgId === 'transparent' ? '투명 PNG로 저장' : '이미지로 저장'}</span>
+                        <span>{selectedBgId === 'transparent' ? '투명 PNG로 저장 (20MB 이하)' : '블로그 최적화 저장 (JPG)'}</span>
                       </button>
 
                       <Link
@@ -2737,7 +2795,7 @@ export default function ImageStudioPage() {
                     className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2 text-sm disabled:opacity-50"
                   >
                     {isExporting ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
-                    <span>고화질 이미지로 저장</span>
+                    <span>블로그 최적화 저장 (20MB 이하 JPG)</span>
                   </button>
 
                   <button 
