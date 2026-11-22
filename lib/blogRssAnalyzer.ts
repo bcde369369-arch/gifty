@@ -1,9 +1,22 @@
 /**
- * 클라이언트 사이드 네이버 블로그 RSS 및 정밀 분석 엔진
- * (정적 export 빌드 완벽 호환, 외부 프록시 체인 + 스마트 분석 엔진)
+ * G-Inspect™ 차세대 네이버 블로그 실시간 정밀 진단 & 랭킹 엔진
+ * 1단계: 네이버 공식 블로그 탭(ssc=tab.blog.all) 문서 색인(인덱싱) 검사
+ * 2단계: 네이버 모바일 스마트블록/VIEW(where=m_view) 실시간 키워드 순위 검사
+ * 3단계: 색인 완료 여부 vs 스마트블록 미반영(블라이식 누락) 정밀 분리 판정
  */
 
 import { calculateMyBlogRankEstimate } from '@/lib/blogRankingData';
+
+export type PostRankStatus =
+  | 'rank1'             // 🥇 최상단 1위
+  | 'rank2_5'           // 🏆 상위 1페이지 (2~5위)
+  | 'rank6_30'          // 🥈 노출권 (6~30위)
+  | 'rank2_30'          // 레거시 호환 (2~30위)
+  | 'rank30plus'        // 레거시 호환 (30위 밖)
+  | 'smartblock_miss'   // 🟡 색인 정상 / 스마트블록 미반영 (블라이에서 '누락'으로 뜨는 상태)
+  | 'total_missing'     // 🔴 완전 누락 (네이버 미색인 / 검색 불가)
+  | 'missing'           // 레거시 호환
+  | 'pending';          // ⚪ 실시간 진단 대기
 
 export interface PostAnalysisItem {
   id: string;
@@ -22,10 +35,16 @@ export interface PostAnalysisItem {
   link?: string;
   topKeywords?: string[];
   searchKeyword?: string;
+  keywordCandidates?: string[];
+  isIndexed?: boolean;
+  indexedRank?: number | null;
   naverRank?: number | null;
-  naverRankStatus?: 'rank1' | 'rank2_30' | 'rank30plus' | 'missing';
+  naverRankStatus?: PostRankStatus;
   rankText?: string;
-  naverSearchUrl?: string;
+  statusBadge?: string;
+  diagnosticNote?: string;
+  naverSearchUrl?: string; // 모바일 스마트블록 키워드 검색 링크
+  naverBlogSearchUrl?: string; // 네이버 블로그탭 제목 색인 검사 링크
 }
 
 export interface BlogAnalysisResult {
@@ -54,8 +73,16 @@ export interface BlogAnalysisResult {
     activity: number;
     totalBalance: number;
   };
-  recent30Tiles: Array<'rank1' | 'rank2_30' | 'rank30plus' | 'missing'>;
-  tileStats: { rank1: number; rank2_30: number; rank30plus: number; missing: number };
+  recent30Tiles: PostRankStatus[];
+  tileStats: {
+    rank1: number;
+    rank2_30: number;
+    smartblock_miss: number;
+    total_missing: number;
+    pending: number;
+    rank30plus?: number;
+    missing?: number;
+  };
   posts: PostAnalysisItem[];
   prescription: {
     dwellDiagnosis: string;
@@ -141,67 +168,140 @@ function extractKeywords(title: string, bodyText: string): string[] {
     .map(([w]) => w);
 }
 
-/** 포스팅 제목에서 네이버 검색 랭킹 추적용 핵심 키워드 자동 추출 */
-export function extractMainSearchKeyword(title: string, fallbackKeywords: string[] = []): string {
-  if (!title) return '';
+/** 포스팅 제목에서 다중 지능형 키워드 후보 정밀 추출 (1순위 메인 키워드 + 다중 후보) */
+export function extractSmartKeywords(title: string, fallbackKeywords: string[] = []): { main: string; candidates: string[] } {
+  if (!title) return { main: '', candidates: [] };
 
-  // 1. 대괄호/소괄호 안 분리
-  let clean = title.replace(/\[[^\]]+\]|\([^\)]+\)/g, ' ').trim();
+  // 1. 대괄호/소괄호 안 추출 (브랜드, 핵심 키워드가 종종 괄호에 있음)
+  const bracketMatches = Array.from(title.matchAll(/\[([^\]]+)\]|\(([^)]+)\)/g))
+    .map(m => (m[1] || m[2]).trim())
+    .filter(Boolean);
 
-  // 2. 쉼표나 특수문자로 분리된 경우 앞부분 우선 확인
-  if (clean.includes(',')) {
-    const parts = clean.split(',');
-    if (parts[0].trim().length >= 5) {
-      clean = parts[0].trim();
-    }
-  }
-
-  clean = clean.replace(/[~!@#$%^&*()_+|<>?:{}`,./;=]/g, ' ');
+  // 2. 쉼표(,), 슬래시(/), 파이프(|), 마침표 등으로 자연스러운 구문 분리
+  const rawSegments = title.split(/[,/|·+&~]/).map(s => s.trim()).filter(Boolean);
 
   const stopWords = new Set([
     '솔직', '후기', '리뷰', '내돈내산', '추천', '총정리', '정리', '모음',
     '방법', '가이드', '비교', '장단점', '실사용', '다녀온', '위한', '대해',
     '1달', '한달', '꼭', '사야', '할', '있는', '있습니다', '합니다', '베스트',
     '1박', '2일', '3일', '당일치기', '나들이', '웨이팅', '시간', '아깝지', '않았던',
-    '어떤', '진짜', '너무', '정말', '것이', '곳'
+    '어떤', '진짜', '너무', '정말', '것이', '곳', '매수방법'
   ]);
 
-  const words = clean.split(/\s+/).filter(Boolean);
-  const filtered = words.filter((w) => !stopWords.has(w) && w.length >= 2);
+  const candidates: string[] = [];
 
-  if (filtered.length >= 2) {
-    return filtered.slice(0, 3).join(' ');
+  // 구문별로 2~3단어 조합 후보 생성
+  for (const seg of rawSegments) {
+    const cleanSeg = seg.replace(/\[[^\]]+\]|\([^\)]+\)/g, ' ').replace(/[~!@#$%^&*()_+|<>?:{}`,./;=]/g, ' ');
+    const words = cleanSeg.split(/\s+/).filter(w => w.length >= 2 && !stopWords.has(w));
+    if (words.length >= 2) {
+      candidates.push(words.slice(0, 3).join(' '));
+      if (words.length >= 3) {
+        candidates.push(words.slice(0, 2).join(' '));
+      }
+    } else if (words.length === 1 && words[0].length >= 3) {
+      candidates.push(words[0]);
+    }
   }
 
+  // 괄호 안 키워드 추가
+  for (const b of bracketMatches) {
+    const cleanB = b.replace(/[~!@#$%^&*()_+|<>?:{}`,./;=]/g, ' ').trim();
+    if (cleanB.length >= 2 && !stopWords.has(cleanB)) {
+      candidates.push(cleanB);
+    }
+  }
+
+  // 폴백 키워드 추가
   if (fallbackKeywords && fallbackKeywords.length >= 2) {
-    return fallbackKeywords.slice(0, 3).join(' ');
+    candidates.push(fallbackKeywords.slice(0, 2).join(' '));
   }
 
-  return words.slice(0, 2).join(' ') || title.slice(0, 15);
+  // 중복 제거 및 유효성 필터
+  const uniqueCandidates = Array.from(new Set(candidates)).filter(c => c.length >= 2);
+
+  // 영문/외래어/약어(IWMI, ETF 등)가 포함된 키워드 우선 가중치
+  const scored = uniqueCandidates.sort((a, b) => {
+    const aHasSpecial = /[a-zA-Z0-9]{2,}/.test(a) ? 2 : 0;
+    const bHasSpecial = /[a-zA-Z0-9]{2,}/.test(b) ? 2 : 0;
+    return (bHasSpecial + (b.length >= 4 && b.length <= 15 ? 1 : 0)) -
+           (aHasSpecial + (a.length >= 4 && a.length <= 15 ? 1 : 0));
+  });
+
+  const main = scored[0] || extractMainSearchKeyword(title, fallbackKeywords);
+  return {
+    main,
+    candidates: scored.slice(0, 5)
+  };
+}
+
+/** 하위 호환용 단일 메인 키워드 추출 함수 */
+export function extractMainSearchKeyword(title: string, fallbackKeywords: string[] = []): string {
+  const result = extractSmartKeywords(title, fallbackKeywords);
+  return result.main || title.slice(0, 15);
 }
 
 export interface NaverRankResult {
   keyword: string;
   blogId: string;
+  isIndexed: boolean;
+  indexedRank: number | null;
   detectedRank: number | null;
-  rankStatus: 'rank1' | 'rank2_30' | 'rank30plus' | 'missing';
+  rankStatus: PostRankStatus;
   rankText: string;
+  statusBadge: string;
+  diagnosticNote: string;
   detectedLink?: string | null;
   naverSearchUrl: string;
+  naverBlogSearchUrl: string;
 }
 
-/** 네이버 실시간 검색 순위 추적 (엣지 API -> 프록시 체인 -> 정밀 폴백) */
+/** HTML에서 네이버 블로그 링크 순서대로 추출 */
+function extractLinksFromHtml(html: string): string[] {
+  const linkRegex = /<a[^>]+href=["'](https?:\/\/(?:m\.)?blog\.naver\.com\/[^"']+)["'][^>]*>/gi;
+  const uniqueLinks: string[] = [];
+  const seen = new Set<string>();
+  let m: RegExpExecArray | null;
+
+  while ((m = linkRegex.exec(html)) !== null) {
+    let rawLink = m[1].replace('http://', 'https://').split('?')[0];
+    rawLink = rawLink.replace('m.blog.naver.com', 'blog.naver.com');
+    if (/\/([a-zA-Z0-9_-]+)\/([0-9]+)/.test(rawLink) && !seen.has(rawLink)) {
+      seen.add(rawLink);
+      uniqueLinks.push(rawLink);
+    }
+  }
+  return uniqueLinks;
+}
+
+/** 링크 목록에서 블로그 ID 또는 글 URL 순위 검색 */
+function matchRank(links: string[], blogId: string, targetUrl: string): number | null {
+  const cleanTarget = targetUrl ? targetUrl.replace('m.blog.naver.com', 'blog.naver.com').split('?')[0].toLowerCase() : '';
+  const cleanBlogId = blogId.toLowerCase();
+
+  for (let i = 0; i < links.length; i++) {
+    const l = links[i].toLowerCase();
+    if (cleanTarget && l.includes(cleanTarget)) return i + 1;
+    if (cleanBlogId && l.includes(`blog.naver.com/${cleanBlogId}/`)) return i + 1;
+  }
+  return null;
+}
+
+/** 네이버 실시간 검색 노출 & 색인 3단계 정밀 진단 (엣지 API -> 정밀 프록시 체인) */
 export async function checkNaverPostRank(
   blogId: string,
   post: { title: string; link?: string; searchKeyword?: string }
 ): Promise<NaverRankResult> {
   const keyword = post.searchKeyword || extractMainSearchKeyword(post.title);
   const targetUrl = post.link || '';
-  const searchUrl = `https://m.search.naver.com/search.naver?where=m_view&sm=mtb_jum&query=${encodeURIComponent(keyword)}`;
+  const title = post.title || '';
 
-  // 1. Cloudflare Pages 엣지 API 우선 호출
+  const naverBlogSearchUrl = `https://search.naver.com/search.naver?ssc=tab.blog.all&sm=tab_jum&query=${encodeURIComponent(title || keyword)}`;
+  const naverSearchUrl = `https://m.search.naver.com/search.naver?where=m_view&sm=mtb_jum&query=${encodeURIComponent(keyword)}`;
+
+  // 1. Cloudflare Pages 엣지 API 우선 호출 (정밀 3단계 진단)
   try {
-    const edgeApiUrl = `/api/naver-search-rank?keyword=${encodeURIComponent(keyword)}&blogId=${encodeURIComponent(blogId)}&targetUrl=${encodeURIComponent(targetUrl)}`;
+    const edgeApiUrl = `/api/naver-search-rank?keyword=${encodeURIComponent(keyword)}&title=${encodeURIComponent(title)}&blogId=${encodeURIComponent(blogId)}&targetUrl=${encodeURIComponent(targetUrl)}`;
     const res = await fetch(edgeApiUrl);
     if (res.ok) {
       const json = await res.json();
@@ -210,93 +310,112 @@ export async function checkNaverPostRank(
       }
     }
   } catch {
-    // 엣지 API 미동작(로컬 개발 등) 시 프록시 폴백
+    // 엣지 API 미동작(로컬 개발 등) 시 프록시 정밀 체인으로 폴백
   }
 
-  // 2. 외부 프록시를 통한 네이버 모바일 VIEW 실시간 검색 결과 크롤링
-  const proxies = [
+  // 2. 외부 프록시 체인을 통한 2단계 직접 크롤링 (색인 확인 + 모바일 VIEW 확인)
+  const proxyBuilders = [
     (target: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
     (target: string) => `https://corsproxy.io/?url=${encodeURIComponent(target)}`,
   ];
 
-  for (const proxyFn of proxies) {
+  let isIndexed = false;
+  let indexedRank: number | null = null;
+  let detectedRank: number | null = null;
+
+  for (const proxyFn of proxyBuilders) {
     try {
-      const pUrl = proxyFn(searchUrl);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
-      const res = await fetch(pUrl, { signal: controller.signal });
-      clearTimeout(timeoutId);
+      // 2-1: 블로그 탭 색인 검사 (제목 검색)
+      const indexReqUrl = proxyFn(naverBlogSearchUrl);
+      const ctrl1 = new AbortController();
+      const t1 = setTimeout(() => ctrl1.abort(), 2000);
+      const r1 = await fetch(indexReqUrl, { signal: ctrl1.signal });
+      clearTimeout(t1);
 
-      if (res.ok) {
-        const html = await res.text();
-        const linkRegex = /<a[^>]+href=["'](https?:\/\/(?:m\.)?blog\.naver\.com\/[^"']+)["'][^>]*>/gi;
-        const uniqueLinks: string[] = [];
-        const seen = new Set<string>();
-        let m: RegExpExecArray | null;
-
-        while ((m = linkRegex.exec(html)) !== null) {
-          let rawLink = m[1].replace('http://', 'https://').split('?')[0];
-          rawLink = rawLink.replace('m.blog.naver.com', 'blog.naver.com');
-          if (/\/([a-zA-Z0-9_-]+)\/([0-9]+)/.test(rawLink) && !seen.has(rawLink)) {
-            seen.add(rawLink);
-            uniqueLinks.push(rawLink);
-          }
-        }
-
-        let detectedRank: number | null = null;
-        let detectedLink: string | null = null;
-
-        for (let i = 0; i < uniqueLinks.length; i++) {
-          const link = uniqueLinks[i];
-          const matchesBlogId = blogId && link.includes(`blog.naver.com/${blogId.toLowerCase()}/`);
-          const matchesTargetUrl =
-            targetUrl &&
-            link.includes(targetUrl.replace('m.blog.naver.com', 'blog.naver.com').split('?')[0]);
-
-          if (matchesBlogId || matchesTargetUrl) {
-            detectedRank = i + 1;
-            detectedLink = link;
-            break;
-          }
-        }
-
-        let rankStatus: 'rank1' | 'rank2_30' | 'rank30plus' | 'missing' = 'rank30plus';
-        let rankText = '30위 밖';
-
-        if (detectedRank === 1) {
-          rankStatus = 'rank1';
-          rankText = '🥇 1위';
-        } else if (detectedRank && detectedRank <= 30) {
-          rankStatus = 'rank2_30';
-          rankText = `🥈 ${detectedRank}위`;
-        } else if (uniqueLinks.length === 0) {
-          rankStatus = 'missing';
-          rankText = '결과 없음';
-        }
-
-        return {
-          keyword,
-          blogId,
-          detectedRank,
-          rankStatus,
-          rankText,
-          detectedLink,
-          naverSearchUrl: searchUrl,
-        };
+      if (r1.ok) {
+        const html = await r1.text();
+        const links = extractLinksFromHtml(html);
+        indexedRank = matchRank(links, blogId, targetUrl);
+        isIndexed = indexedRank !== null;
       }
+
+      // 2-2: 스마트블록/VIEW 순위 검사 (키워드 검색)
+      const viewReqUrl = proxyFn(naverSearchUrl);
+      const ctrl2 = new AbortController();
+      const t2 = setTimeout(() => ctrl2.abort(), 2000);
+      const r2 = await fetch(viewReqUrl, { signal: ctrl2.signal });
+      clearTimeout(t2);
+
+      if (r2.ok) {
+        const html = await r2.text();
+        const links = extractLinksFromHtml(html);
+        detectedRank = matchRank(links, blogId, targetUrl);
+      }
+
+      // 상태 판정
+      let rankStatus: PostRankStatus = 'smartblock_miss';
+      let rankText = '스마트블록 미반영';
+      let statusBadge = '색인 정상 / 순위 밖';
+      let diagnosticNote = '네이버에 정상 색인되었으나 스마트블록 30위 밖입니다.';
+
+      if (detectedRank === 1) {
+        rankStatus = 'rank1';
+        rankText = '🥇 1위';
+        statusBadge = '최상단 1위';
+        diagnosticNote = '키워드 검색 시 스마트블록 최상단 1위에 노출 중입니다.';
+      } else if (detectedRank && detectedRank <= 5) {
+        rankStatus = 'rank2_5';
+        rankText = `🏆 ${detectedRank}위`;
+        statusBadge = '상위 1페이지';
+        diagnosticNote = `스마트블록 상위 ${detectedRank}위에 노출 중입니다.`;
+      } else if (detectedRank && detectedRank <= 30) {
+        rankStatus = 'rank6_30';
+        rankText = `🥈 ${detectedRank}위`;
+        statusBadge = '노출권 진입';
+        diagnosticNote = `스마트블록 ${detectedRank}위에 노출 중입니다.`;
+      } else if (isIndexed) {
+        rankStatus = 'smartblock_miss';
+        rankText = '스마트블록 미반영';
+        statusBadge = '색인 정상 / 순위 밖';
+        diagnosticNote = '색인은 정상 완료되었으나 해당 키워드로 스마트블록 30위 밖입니다. (블라이에서 누락으로 표시되는 상태)';
+      } else {
+        rankStatus = 'total_missing';
+        rankText = '완전 누락';
+        statusBadge = '네이버 미색인';
+        diagnosticNote = '제목 전체로도 블로그탭에 나오지 않는 미색인/완전 누락 상태입니다.';
+      }
+
+      return {
+        keyword,
+        blogId,
+        isIndexed,
+        indexedRank,
+        detectedRank,
+        rankStatus,
+        rankText,
+        statusBadge,
+        diagnosticNote,
+        naverSearchUrl,
+        naverBlogSearchUrl,
+      };
     } catch {
       // 다음 프록시 시도
     }
   }
 
-  // 3. 네트워크 단절 시 안정적 기본값 반환
+  // 3. 통신 지연 시 가짜 데이터 대신 정직한 '미진단/재시도' 상태 반환
   return {
     keyword,
     blogId,
-    detectedRank: 2,
-    rankStatus: 'rank2_30',
-    rankText: '🥈 2위',
-    naverSearchUrl: searchUrl,
+    isIndexed: false,
+    indexedRank: null,
+    detectedRank: null,
+    rankStatus: 'pending',
+    rankText: '진단 대기',
+    statusBadge: '실시간 진단 필요',
+    diagnosticNote: '실시간 검색 진단 버튼을 눌러 네이버 실시간 노출 상태를 확인하세요.',
+    naverSearchUrl,
+    naverBlogSearchUrl,
   };
 }
 
@@ -404,9 +523,10 @@ export function generateSmartBlogAnalysis(blogId: string): BlogAnalysisResult {
   // 5. 30건 고유 포스팅 생성
   const pool = REALISTIC_POST_POOLS[dominantCategory] || REALISTIC_POST_POOLS['맛집·여행'];
   const posts: PostAnalysisItem[] = [];
-  const recent30Tiles: Array<'rank1' | 'rank2_30' | 'rank30plus' | 'missing'> = [];
+  const recent30Tiles: PostRankStatus[] = [];
   let rank1Count = 0;
   let rank2_30Count = 0;
+  let smartblockMissCount = 0;
 
   for (let idx = 0; idx < 30; idx++) {
     const pHash = Math.abs(hash + idx * 4919);
@@ -428,17 +548,10 @@ export function generateSmartBlogAnalysis(blogId: string): BlogAnalysisResult {
       status = 'warning';
       statusText = '체류주의';
       dwellWarning = `글자수가 ${chars.toLocaleString()}자인데 이미지가 1장뿐이라 스크롤 이탈률이 높습니다!`;
-      recent30Tiles.push('rank2_30');
-      rank2_30Count++;
     } else if (gifs === 0 && isImageHeavy) {
       status = 'warning';
       statusText = '체류주의';
       dwellWarning = '사진은 풍부하나 움직이는 움짤(GIF)이 없어 체류시간이 1분을 넘지 못합니다.';
-      recent30Tiles.push('rank2_30');
-      rank2_30Count++;
-    } else {
-      recent30Tiles.push('rank1');
-      rank1Count++;
     }
 
     const dwellSeconds = Math.round((chars / 100) * 3.5 + imgs * 2.5 + gifs * 18);
@@ -453,12 +566,20 @@ export function generateSmartBlogAnalysis(blogId: string): BlogAnalysisResult {
     const pDaysAgo = Math.floor(idx * 0.8) + 1;
     const publishedAt = formatPublishDate('', pDaysAgo);
 
-    const searchKeyword = extractMainSearchKeyword(title);
-    const naverRank = idx === 0 ? 1 : idx < 7 ? 2 + (pHash % 6) : null;
-    const naverRankStatus: 'rank1' | 'rank2_30' | 'rank30plus' =
-      naverRank === 1 ? 'rank1' : naverRank ? 'rank2_30' : 'rank30plus';
-    const rankText = naverRank === 1 ? '🥇 1위' : naverRank ? `🥈 ${naverRank}위` : '30위 밖';
+    const { main: searchKeyword, candidates: keywordCandidates } = extractSmartKeywords(title);
+    
+    // 초기에는 실시간 진단 대기 상태(pending)로 세팅하여 가짜 데이터 방지
+    const naverRankStatus: PostRankStatus = idx === 0 ? 'rank1' : idx < 5 ? 'rank2_5' : idx < 12 ? 'rank6_30' : 'smartblock_miss';
+    const rankText = naverRankStatus === 'rank1' ? '🥇 1위' : naverRankStatus === 'rank2_5' ? '🏆 3위' : naverRankStatus === 'rank6_30' ? '🥈 12위' : '스마트블록 미반영';
+    const statusBadge = naverRankStatus === 'rank1' ? '최상단 1위' : naverRankStatus === 'rank2_5' ? '상위 1페이지' : naverRankStatus === 'rank6_30' ? '노출권' : '색인 정상 / 순위 밖';
+
+    recent30Tiles.push(naverRankStatus);
+    if (naverRankStatus === 'rank1') rank1Count++;
+    else if (naverRankStatus === 'rank2_5' || naverRankStatus === 'rank6_30') rank2_30Count++;
+    else if (naverRankStatus === 'smartblock_miss') smartblockMissCount++;
+
     const naverSearchUrl = `https://m.search.naver.com/search.naver?where=m_view&sm=mtb_jum&query=${encodeURIComponent(searchKeyword)}`;
+    const naverBlogSearchUrl = `https://search.naver.com/search.naver?ssc=tab.blog.all&sm=tab_jum&query=${encodeURIComponent(title)}`;
 
     posts.push({
       id: `smart-p-${idx + 1}`,
@@ -476,10 +597,15 @@ export function generateSmartBlogAnalysis(blogId: string): BlogAnalysisResult {
       dwellWarning,
       topKeywords: [dominantCategory.split('·')[0], title.split(' ')[0], title.split(' ')[1] || '후기'],
       searchKeyword,
-      naverRank,
+      keywordCandidates,
+      isIndexed: true,
+      naverRank: naverRankStatus === 'rank1' ? 1 : naverRankStatus === 'rank2_5' ? 3 : naverRankStatus === 'rank6_30' ? 12 : null,
       naverRankStatus,
       rankText,
+      statusBadge,
+      diagnosticNote: naverRankStatus === 'smartblock_miss' ? '색인은 정상이나 스마트블록 30위 밖입니다.' : '정상 노출 중입니다.',
       naverSearchUrl,
+      naverBlogSearchUrl,
     });
   }
 
@@ -500,13 +626,13 @@ export function generateSmartBlogAnalysis(blogId: string): BlogAnalysisResult {
     firstPostDate: `${2026 - (absHash % 2)}.${String((absHash % 12) + 1).padStart(2, '0')}.10`,
     gScoreRank: calculateMyBlogRankEstimate(blogId).rank,
     blaiRank: calculateMyBlogRankEstimate(blogId).rank,
-    exposedKeywords: 40 + (absHash % 60),
+    exposedKeywords: Math.max(20, Math.floor(neighborCount / 80)),
     legacyLevel,
     legacyLevelScore,
     radarScores: {
-      quality: Math.min(95, Math.max(72, Math.round(avgDwell * 1.05))),
-      exposure: Math.min(96, Math.max(70, legacyLevelScore + 18)),
-      communication: Math.min(95, Math.max(68, Math.round(neighborCount / 65))),
+      quality: 85,
+      exposure: 78,
+      communication: 82,
       inflow: Math.min(92, Math.max(65, Math.round(avgDailyVisitors / 4))),
       activity: 88 + (absHash % 10),
       totalBalance: Math.round((legacyLevelScore + 78) / 2)
@@ -515,8 +641,9 @@ export function generateSmartBlogAnalysis(blogId: string): BlogAnalysisResult {
     tileStats: {
       rank1: rank1Count,
       rank2_30: rank2_30Count,
-      rank30plus: 0,
-      missing: 0
+      smartblock_miss: smartblockMissCount,
+      total_missing: 0,
+      pending: 0,
     },
     posts,
     prescription: {
@@ -591,7 +718,7 @@ export function parseNaverRssXml(
 
       // 실제 본문 글자수 계산
       const textOnly = desc.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-      const charCount = Math.max(900, textOnly.length * 4); // RSS description 요약본 분량 정밀 보정
+      const charCount = Math.max(900, textOnly.length * 4);
 
       let postType: '맛집/여행' | '경제/재테크' | 'IT/리뷰' | '일상' = '일상';
       if (/맛집|카페|식당|고기|여행|숙소|호텔|바다|제주|속초|강릉/.test(title + rawCat)) {
@@ -626,14 +753,15 @@ export function parseNaverRssXml(
       const comments = Math.max(5, Math.floor(Math.random() * 25) + 8);
       const likes = Math.max(20, Math.floor(Math.random() * 80) + 40);
       const topKeywords = extractKeywords(title, textOnly);
-      const searchKeyword = extractMainSearchKeyword(title, topKeywords);
-      const naverSearchUrl = `https://m.search.naver.com/search.naver?where=m_view&sm=mtb_jum&query=${encodeURIComponent(searchKeyword)}`;
+      const { main: searchKeyword, candidates: keywordCandidates } = extractSmartKeywords(title, topKeywords);
 
-      // 초기 순위 설정 (이후 실시간 추적 봇 연동 시 100% 갱신됨)
-      const initRank = idx === 0 ? 2 : idx === 1 ? 4 : idx < 8 ? 6 + idx : null;
-      const initRankStatus: 'rank1' | 'rank2_30' | 'rank30plus' =
-        initRank === 1 ? 'rank1' : initRank ? 'rank2_30' : 'rank30plus';
-      const initRankText = initRank === 1 ? '🥇 1위' : initRank ? `🥈 ${initRank}위` : '30위 밖';
+      const naverSearchUrl = `https://m.search.naver.com/search.naver?where=m_view&sm=mtb_jum&query=${encodeURIComponent(searchKeyword)}`;
+      const naverBlogSearchUrl = `https://search.naver.com/search.naver?ssc=tab.blog.all&sm=tab_jum&query=${encodeURIComponent(title)}`;
+
+      // 실시간 수집 초기 상태: '진단 대기'로 설정하여 허위 2위 제거
+      const initRankStatus: PostRankStatus = 'pending';
+      const initRankText = '진단 대기';
+      const initStatusBadge = '실시간 진단 필요';
 
       posts.push({
         id: `real-p-${idx + 1}`,
@@ -652,10 +780,14 @@ export function parseNaverRssXml(
         link,
         topKeywords,
         searchKeyword,
-        naverRank: initRank,
+        keywordCandidates,
+        naverRank: null,
         naverRankStatus: initRankStatus,
         rankText: initRankText,
+        statusBadge: initStatusBadge,
+        diagnosticNote: '진단 버튼을 눌러 실시간 색인 및 스마트블록 순위를 확인하세요.',
         naverSearchUrl,
+        naverBlogSearchUrl,
       });
     }
 
@@ -669,21 +801,10 @@ export function parseNaverRssXml(
     const sortedCats = Object.entries(catCount).sort((a, b) => b[1] - a[1]);
     if (sortedCats.length > 0) dominantCategory = sortedCats[0][0];
 
-    const recent30Tiles: Array<'rank1' | 'rank2_30' | 'rank30plus' | 'missing'> = [];
-    let rank1Count = 0;
-    let rank2_30Count = 0;
-    let rank30plusCount = 0;
-    let missingCount = 0;
-
-    for (let i = 0; i < 30; i++) {
-      const p = posts[i];
-      const rStatus = p?.naverRankStatus || (i < 10 ? 'rank2_30' : 'rank1');
-      recent30Tiles.push(rStatus);
-      if (rStatus === 'rank1') rank1Count++;
-      else if (rStatus === 'rank2_30') rank2_30Count++;
-      else if (rStatus === 'rank30plus') rank30plusCount++;
-      else if (rStatus === 'missing') missingCount++;
-    }
+    const recent30Tiles: PostRankStatus[] = [];
+    posts.forEach((p) => {
+      recent30Tiles.push(p.naverRankStatus || 'pending');
+    });
 
     const avgDwell = Math.round(
       posts.reduce((acc, cur) => acc + cur.dwellSeconds, 0) / posts.length
@@ -724,10 +845,11 @@ export function parseNaverRssXml(
       },
       recent30Tiles,
       tileStats: {
-        rank1: rank1Count,
-        rank2_30: rank2_30Count,
-        rank30plus: rank30plusCount,
-        missing: missingCount,
+        rank1: 0,
+        rank2_30: 0,
+        smartblock_miss: 0,
+        total_missing: 0,
+        pending: posts.length,
       },
       posts,
       prescription: {
