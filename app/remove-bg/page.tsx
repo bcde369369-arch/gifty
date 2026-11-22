@@ -82,6 +82,18 @@ const GRADIENT_PRESETS = [
   { id: 'aurora', name: '오로라', bg: 'linear-gradient(135deg, #2af598 0%, #009efd 100%)' },
 ];
 
+// 미리캔버스 썸네일 전용 8대 대표 폰트 프리셋
+const FONT_OPTIONS = [
+  { id: 'blackhan', name: '블랙한산스', category: '먹방/어그로', family: '"Black Han Sans", "BlackHanSans", sans-serif', sample: '맛집 1등', previewStyle: { fontFamily: '"Black Han Sans", sans-serif' } },
+  { id: 'dohyeon', name: '배민 도현체', category: '볼드 타이틀', family: '"Do Hyeon", sans-serif', sample: '솔직 후기', previewStyle: { fontFamily: '"Do Hyeon", sans-serif' } },
+  { id: 'gmarket', name: '지마켓 산스', category: '트렌디/테크', family: "'GmarketSans', sans-serif", sample: '꿀팁 총정리', previewStyle: { fontFamily: "'GmarketSans', sans-serif", fontWeight: 700 } },
+  { id: 'jua', name: '배민 주아체', category: '귀여운/친근', family: '"Jua", cursive, sans-serif', sample: '내돈내산!', previewStyle: { fontFamily: '"Jua", cursive' } },
+  { id: 'gaegu', name: '손글씨 개구', category: '발랄한 일상', family: '"Gaegu", cursive, sans-serif', sample: '소소한 하루', previewStyle: { fontFamily: '"Gaegu", cursive' } },
+  { id: 'pen', name: '나눔손글씨', category: '서정적 펜', family: '"Nanum Pen Script", cursive', sample: '따뜻한 감성', previewStyle: { fontFamily: '"Nanum Pen Script", cursive' } },
+  { id: 'serif', name: '감성 본명조', category: '매거진/카페', family: '"Noto Serif KR", "Batang", serif', sample: '제주도 여행', previewStyle: { fontFamily: '"Noto Serif KR", serif' } },
+  { id: 'pretendard', name: '깔끔 프리텐', category: '가독성 고딕', family: '"Pretendard", -apple-system, sans-serif', sample: '정확한 정보', previewStyle: { fontFamily: '"Pretendard", sans-serif', fontWeight: 700 } },
+];
+
 // 사진 감성 톤 프리셋
 type PresetCategory = 'all' | 'daily' | 'food' | 'beauty' | 'travel' | 'shop' | 'film';
 
@@ -357,7 +369,7 @@ export default function ImageStudioPage() {
   const [hasOutline, setHasOutline] = useState<boolean>(true);
   const [mainFontScale, setMainFontScale] = useState<number>(100); // 30 ~ 250% (메인 제목 크기)
   const [subFontScale, setSubFontScale] = useState<number>(100); // 30 ~ 200% (서브 카피 크기)
-  const [fontFamily, setFontFamily] = useState<'sans' | 'serif' | 'impact' | 'round'>('sans');
+  const [fontFamily, setFontFamily] = useState<string>('blackhan');
   const [extraDeco, setExtraDeco] = useState<'none' | 'stars' | 'check' | 'heart' | 'arrow' | 'hot'>('none');
   const [isExportingDesign, setIsExportingDesign] = useState<boolean>(false);
 
@@ -1881,14 +1893,8 @@ export default function ImageStudioPage() {
     const mainFontSize = Math.round(cw * 0.068 * (mainFontScale / 100));
     const subFontSize = Math.round(cw * 0.036 * (subFontScale / 100));
 
-    let chosenFontFamily = '-apple-system, BlinkMacSystemFont, "Pretendard", "Noto Sans KR", sans-serif';
-    if (fontFamily === 'serif' || designTemplate === 'cafe') {
-      chosenFontFamily = '"Noto Serif KR", "Batang", -apple-system, serif';
-    } else if (fontFamily === 'impact') {
-      chosenFontFamily = '"Arial Black", "Impact", "Pretendard", sans-serif';
-    } else if (fontFamily === 'round') {
-      chosenFontFamily = '"Pretendard", "Apple SD Gothic Neo", sans-serif';
-    }
+    const fontOpt = FONT_OPTIONS.find(f => f.id === fontFamily) || FONT_OPTIONS[0];
+    const chosenFontFamily = fontOpt.family;
 
     ctx.font = `900 ${mainFontSize}px ${chosenFontFamily}`;
 
@@ -2055,8 +2061,11 @@ export default function ImageStudioPage() {
   useEffect(() => {
     if (designUrl && currentTab === 'design') {
       renderDesignCanvas();
+      if (typeof document !== 'undefined' && document.fonts) {
+        document.fonts.ready.then(() => renderDesignCanvas());
+      }
     }
-  }, [designUrl, currentTab, renderDesignCanvas]);
+  }, [designUrl, currentTab, fontFamily, renderDesignCanvas]);
 
   const handleDownloadDesign = async () => {
     const canvas = designCanvasRef.current;
@@ -3576,17 +3585,35 @@ export default function ImageStudioPage() {
                     {/* 3. 글꼴 & 글자 크기 (메인 / 서브 분리 자유 조절) */}
                     <div className="flex flex-col gap-2.5">
                       <div>
-                        <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">글꼴(폰트) 스타일</label>
-                        <select
-                          value={fontFamily}
-                          onChange={(e) => setFontFamily(e.target.value as any)}
-                          className="w-full px-2.5 py-1.5 text-xs font-bold bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"
-                        >
-                          <option value="sans">깔끔 고딕 (Pretendard)</option>
-                          <option value="serif">감성 명조 (Noto Serif)</option>
-                          <option value="impact">볼드 임팩트 (Impact)</option>
-                          <option value="round">둥근 고딕 (Round)</option>
-                        </select>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-[11px] font-extrabold text-slate-700 flex items-center gap-1">
+                            <Type size={13} className="text-rose-600" /> 인기 블로그 폰트 (8종)
+                          </label>
+                          <span className="text-[10px] text-rose-600 font-bold">
+                            {FONT_OPTIONS.find(f => f.id === fontFamily)?.name} ({FONT_OPTIONS.find(f => f.id === fontFamily)?.category})
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 bg-white rounded-xl border border-slate-200 shadow-inner">
+                          {FONT_OPTIONS.map((f) => (
+                            <button
+                              key={f.id}
+                              type="button"
+                              onClick={() => setFontFamily(f.id)}
+                              className={`p-1.5 rounded-lg border text-left transition-all ${
+                                fontFamily === f.id
+                                  ? 'bg-rose-50 border-rose-500 text-rose-700 shadow-xs ring-1 ring-rose-500 scale-[1.02]'
+                                  : 'border-slate-100 hover:bg-slate-50 text-slate-700'
+                              }`}
+                            >
+                              <p className="text-xs truncate font-bold" style={f.previewStyle}>
+                                {f.sample}
+                              </p>
+                              <div className="flex items-center justify-between mt-0.5">
+                                <span className="text-[10px] font-semibold text-slate-500 truncate">{f.name}</span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
