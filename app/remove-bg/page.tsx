@@ -347,12 +347,17 @@ export default function ImageStudioPage() {
   const [subTitle, setSubTitle] = useState<string>('웨이팅 1시간 아깝지 않았던 인생 맛집!');
   const [designTemplate, setDesignTemplate] = useState<'food' | 'cafe' | 'info' | 'nandn' | 'clean'>('food');
   const [textPosition, setTextPosition] = useState<'center' | 'top' | 'bottom'>('center');
+  const [textNormX, setTextNormX] = useState<number>(0.5); // 0.0 ~ 1.0 (비율 좌표: 기본 50% 중앙)
+  const [textNormY, setTextNormY] = useState<number>(0.5); // 0.0 ~ 1.0 (비율 좌표: 기본 50% 중앙)
+  const [isDraggingText, setIsDraggingText] = useState<boolean>(false);
+  const dragStartRef = useRef<{ startX: number; startY: number; initNormX: number; initNormY: number } | null>(null);
+
   const [badgeType, setBadgeType] = useState<'none' | 'nandn' | 'honest' | 'best' | 'must'>('nandn');
   const [titleColor, setTitleColor] = useState<string>('#FFFFFF');
   const [hasOutline, setHasOutline] = useState<boolean>(true);
-  const [fontScale, setFontScale] = useState<number>(100); // 70 ~ 150% 글자 크기
+  const [mainFontScale, setMainFontScale] = useState<number>(100); // 30 ~ 250% (메인 제목 크기)
+  const [subFontScale, setSubFontScale] = useState<number>(100); // 30 ~ 200% (서브 카피 크기)
   const [fontFamily, setFontFamily] = useState<'sans' | 'serif' | 'impact' | 'round'>('sans');
-  const [textOffsetY, setTextOffsetY] = useState<number>(0); // -150 ~ 150px 위치 미세 조절
   const [extraDeco, setExtraDeco] = useState<'none' | 'stars' | 'check' | 'heart' | 'arrow' | 'hot'>('none');
   const [isExportingDesign, setIsExportingDesign] = useState<boolean>(false);
 
@@ -1843,13 +1848,9 @@ export default function ImageStudioPage() {
       ctx.fillText(badgeText, bx + bWidth / 2, by + bHeight / 2 + 1);
     }
 
-    // 5. 텍스트 위치 계산
-    let centerY = ch / 2;
-    if (textPosition === 'top') {
-      centerY = ch * 0.28;
-    } else if (textPosition === 'bottom') {
-      centerY = ch * 0.74;
-    }
+    // 5. 텍스트 기준 위치 계산 (자유 마우스 드래그 좌표 textNormX, textNormY 사용)
+    const centerX = Math.round(cw * textNormX);
+    const centerY = Math.round(ch * textNormY);
 
     // 6. 정보성(info) 반투명 다크 바
     if (designTemplate === 'info') {
@@ -1877,9 +1878,8 @@ export default function ImageStudioPage() {
     ctx.save();
     ctx.textAlign = 'center';
 
-    const scaleFactor = fontScale / 100;
-    const mainFontSize = Math.round(cw * 0.068 * scaleFactor);
-    const subFontSize = Math.round(cw * 0.036 * scaleFactor);
+    const mainFontSize = Math.round(cw * 0.068 * (mainFontScale / 100));
+    const subFontSize = Math.round(cw * 0.036 * (subFontScale / 100));
 
     let chosenFontFamily = '-apple-system, BlinkMacSystemFont, "Pretendard", "Noto Sans KR", sans-serif';
     if (fontFamily === 'serif' || designTemplate === 'cafe') {
@@ -1892,7 +1892,7 @@ export default function ImageStudioPage() {
 
     ctx.font = `900 ${mainFontSize}px ${chosenFontFamily}`;
 
-    const titleY = (subTitle ? centerY - mainFontSize * 0.35 : centerY) + textOffsetY;
+    const titleY = subTitle ? centerY - mainFontSize * 0.35 : centerY;
 
     ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
     ctx.shadowBlur = 14;
@@ -1903,7 +1903,7 @@ export default function ImageStudioPage() {
       ctx.lineWidth = Math.max(4, Math.round(mainFontSize * 0.16));
       ctx.lineJoin = 'round';
       ctx.miterLimit = 2;
-      ctx.strokeText(mainTitle, cw / 2, titleY);
+      ctx.strokeText(mainTitle, centerX, titleY);
     }
 
     let mColor = titleColor;
@@ -1911,7 +1911,7 @@ export default function ImageStudioPage() {
       mColor = '#FDE047'; // 맛집 강조 옐로우
     }
     ctx.fillStyle = mColor;
-    ctx.fillText(mainTitle, cw / 2, titleY);
+    ctx.fillText(mainTitle, centerX, titleY);
 
     if (designTemplate === 'cafe') {
       const tMetrics = ctx.measureText(mainTitle);
@@ -1919,8 +1919,8 @@ export default function ImageStudioPage() {
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(cw / 2 - lineW / 2, titleY + mainFontSize * 0.45);
-      ctx.lineTo(cw / 2 + lineW / 2, titleY + mainFontSize * 0.45);
+      ctx.moveTo(centerX - lineW / 2, titleY + mainFontSize * 0.45);
+      ctx.lineTo(centerX + lineW / 2, titleY + mainFontSize * 0.45);
       ctx.stroke();
     }
 
@@ -1935,11 +1935,11 @@ export default function ImageStudioPage() {
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = Math.max(3, Math.round(subFontSize * 0.14));
         ctx.lineJoin = 'round';
-        ctx.strokeText(subTitle, cw / 2, subY);
+        ctx.strokeText(subTitle, centerX, subY);
       }
 
       ctx.fillStyle = '#FFFFFF';
-      ctx.fillText(subTitle, cw / 2, subY);
+      ctx.fillText(subTitle, centerX, subY);
     }
 
     // 8. 추가 스티커/장식 (별점, 하트, 체크 등)
@@ -1963,21 +1963,94 @@ export default function ImageStudioPage() {
         decoColor = '#FB923C';
       }
 
-      const decoFontSize = Math.round(cw * 0.032 * scaleFactor);
+      const decoFontSize = Math.round(cw * 0.032 * (subFontScale / 100));
       const decoY = nextY + mainFontSize * 0.75;
       ctx.font = `bold ${decoFontSize}px -apple-system, BlinkMacSystemFont, "Pretendard", sans-serif`;
 
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = Math.max(2, Math.round(decoFontSize * 0.12));
       ctx.lineJoin = 'round';
-      ctx.strokeText(decoText, cw / 2, decoY);
+      ctx.strokeText(decoText, centerX, decoY);
 
       ctx.fillStyle = decoColor;
-      ctx.fillText(decoText, cw / 2, decoY);
+      ctx.fillText(decoText, centerX, decoY);
+    }
+
+    // 9. 드래그 중 바운딩 박스 가이드라인
+    if (isDraggingText) {
+      ctx.save();
+      ctx.strokeStyle = '#f43f5e';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8, 6]);
+      const mWidth = ctx.measureText(mainTitle).width;
+      const boxW = Math.max(280, mWidth + 60);
+      const boxH = Math.max(120, mainFontSize * 2.3);
+      ctx.strokeRect(centerX - boxW / 2, centerY - boxH / 2, boxW, boxH);
+      ctx.restore();
     }
 
     ctx.restore();
-  }, [designRatio, designDim, mainTitle, subTitle, designTemplate, textPosition, badgeType, titleColor, hasOutline, fontScale, fontFamily, textOffsetY, extraDeco]);
+  }, [designRatio, designDim, mainTitle, subTitle, designTemplate, textNormX, textNormY, isDraggingText, badgeType, titleColor, hasOutline, mainFontScale, subFontScale, fontFamily, extraDeco]);
+
+  // 마우스/터치 드래그 위치 제어 핸들러
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    setIsDraggingText(true);
+    dragStartRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initNormX: textNormX,
+      initNormY: textNormY,
+    };
+  };
+
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDraggingText || !dragStartRef.current) return;
+    const canvas = designCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const dx = (e.clientX - dragStartRef.current.startX) / rect.width;
+    const dy = (e.clientY - dragStartRef.current.startY) / rect.height;
+
+    const newX = Math.max(0.1, Math.min(0.9, dragStartRef.current.initNormX + dx));
+    const newY = Math.max(0.1, Math.min(0.9, dragStartRef.current.initNormY + dy));
+    setTextNormX(newX);
+    setTextNormY(newY);
+  };
+
+  const handleCanvasMouseUp = () => {
+    setIsDraggingText(false);
+    dragStartRef.current = null;
+  };
+
+  const handleCanvasTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (e.touches.length === 0) return;
+    setIsDraggingText(true);
+    dragStartRef.current = {
+      startX: e.touches[0].clientX,
+      startY: e.touches[0].clientY,
+      initNormX: textNormX,
+      initNormY: textNormY,
+    };
+  };
+
+  const handleCanvasTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDraggingText || !dragStartRef.current || e.touches.length === 0) return;
+    const canvas = designCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const dx = (e.touches[0].clientX - dragStartRef.current.startX) / rect.width;
+    const dy = (e.touches[0].clientY - dragStartRef.current.startY) / rect.height;
+
+    const newX = Math.max(0.1, Math.min(0.9, dragStartRef.current.initNormX + dx));
+    const newY = Math.max(0.1, Math.min(0.9, dragStartRef.current.initNormY + dy));
+    setTextNormX(newX);
+    setTextNormY(newY);
+  };
+
+  const handleCanvasTouchEnd = () => {
+    setIsDraggingText(false);
+    dragStartRef.current = null;
+  };
 
   useEffect(() => {
     if (designUrl && currentTab === 'design') {
@@ -3354,12 +3427,25 @@ export default function ImageStudioPage() {
                       </div>
                     </div>
 
-                    {/* 실시간 캔버스 */}
-                    <div className="w-full flex items-center justify-center min-h-[320px] max-h-[460px] overflow-hidden rounded-xl bg-slate-900/5 relative shadow-inner">
+                    {/* 실시간 캔버스 (마우스 직접 드래그 지원) */}
+                    <div className="w-full flex items-center justify-center min-h-[320px] max-h-[460px] overflow-hidden rounded-xl bg-slate-900/5 relative shadow-inner group">
                       <canvas 
                         ref={designCanvasRef} 
-                        className="max-h-[440px] max-w-full object-contain rounded-xl shadow-md border border-white"
+                        onMouseDown={handleCanvasMouseDown}
+                        onMouseMove={handleCanvasMouseMove}
+                        onMouseUp={handleCanvasMouseUp}
+                        onMouseLeave={handleCanvasMouseUp}
+                        onTouchStart={handleCanvasTouchStart}
+                        onTouchMove={handleCanvasTouchMove}
+                        onTouchEnd={handleCanvasTouchEnd}
+                        className={`max-h-[440px] max-w-full object-contain rounded-xl shadow-md border border-white transition-all select-none touch-none ${
+                          isDraggingText ? 'cursor-grabbing scale-[1.01]' : 'cursor-grab'
+                        }`}
+                        title="글씨를 마우스로 잡고 원하는 위치로 자유롭게 드래그하세요!"
                       />
+                      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-slate-900/75 text-white text-[10px] font-bold py-1 px-3 rounded-full pointer-events-none opacity-80 backdrop-blur-xs flex items-center gap-1.5 shadow-sm">
+                        <span>👆 마우스로 글씨를 끌어서 어디든 자유롭게 놓으세요</span>
+                      </div>
                     </div>
 
                     <p className="text-[11px] text-slate-500 font-medium mt-3 text-center">
@@ -3487,8 +3573,8 @@ export default function ImageStudioPage() {
                       </div>
                     </div>
 
-                    {/* 3. 글꼴 & 글자 크기 */}
-                    <div className="grid grid-cols-2 gap-2">
+                    {/* 3. 글꼴 & 글자 크기 (메인 / 서브 분리 자유 조절) */}
+                    <div className="flex flex-col gap-2.5">
                       <div>
                         <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">글꼴(폰트) 스타일</label>
                         <select
@@ -3503,19 +3589,36 @@ export default function ImageStudioPage() {
                         </select>
                       </div>
 
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="text-[11px] font-extrabold text-slate-700">글자 크기</label>
-                          <span className="text-[10px] font-bold text-slate-500">{fontScale}%</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[11px] font-extrabold text-slate-700">메인 제목 크기</label>
+                            <span className="text-[10px] font-black text-rose-600">{mainFontScale}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="30"
+                            max="250"
+                            value={mainFontScale}
+                            onChange={(e) => setMainFontScale(Number(e.target.value))}
+                            className="w-full accent-rose-600"
+                          />
                         </div>
-                        <input
-                          type="range"
-                          min="70"
-                          max="150"
-                          value={fontScale}
-                          onChange={(e) => setFontScale(Number(e.target.value))}
-                          className="w-full accent-rose-600 mt-1"
-                        />
+
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[11px] font-extrabold text-slate-700">서브 카피 크기</label>
+                            <span className="text-[10px] font-black text-rose-600">{subFontScale}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="30"
+                            max="200"
+                            value={subFontScale}
+                            onChange={(e) => setSubFontScale(Number(e.target.value))}
+                            className="w-full accent-rose-600"
+                          />
+                        </div>
                       </div>
                     </div>
 
@@ -3561,54 +3664,54 @@ export default function ImageStudioPage() {
                       </div>
                     </div>
 
-                    {/* 5. 텍스트 위치 & 상하 미세 조절 */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">기준 위치</label>
-                        <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs font-bold">
-                          <button
-                            type="button"
-                            onClick={() => { setTextPosition('top'); setTextOffsetY(0); }}
-                            className={`flex-1 py-1 rounded-lg text-center ${
-                              textPosition === 'top' ? 'bg-rose-100 text-rose-700' : 'text-slate-600'
-                            }`}
-                          >
-                            상단
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => { setTextPosition('center'); setTextOffsetY(0); }}
-                            className={`flex-1 py-1 rounded-lg text-center ${
-                              textPosition === 'center' ? 'bg-rose-100 text-rose-700' : 'text-slate-600'
-                            }`}
-                          >
-                            중앙
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => { setTextPosition('bottom'); setTextOffsetY(0); }}
-                            className={`flex-1 py-1 rounded-lg text-center ${
-                              textPosition === 'bottom' ? 'bg-rose-100 text-rose-700' : 'text-slate-600'
-                            }`}
-                          >
-                            하단
-                          </button>
-                        </div>
+                    {/* 5. 텍스트 위치 빠른 맞춤 & 마우스 드래그 안내 */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-extrabold text-slate-700">위치 빠른 맞춤 (또는 마우스로 드래그)</label>
+                        <button
+                          type="button"
+                          onClick={() => { setTextNormX(0.5); setTextNormY(0.5); }}
+                          className="text-[10px] text-slate-500 hover:text-slate-800 underline font-semibold"
+                        >
+                          정중앙 리셋
+                        </button>
                       </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="text-[11px] font-extrabold text-slate-700">위치 미세조절</label>
-                          <span className="text-[10px] font-bold text-slate-500">{textOffsetY}px</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="-120"
-                          max="120"
-                          value={textOffsetY}
-                          onChange={(e) => setTextOffsetY(Number(e.target.value))}
-                          className="w-full accent-rose-600 mt-1"
-                        />
+                      <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs font-bold">
+                        <button
+                          type="button"
+                          onClick={() => { setTextNormX(0.5); setTextNormY(0.25); }}
+                          className="flex-1 py-1 rounded-lg text-center hover:bg-slate-100 text-slate-700"
+                        >
+                          상단
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setTextNormX(0.5); setTextNormY(0.5); }}
+                          className="flex-1 py-1 rounded-lg text-center hover:bg-slate-100 text-slate-700"
+                        >
+                          중앙
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setTextNormX(0.5); setTextNormY(0.75); }}
+                          className="flex-1 py-1 rounded-lg text-center hover:bg-slate-100 text-slate-700"
+                        >
+                          하단
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setTextNormX(0.3); }}
+                          className="flex-1 py-1 rounded-lg text-center hover:bg-slate-100 text-slate-700"
+                        >
+                          좌측
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setTextNormX(0.7); }}
+                          className="flex-1 py-1 rounded-lg text-center hover:bg-slate-100 text-slate-700"
+                        >
+                          우측
+                        </button>
                       </div>
                     </div>
 
