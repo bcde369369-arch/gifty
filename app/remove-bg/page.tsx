@@ -53,7 +53,10 @@ import {
   Square,
   Smile,
   ShieldAlert,
-  EyeOff
+  EyeOff,
+  Type,
+  LayoutTemplate,
+  BookmarkCheck
 } from 'lucide-react';
 import { removeBackground } from '@imgly/background-removal';
 import CoupangBanner from '@/components/CoupangBanner';
@@ -325,8 +328,29 @@ export default function ImageStudioPage() {
   const { settings, isLoaded } = useSiteSettings();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // 상단 메인 모드 탭: 'remove-bg' (AI 배경제거) vs 'enhance' (사진 보정 & 물리 조명 그림자 복원)
-  const [currentTab, setCurrentTab] = useState<'remove-bg' | 'enhance'>('remove-bg');
+  // 상단 메인 모드 탭: 'remove-bg' (AI 배경제거) vs 'enhance' (사진 보정 & 그림자 복원) vs 'design' (미리캔버스 썸네일 디자인)
+  const [currentTab, setCurrentTab] = useState<'remove-bg' | 'enhance' | 'design'>('remove-bg');
+
+  // ==========================================
+  // [미리캔버스 모드: 썸네일 & 타이포 디자인 전용 상태]
+  // ==========================================
+  const [designFile, setDesignFile] = useState<File | null>(null);
+  const [designUrl, setDesignUrl] = useState<string | null>(null);
+  const [isDesignDragging, setIsDesignDragging] = useState(false);
+  const designCanvasRef = useRef<HTMLCanvasElement>(null);
+  const designImageRef = useRef<HTMLImageElement | null>(null);
+  const designFileInputRef = useRef<HTMLInputElement>(null);
+
+  const [designRatio, setDesignRatio] = useState<'1:1' | '4:3' | '16:9' | 'orig'>('1:1');
+  const [designDim, setDesignDim] = useState<number>(35); // 어두운 딤 오버레이 (0~75%)
+  const [mainTitle, setMainTitle] = useState<string>('내돈내산 솔직 리뷰');
+  const [subTitle, setSubTitle] = useState<string>('웨이팅 1시간 아깝지 않았던 인생 맛집!');
+  const [designTemplate, setDesignTemplate] = useState<'food' | 'cafe' | 'info' | 'nandn' | 'clean'>('food');
+  const [textPosition, setTextPosition] = useState<'center' | 'top' | 'bottom'>('center');
+  const [badgeType, setBadgeType] = useState<'none' | 'nandn' | 'honest' | 'best' | 'must'>('nandn');
+  const [titleColor, setTitleColor] = useState<string>('#FFFFFF');
+  const [hasOutline, setHasOutline] = useState<boolean>(true);
+  const [isExportingDesign, setIsExportingDesign] = useState<boolean>(false);
 
   // ==========================================
   // [공통 & 누끼 탭 상태]
@@ -697,6 +721,25 @@ export default function ImageStudioPage() {
       processEnhanceFile(file);
       setCurrentTab('enhance');
       setCopyFeedback('누끼 이미지를 보정실로 불러왔습니다! 톤 보정 및 그림자 복원을 사용해보세요.');
+      setTimeout(() => setCopyFeedback(''), 4000);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // 누끼 결과물을 썸네일 디자인 탭으로 즉시 전송
+  const handleTransferToDesign = async () => {
+    setIsProcessing(true);
+    setProgressText('썸네일 디자인실로 이동 중...');
+    try {
+      const { blob } = await generateFinalBlob(true);
+      if (!blob) return;
+      const file = new File([blob], `nukki-for-design-${Date.now()}.png`, { type: 'image/png' });
+      processDesignFile(file);
+      setCurrentTab('design');
+      setCopyFeedback('누끼 이미지를 썸네일 디자인실로 불러왔습니다! 제목과 템플릿을 선택해보세요.');
       setTimeout(() => setCopyFeedback(''), 4000);
     } catch (e) {
       console.error(e);
@@ -1620,7 +1663,7 @@ export default function ImageStudioPage() {
   const handleTransferToNukki = async () => {
     setIsExporting(true);
     try {
-      const blob = await generateEnhancedBlob();
+      const { blob } = await generateEnhancedBlob(true);
       if (!blob) return;
       const file = new File([blob], `enhanced-for-nukki-${Date.now()}.png`, { type: 'image/png' });
       processFile(file);
@@ -1631,6 +1674,308 @@ export default function ImageStudioPage() {
       console.error(e);
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  // 보정된 사진을 썸네일 디자인 탭으로 전송
+  const handleTransferEnhancedToDesign = async () => {
+    setIsExporting(true);
+    try {
+      const { blob } = await generateEnhancedBlob(false);
+      if (!blob) return;
+      const file = new File([blob], `enhanced-for-design-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      processDesignFile(file);
+      setCurrentTab('design');
+      setCopyFeedback('보정된 사진을 썸네일 디자인실로 불러왔습니다! 멋진 블로그 썸네일을 완성해보세요.');
+      setTimeout(() => setCopyFeedback(''), 4000);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // ==========================================
+  // [미리캔버스 썸네일 디자인 핸들러]
+  // ==========================================
+  const processDesignFile = (file: File) => {
+    setDesignFile(file);
+    const url = URL.createObjectURL(file);
+    setDesignUrl(url);
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      designImageRef.current = img;
+      renderDesignCanvas();
+    };
+    img.src = url;
+  };
+
+  const handleDesignFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processDesignFile(file);
+  };
+
+  const handleDesignDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDesignDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processDesignFile(file);
+  };
+
+  const renderDesignCanvas = useCallback(() => {
+    const canvas = designCanvasRef.current;
+    const img = designImageRef.current;
+    if (!canvas || !img) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const nw = img.naturalWidth || img.width;
+    const nh = img.naturalHeight || img.height;
+
+    let cw = 1080;
+    let ch = 1080;
+
+    if (designRatio === '1:1') {
+      cw = 1080;
+      ch = 1080;
+    } else if (designRatio === '4:3') {
+      cw = 1080;
+      ch = 810;
+    } else if (designRatio === '16:9') {
+      cw = 1280;
+      ch = 720;
+    } else {
+      if (nw >= nh) {
+        cw = Math.min(1280, nw);
+        ch = Math.round((nh * cw) / nw);
+      } else {
+        ch = Math.min(1280, nh);
+        cw = Math.round((nw * ch) / nh);
+      }
+    }
+
+    canvas.width = cw;
+    canvas.height = ch;
+
+    // 1. 이미지 cover 렌더링
+    const imgRatio = nw / nh;
+    const canvasRatio = cw / ch;
+    let sx = 0, sy = 0, sWidth = nw, sHeight = nh;
+
+    if (imgRatio > canvasRatio) {
+      sWidth = nh * canvasRatio;
+      sx = (nw - sWidth) / 2;
+    } else {
+      sHeight = nw / canvasRatio;
+      sy = (nh - sHeight) / 2;
+    }
+
+    ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, cw, ch);
+
+    // 2. 어두운 딤(Dim) 오버레이
+    if (designDim > 0) {
+      ctx.fillStyle = `rgba(0, 0, 0, ${designDim / 100})`;
+      ctx.fillRect(0, 0, cw, ch);
+    }
+
+    // 3. 미니멀 템플릿 테두리
+    if (designTemplate === 'clean') {
+      const pad = Math.round(cw * 0.035);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+      ctx.lineWidth = Math.max(3, Math.round(cw * 0.005));
+      ctx.strokeRect(pad, pad, cw - pad * 2, ch - pad * 2);
+    }
+
+    // 4. 블로그 뱃지(도장) 렌더링
+    if (badgeType !== 'none') {
+      let badgeText = '';
+      let badgeBg = '#4f46e5';
+
+      if (badgeType === 'nandn') {
+        badgeText = '💰 100% 내돈내산';
+        badgeBg = '#059669';
+      } else if (badgeType === 'honest') {
+        badgeText = '✨ 솔직 방문 후기';
+        badgeBg = '#7c3aed';
+      } else if (badgeType === 'best') {
+        badgeText = '🔥 인생 BEST 추천';
+        badgeBg = '#ea580c';
+      } else if (badgeType === 'must') {
+        badgeText = '📌 저장 & 필독 가이드';
+        badgeBg = '#e11d48';
+      }
+
+      const bFontSize = Math.round(cw * 0.032);
+      ctx.font = `bold ${bFontSize}px -apple-system, BlinkMacSystemFont, "Pretendard", "Noto Sans KR", sans-serif`;
+      const bMetrics = ctx.measureText(badgeText);
+      const bPadX = Math.round(cw * 0.032);
+      const bPadY = Math.round(ch * 0.016);
+      const bWidth = bMetrics.width + bPadX * 2;
+      const bHeight = bFontSize + bPadY * 2;
+
+      const bx = Math.round(cw * 0.06);
+      const by = Math.round(ch * 0.06);
+
+      ctx.save();
+      ctx.fillStyle = badgeBg;
+      ctx.shadowColor = 'rgba(0,0,0,0.5)';
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetY = 4;
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(bx, by, bWidth, bHeight, Math.round(bHeight / 2));
+      } else {
+        ctx.rect(bx, by, bWidth, bHeight);
+      }
+      ctx.fill();
+      ctx.restore();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center';
+      ctx.fillText(badgeText, bx + bWidth / 2, by + bHeight / 2 + 1);
+    }
+
+    // 5. 텍스트 위치 계산
+    let centerY = ch / 2;
+    if (textPosition === 'top') {
+      centerY = ch * 0.28;
+    } else if (textPosition === 'bottom') {
+      centerY = ch * 0.74;
+    }
+
+    // 6. 정보성(info) 반투명 다크 바
+    if (designTemplate === 'info') {
+      const boxPadX = Math.round(cw * 0.06);
+      const boxW = cw - boxPadX * 2;
+      const boxH = Math.round(ch * 0.3);
+      const boxY = centerY - boxH / 2;
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(boxPadX, boxY, boxW, boxH, 20);
+      } else {
+        ctx.rect(boxPadX, boxY, boxW, boxH);
+      }
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 7. 메인 타이틀 & 서브 타이틀 렌더링
+    ctx.save();
+    ctx.textAlign = 'center';
+
+    const mainFontSize = Math.round(cw * 0.068);
+    const subFontSize = Math.round(cw * 0.036);
+
+    if (designTemplate === 'cafe') {
+      ctx.font = `600 ${mainFontSize}px "Noto Serif KR", "Batang", -apple-system, serif`;
+    } else {
+      ctx.font = `900 ${mainFontSize}px -apple-system, BlinkMacSystemFont, "Pretendard", "Noto Sans KR", sans-serif`;
+    }
+
+    const titleY = subTitle ? centerY - mainFontSize * 0.35 : centerY;
+
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 4;
+
+    if (hasOutline || designTemplate === 'food') {
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = Math.max(4, Math.round(mainFontSize * 0.16));
+      ctx.lineJoin = 'round';
+      ctx.miterLimit = 2;
+      ctx.strokeText(mainTitle, cw / 2, titleY);
+    }
+
+    let mColor = titleColor;
+    if (designTemplate === 'food' && titleColor === '#FFFFFF') {
+      mColor = '#FDE047'; // 맛집 강조 옐로우
+    }
+    ctx.fillStyle = mColor;
+    ctx.fillText(mainTitle, cw / 2, titleY);
+
+    if (designTemplate === 'cafe') {
+      const tMetrics = ctx.measureText(mainTitle);
+      const lineW = tMetrics.width * 0.8;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cw / 2 - lineW / 2, titleY + mainFontSize * 0.45);
+      ctx.lineTo(cw / 2 + lineW / 2, titleY + mainFontSize * 0.45);
+      ctx.stroke();
+    }
+
+    if (subTitle) {
+      const subY = titleY + mainFontSize * 0.98;
+      ctx.font = `600 ${subFontSize}px -apple-system, BlinkMacSystemFont, "Pretendard", "Noto Sans KR", sans-serif`;
+
+      if (hasOutline || designTemplate === 'food') {
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = Math.max(3, Math.round(subFontSize * 0.14));
+        ctx.lineJoin = 'round';
+        ctx.strokeText(subTitle, cw / 2, subY);
+      }
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(subTitle, cw / 2, subY);
+    }
+
+    ctx.restore();
+  }, [designRatio, designDim, mainTitle, subTitle, designTemplate, textPosition, badgeType, titleColor, hasOutline]);
+
+  useEffect(() => {
+    if (designUrl && currentTab === 'design') {
+      renderDesignCanvas();
+    }
+  }, [designUrl, currentTab, renderDesignCanvas]);
+
+  const handleDownloadDesign = async () => {
+    const canvas = designCanvasRef.current;
+    if (!canvas) return;
+    setIsExportingDesign(true);
+    try {
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `gifty-studio-thumbnail-${Date.now()}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 'image/jpeg', 0.92);
+    } finally {
+      setIsExportingDesign(false);
+    }
+  };
+
+  const handleCopyDesignClipboard = async () => {
+    const canvas = designCanvasRef.current;
+    if (!canvas) return;
+    setIsExportingDesign(true);
+    try {
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
+        const item = new ClipboardItem({ 'image/png': blob });
+        await navigator.clipboard.write([item]);
+        setCopyFeedback('썸네일이 클립보드에 복사되었습니다! 블로그 에디터에 바로 붙여넣으세요.');
+        setTimeout(() => setCopyFeedback(''), 3500);
+      }, 'image/png');
+    } catch (e) {
+      console.error(e);
+      alert('클립보드 복사에 실패했습니다. [이미지로 저장] 버튼을 이용해주세요.');
+    } finally {
+      setIsExportingDesign(false);
     }
   };
 
@@ -1692,35 +2037,49 @@ export default function ImageStudioPage() {
           <p className="text-slate-500 text-sm sm:text-base max-w-lg mx-auto">
             {currentTab === 'remove-bg' 
               ? '클릭 한 번으로 깔끔하게 누끼를 따고, 원하는 배경색과 스티커 효과를 더해보세요.' 
-              : '물리 조명 역보정으로 질감을 살리며 그림자를 싹 지우고, 화사하게 톤보정하세요.'}
+              : currentTab === 'enhance'
+              ? '물리 조명 역보정으로 질감을 살리며 그림자를 싹 지우고, 화사하게 톤보정하세요.'
+              : '사진 위에 감성 타이틀과 블로그 뱃지를 얹어 네이버 1등 대표 썸네일을 1초 만에 완성하세요.'}
           </p>
         </div>
 
         {/* 상단 탭 전환 스위처 */}
-        <div className="w-full max-w-md bg-slate-200/80 p-1.5 rounded-2xl flex items-center mb-7 shadow-inner">
+        <div className="w-full max-w-xl bg-slate-200/80 p-1.5 rounded-2xl flex items-center mb-7 shadow-inner">
           <button
             type="button"
             onClick={() => setCurrentTab('remove-bg')}
-            className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all ${
+            className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 transition-all ${
               currentTab === 'remove-bg'
                 ? 'bg-white text-purple-700 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Scissors size={17} />
-            <span>AI 배경 제거 (누끼)</span>
+            <Scissors size={16} />
+            <span>AI 누끼</span>
           </button>
           <button
             type="button"
             onClick={() => setCurrentTab('enhance')}
-            className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all ${
+            className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 transition-all ${
               currentTab === 'enhance'
                 ? 'bg-white text-indigo-600 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Sliders size={17} />
-            <span>사진 보정 & 그림자 복원 ✨</span>
+            <Sliders size={16} />
+            <span>사진 보정</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setCurrentTab('design')}
+            className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 transition-all ${
+              currentTab === 'design'
+                ? 'bg-white text-rose-600 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Palette size={16} />
+            <span>썸네일 디자인 (미리캔버스) 🎨</span>
           </button>
         </div>
 
@@ -1951,16 +2310,26 @@ export default function ImageStudioPage() {
                     <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-3 rounded-xl border border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-2.5">
                       <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
                         <Sparkles size={16} className="text-indigo-600 shrink-0" />
-                        <span>누끼 딴 피사체의 밝기, 감성 톤보정 및 그림자 복원을 하시겠어요?</span>
+                        <span>누끼 딴 피사체로 보정 또는 썸네일을 만드시겠어요?</span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={handleTransferToEnhance}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-black shadow-xs flex items-center gap-1 shrink-0 transition-transform active:scale-95"
-                      >
-                        <Sliders size={13} />
-                        <span>이 사진 보정실로 보내기 &rarr;</span>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleTransferToEnhance}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-black shadow-xs flex items-center gap-1 shrink-0 transition-transform active:scale-95"
+                        >
+                          <Sliders size={13} />
+                          <span>사진 보정실 &rarr;</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleTransferToDesign}
+                          className="bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-black shadow-xs flex items-center gap-1 shrink-0 transition-transform active:scale-95"
+                        >
+                          <Palette size={13} />
+                          <span>썸네일 만들기 &rarr;</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -2760,21 +3129,32 @@ export default function ImageStudioPage() {
                     </div>
                   </div>
 
-                  {/* 누끼 탭 연동 팁 배너 */}
+                  {/* 누끼 및 썸네일 탭 연동 팁 배너 */}
                   <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-3 rounded-xl border border-purple-100 flex flex-col sm:flex-row items-center justify-between gap-2.5">
                     <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-                      <Scissors size={16} className="text-purple-600 shrink-0" />
-                      <span>그림자를 복원하고 보정한 이 사진의 배경을 지우시겠습니까?</span>
+                      <Sparkles size={16} className="text-purple-600 shrink-0" />
+                      <span>보정한 이 사진으로 누끼를 따거나 대표 썸네일을 만드시겠어요?</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleTransferToNukki}
-                      disabled={isExporting}
-                      className="bg-purple-600 hover:bg-purple-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-black shadow-xs flex items-center gap-1 shrink-0 transition-transform active:scale-95 disabled:opacity-50"
-                    >
-                      <Scissors size={13} />
-                      <span>누끼따기 작업실로 보내기 &rarr;</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleTransferToNukki}
+                        disabled={isExporting}
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-black shadow-xs flex items-center gap-1 shrink-0 transition-transform active:scale-95 disabled:opacity-50"
+                      >
+                        <Scissors size={13} />
+                        <span>누끼따기 &rarr;</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleTransferEnhancedToDesign}
+                        disabled={isExporting}
+                        className="bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-black shadow-xs flex items-center gap-1 shrink-0 transition-transform active:scale-95 disabled:opacity-50"
+                      >
+                        <Palette size={13} />
+                        <span>썸네일 만들기 &rarr;</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -2816,6 +3196,409 @@ export default function ImageStudioPage() {
               type="file" 
               ref={enhanceFileInputRef} 
               onChange={handleEnhanceFileChange} 
+              accept="image/*" 
+              className="hidden" 
+            />
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* 탭 3: 미리캔버스 모드 (블로그 썸네일 & 타이포 디자인) */}
+        {/* ========================================================= */}
+        {currentTab === 'design' && (
+          <div className="w-full bg-white rounded-3xl shadow-sm border border-slate-200 p-5 sm:p-8 animate-in fade-in">
+            {!designUrl ? (
+              <div 
+                className={`border-2 border-dashed rounded-3xl p-8 sm:p-12 text-center transition-all cursor-pointer ${
+                  isDesignDragging 
+                    ? 'border-rose-500 bg-rose-50/50 scale-[0.99]' 
+                    : 'border-slate-300 hover:border-rose-400 hover:bg-slate-50/50'
+                }`}
+                onDragOver={(e) => { e.preventDefault(); setIsDesignDragging(true); }}
+                onDragLeave={() => setIsDesignDragging(false)}
+                onDrop={handleDesignDrop}
+                onClick={() => designFileInputRef.current?.click()}
+              >
+                <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-inner">
+                  <Palette size={32} />
+                </div>
+                <h3 className="text-lg font-black text-slate-800 mb-1">
+                  썸네일로 만들 사진을 업로드하세요
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-500 mb-4 max-w-sm mx-auto">
+                  클릭하거나 사진을 드래그하세요. 네이버 1등 블로그 스타일의 대표 썸네일을 1초 만에 완성합니다.
+                </p>
+                <div className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 px-6 rounded-xl text-xs sm:text-sm shadow-sm transition-transform active:scale-95">
+                  <Upload size={16} />
+                  <span>사진 선택하기</span>
+                </div>
+
+                {/* 템플릿 소개 카드 프리뷰 */}
+                <div className="mt-8 pt-6 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl mx-auto text-left">
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/60">
+                    <span className="text-base">🔥</span>
+                    <p className="text-xs font-black text-slate-800 mt-1">맛집/리뷰 썸네일</p>
+                    <p className="text-[11px] text-slate-500">노란 볼드 타이틀 + 외곽선</p>
+                  </div>
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/60">
+                    <span className="text-base">☕</span>
+                    <p className="text-xs font-black text-slate-800 mt-1">감성 카페/여행</p>
+                    <p className="text-[11px] text-slate-500">감성 세리프 + 언더라인</p>
+                  </div>
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/60">
+                    <span className="text-base">💡</span>
+                    <p className="text-xs font-black text-slate-800 mt-1">정보/꿀팁 IT</p>
+                    <p className="text-[11px] text-slate-500">가독성 100% 다크 박스</p>
+                  </div>
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/60">
+                    <span className="text-base">💰</span>
+                    <p className="text-xs font-black text-slate-800 mt-1">내돈내산 인증</p>
+                    <p className="text-[11px] text-slate-500">100% 내돈내산 뱃지 부착</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                  {/* 좌측: 실시간 캔버스 미리보기 */}
+                  <div className="lg:col-span-7 flex flex-col items-center bg-slate-100/80 p-4 sm:p-6 rounded-2xl border border-slate-200">
+                    {/* 상단 캔버스 비율 전환 칩 */}
+                    <div className="w-full flex items-center justify-between mb-4 flex-wrap gap-2">
+                      <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1.5">
+                        <LayoutTemplate size={14} className="text-rose-600" /> 캔버스 비율
+                      </span>
+                      <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs font-bold shadow-xs">
+                        <button
+                          type="button"
+                          onClick={() => setDesignRatio('1:1')}
+                          className={`px-2.5 py-1 rounded-lg transition-all ${
+                            designRatio === '1:1' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          1:1 정방형 (권장)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDesignRatio('4:3')}
+                          className={`px-2.5 py-1 rounded-lg transition-all ${
+                            designRatio === '4:3' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          4:3
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDesignRatio('16:9')}
+                          className={`px-2.5 py-1 rounded-lg transition-all ${
+                            designRatio === '16:9' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          16:9 와이드
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDesignRatio('orig')}
+                          className={`px-2.5 py-1 rounded-lg transition-all ${
+                            designRatio === 'orig' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          원본
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 실시간 캔버스 */}
+                    <div className="w-full flex items-center justify-center min-h-[320px] max-h-[460px] overflow-hidden rounded-xl bg-slate-900/5 relative shadow-inner">
+                      <canvas 
+                        ref={designCanvasRef} 
+                        className="max-h-[440px] max-w-full object-contain rounded-xl shadow-md border border-white"
+                      />
+                    </div>
+
+                    <p className="text-[11px] text-slate-500 font-medium mt-3 text-center">
+                      ⚡ 네이버 블로그 20MB 업로드 제한을 완벽히 통과하는 고화질(JPG)로 자동 최적화됩니다.
+                    </p>
+                  </div>
+
+                  {/* 우측: 미리캔버스 스타일 디자인 설정 패널 */}
+                  <div className="lg:col-span-5 flex flex-col gap-4 bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200">
+                    {/* 1. 디자인 템플릿 프리셋 */}
+                    <div>
+                      <label className="text-xs font-black text-slate-800 flex items-center gap-1.5 mb-2">
+                        <Sparkles size={14} className="text-rose-600" /> 템플릿 프리셋 (원클릭)
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDesignTemplate('food');
+                            setHasOutline(true);
+                            setTitleColor('#FFFFFF');
+                            setDesignDim(35);
+                          }}
+                          className={`p-2 rounded-xl text-xs font-bold border text-left transition-all ${
+                            designTemplate === 'food'
+                              ? 'bg-rose-50 border-rose-500 text-rose-700 shadow-xs ring-1 ring-rose-500'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span className="block text-sm">🔥</span>
+                          <span>맛집/먹방</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDesignTemplate('cafe');
+                            setHasOutline(false);
+                            setTitleColor('#FFFFFF');
+                            setDesignDim(30);
+                          }}
+                          className={`p-2 rounded-xl text-xs font-bold border text-left transition-all ${
+                            designTemplate === 'cafe'
+                              ? 'bg-rose-50 border-rose-500 text-rose-700 shadow-xs ring-1 ring-rose-500'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span className="block text-sm">☕</span>
+                          <span>감성 카페</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDesignTemplate('info');
+                            setHasOutline(false);
+                            setTitleColor('#FFFFFF');
+                            setDesignDim(20);
+                          }}
+                          className={`p-2 rounded-xl text-xs font-bold border text-left transition-all ${
+                            designTemplate === 'info'
+                              ? 'bg-rose-50 border-rose-500 text-rose-700 shadow-xs ring-1 ring-rose-500'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span className="block text-sm">💡</span>
+                          <span>정보/꿀팁</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDesignTemplate('nandn');
+                            setHasOutline(true);
+                            setBadgeType('nandn');
+                            setDesignDim(35);
+                          }}
+                          className={`p-2 rounded-xl text-xs font-bold border text-left transition-all ${
+                            designTemplate === 'nandn'
+                              ? 'bg-rose-50 border-rose-500 text-rose-700 shadow-xs ring-1 ring-rose-500'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span className="block text-sm">💰</span>
+                          <span>내돈내산</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDesignTemplate('clean');
+                            setHasOutline(false);
+                            setTitleColor('#FFFFFF');
+                            setDesignDim(30);
+                          }}
+                          className={`p-2 rounded-xl text-xs font-bold border text-left transition-all col-span-2 sm:col-span-1 ${
+                            designTemplate === 'clean'
+                              ? 'bg-rose-50 border-rose-500 text-rose-700 shadow-xs ring-1 ring-rose-500'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span className="block text-sm">✨</span>
+                          <span>미니멀 보더</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 2. 텍스트 입력창 */}
+                    <div className="flex flex-col gap-2.5">
+                      <div>
+                        <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">메인 타이틀 (제목)</label>
+                        <input
+                          type="text"
+                          value={mainTitle}
+                          onChange={(e) => setMainTitle(e.target.value)}
+                          placeholder="제목을 입력하세요"
+                          className="w-full px-3 py-2 text-xs sm:text-sm font-bold bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">서브 카피 (부제 / 생략 가능)</label>
+                        <input
+                          type="text"
+                          value={subTitle}
+                          onChange={(e) => setSubTitle(e.target.value)}
+                          placeholder="소제목 또는 꿀팁 요약"
+                          className="w-full px-3 py-2 text-xs sm:text-sm font-semibold bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* 3. 텍스트 위치 & 스타일 */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">글씨 위치</label>
+                        <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs font-bold">
+                          <button
+                            type="button"
+                            onClick={() => setTextPosition('top')}
+                            className={`flex-1 py-1 rounded-lg text-center ${
+                              textPosition === 'top' ? 'bg-rose-100 text-rose-700' : 'text-slate-600'
+                            }`}
+                          >
+                            상단
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTextPosition('center')}
+                            className={`flex-1 py-1 rounded-lg text-center ${
+                              textPosition === 'center' ? 'bg-rose-100 text-rose-700' : 'text-slate-600'
+                            }`}
+                          >
+                            중앙
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTextPosition('bottom')}
+                            className={`flex-1 py-1 rounded-lg text-center ${
+                              textPosition === 'bottom' ? 'bg-rose-100 text-rose-700' : 'text-slate-600'
+                            }`}
+                          >
+                            하단
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">검은 외곽선</label>
+                        <button
+                          type="button"
+                          onClick={() => setHasOutline(!hasOutline)}
+                          className={`w-full py-1.5 px-3 rounded-xl border text-xs font-bold transition-all ${
+                            hasOutline ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-300'
+                          }`}
+                        >
+                          {hasOutline ? '외곽선 켜짐 ✓' : '외곽선 없음'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 4. 블로그 인증 뱃지 */}
+                    <div>
+                      <label className="text-xs font-black text-slate-800 flex items-center gap-1.5 mb-1.5">
+                        <BookmarkCheck size={14} className="text-emerald-600" /> 블로그 인증 뱃지 (원클릭 부착)
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setBadgeType('none')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
+                            badgeType === 'none' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200'
+                          }`}
+                        >
+                          없음
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBadgeType('nandn')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
+                            badgeType === 'nandn' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-700 border-emerald-200'
+                          }`}
+                        >
+                          💰 내돈내산
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBadgeType('honest')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
+                            badgeType === 'honest' ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-purple-700 border-purple-200'
+                          }`}
+                        >
+                          ✨ 솔직후기
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBadgeType('best')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
+                            badgeType === 'best' ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-orange-700 border-orange-200'
+                          }`}
+                        >
+                          🔥 인생BEST
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBadgeType('must')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
+                            badgeType === 'must' ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-rose-700 border-rose-200'
+                          }`}
+                        >
+                          📌 필독가이드
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 5. 배경 어두운 딤(Dim) 조절 */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-extrabold text-slate-700">배경 어둡기 (글씨 가독성)</label>
+                        <span className="text-[11px] font-bold text-slate-500">{designDim}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="70"
+                        value={designDim}
+                        onChange={(e) => setDesignDim(Number(e.target.value))}
+                        className="w-full accent-rose-600"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 하단 액션 버튼 그룹 */}
+                <div className="flex flex-col sm:flex-row gap-3 flex-wrap justify-center w-full pt-4 border-t border-slate-100">
+                  <button 
+                    onClick={handleCopyDesignClipboard}
+                    disabled={isExportingDesign}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                  >
+                    {isExportingDesign ? <Loader2 className="animate-spin" size={16} /> : <Copy size={16} />}
+                    <span>클립보드 복사 (Ctrl+V)</span>
+                  </button>
+
+                  <button 
+                    onClick={handleDownloadDesign}
+                    disabled={isExportingDesign}
+                    className="bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                  >
+                    {isExportingDesign ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
+                    <span>블로그 최적화 썸네일 저장 (JPG)</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setDesignFile(null);
+                      setDesignUrl(null);
+                      if (designFileInputRef.current) designFileInputRef.current.value = '';
+                    }}
+                    className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-3 px-5 rounded-xl transition-colors text-sm"
+                  >
+                    다른 사진 고르기
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <input 
+              type="file" 
+              ref={designFileInputRef} 
+              onChange={handleDesignFileChange} 
               accept="image/*" 
               className="hidden" 
             />
