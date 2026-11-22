@@ -3141,10 +3141,11 @@ export default function NeighborAnalyticsPage() {
                   <span className="text-[10px] bg-emerald-600 text-white font-black px-2 py-0.5 rounded-full">가장 쉬움</span>
                 </div>
                 <p className="text-[11px] text-emerald-800 leading-relaxed">
-                  압축을 푼 폴더 안에서 <strong>1초_자동설치.bat</strong> 파일을 더블클릭하시면, 크롬이 자동으로 켜지면서 확장 프로그램이 바로 장착되어 네이버 화면으로 이동합니다!
+                  압축을 푼 폴더 안에서 <strong>1초_자동설치.bat</strong> 파일을 더블클릭하시면, 크롬이 확장 프로그램을 즉시 자동 장착합니다!
                 </p>
-                <div className="text-[10px] text-emerald-700 bg-white/70 p-2 rounded-xl border border-emerald-200">
-                  ※ 만약 윈도우 파란색 보안 창(&apos;PC 보호&apos;)이 뜨면 <strong>[추가 정보] ➔ [실행]</strong>을 누르시면 됩니다.
+                <div className="text-[10px] text-emerald-800 bg-white/80 p-2.5 rounded-xl border border-emerald-200 space-y-1">
+                  <div>💡 <strong>크롬이 이미 켜져 있는 경우:</strong> 검은 창에서 <span className="underline font-bold">1번(Enter)</span>만 누르시면 크롬을 재시작하며 즉시 자동 장착됩니다.</div>
+                  <div>※ 윈도우 파란색 보안 창(&apos;PC 보호&apos;)이 뜨면 <strong>[추가 정보] ➔ [실행]</strong>을 누르시면 됩니다.</div>
                 </div>
               </div>
 
