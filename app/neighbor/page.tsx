@@ -1252,7 +1252,7 @@ export default function NeighborAnalyticsPage() {
                   <span className="text-amber-400">⚡</span>
                 </h3>
                 <p className="text-xs sm:text-sm text-indigo-100 leading-relaxed mt-1">
-                  다운로드 후 꼭 <strong>[압축 풀기]</strong>를 누른 뒤, 새 폴더 안의 <strong>[1초_자동설치.bat]</strong>만 더블클릭하세요. 크롬이 확장 프로그램을 즉시 자동 장착합니다!
+                  다운로드 후 <strong>[압축 풀기]</strong>를 누르고, 크롬 창(chrome://extensions)에 폴더를 쓱 끌어다 놓으시면 즉시 장착 완료됩니다!
                 </p>
               </div>
 
@@ -3115,11 +3115,11 @@ export default function NeighborAnalyticsPage() {
                 <div className="flex items-center justify-between">
                   <span className="font-black text-slate-800 flex items-center gap-1.5">
                     <span className="w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[11px]">1</span>
-                    <span>확장 프로그램 파일 다운로드 및 압축 풀기</span>
+                    <span>확장 프로그램 다운로드 및 [압축 풀기]</span>
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 leading-relaxed">
-                  아래 버튼을 눌러 압축 파일(<code className="bg-slate-200 px-1 py-0.5 rounded text-[11px]">gifty-neighbor-cleaner.zip</code>)을 다운로드한 후, 바탕화면이나 편한 폴더에 압축을 풀어주세요.
+                  아래 버튼을 눌러 압축 파일(<code className="bg-slate-200 px-1 py-0.5 rounded text-[11px]">gifty-neighbor-cleaner.zip</code>)을 다운로드한 후, <strong>[압축 풀기]</strong>를 꼭 눌러주세요.
                 </p>
                 <div className="text-[10px] text-amber-900 bg-amber-50 p-2.5 rounded-xl border border-amber-200/90 space-y-1">
                   <div className="font-bold flex items-center gap-1 text-amber-800">
@@ -3138,41 +3138,57 @@ export default function NeighborAnalyticsPage() {
                 </a>
               </div>
 
-              {/* Step 2 - One Click BAT (추천) */}
-              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-300 space-y-2">
+              {/* Step 2 - Chrome Extensions Load (100% 확실 & 추천) */}
+              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-300 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="font-black text-emerald-950 flex items-center gap-1.5">
                     <span className="w-5 h-5 bg-emerald-600 text-white rounded-full flex items-center justify-center text-[11px]">2</span>
-                    <span>압축 푼 새 폴더 안의 [1초_자동설치.bat] 더블클릭! (끝 🎉)</span>
+                    <span>크롬에 5초 만에 등록하기 (가장 확실 & 추천 ⭐)</span>
                   </span>
-                  <span className="text-[10px] bg-emerald-600 text-white font-black px-2 py-0.5 rounded-full">가장 쉬움</span>
+                  <span className="text-[10px] bg-emerald-600 text-white font-black px-2 py-0.5 rounded-full">초간단</span>
                 </div>
-                <p className="text-[11px] text-emerald-800 leading-relaxed">
-                  압축이 풀린 <strong>새 일반 폴더</strong> 안에서 <strong>1초_자동설치.bat</strong> 파일을 더블클릭하시면, 크롬이 확장 프로그램을 즉시 자동 장착합니다!
-                </p>
-                <div className="text-[10px] text-emerald-800 bg-white/80 p-2.5 rounded-xl border border-emerald-200 space-y-1">
-                  <div>💡 <strong>크롬이 이미 켜져 있는 경우:</strong> 검은 창에서 <span className="underline font-bold">1번(Enter)</span>만 누르시면 크롬을 재시작하며 즉시 자동 장착됩니다.</div>
-                  <div>※ 윈도우 파란색 보안 창(&apos;PC 보호&apos;)이 뜨면 <strong>[추가 정보] ➔ [실행]</strong>을 누르시면 됩니다.</div>
+                <div className="space-y-1.5 text-[11px] text-emerald-900 leading-relaxed bg-white/80 p-3 rounded-xl border border-emerald-200">
+                  <div className="flex items-start gap-1.5">
+                    <span className="font-bold text-emerald-700 min-w-4">①</span>
+                    <span>크롬 새 탭 주소창에 <code className="bg-emerald-100 text-emerald-800 px-1 py-0.5 rounded font-mono font-bold select-all">chrome://extensions</code> 입력 후 엔터</span>
+                  </div>
+                  <div className="flex items-start gap-1.5">
+                    <span className="font-bold text-emerald-700 min-w-4">②</span>
+                    <span>오른쪽 상단 <strong>[개발자 모드]</strong> 스위치를 켭니다 (ON)</span>
+                  </div>
+                  <div className="flex items-start gap-1.5">
+                    <span className="font-bold text-emerald-700 min-w-4">③</span>
+                    <span>왼쪽 상단 <strong>[압축해제된 확장 프로그램을 로드합니다]</strong> 클릭 ➔ 아까 압축 푼 폴더 선택!</span>
+                  </div>
+                  <div className="text-[10px] text-emerald-700 pt-1 border-t border-emerald-100 flex items-center gap-1">
+                    <span>💡</span>
+                    <span><strong>더 쉬운 방법:</strong> 압축 푼 폴더를 크롬 창 안으로 마우스로 쓱 끌어다 놓으셔도(드래그) 즉시 설치됩니다!</span>
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-slate-500 bg-slate-100/80 p-2 rounded-xl">
+                  ※ 또는 압축 푼 폴더 안의 <strong>[1초_자동설치.bat]</strong>을 더블클릭하고 엔터를 누르셔도 됩니다.
                 </div>
               </div>
 
-              {/* Step 3 - Manual Chrome Extensions (대체 방법) */}
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2 text-slate-600">
-                <span className="font-bold text-slate-700 flex items-center gap-1.5 text-[11px]">
-                  <span>💡 직접 크롬에 등록하고 싶으신 경우:</span>
+              {/* Step 3 - Pin Extension */}
+              <div className="p-3.5 bg-indigo-50/70 rounded-2xl border border-indigo-200 space-y-1.5">
+                <span className="font-black text-indigo-950 flex items-center gap-1.5">
+                  <span className="w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[11px]">3</span>
+                  <span>상단 툴바에 보라색 &apos;G&apos; 아이콘 고정하기 (필수 꿀팁 📌)</span>
                 </span>
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  크롬 주소창에 <code className="bg-white px-1 py-0.5 rounded text-indigo-600 font-mono font-bold">chrome://extensions</code> 입력 ➔ 우측 상단 <strong>[개발자 모드]</strong> 켜기 ➔ 좌측 상단 <strong>[압축해제된 확장 프로그램을 로드합니다]</strong> 클릭 후 압축 푼 폴더를 선택하셔도 됩니다.
+                <p className="text-[11px] text-indigo-900 leading-relaxed">
+                  크롬 우측 상단의 <strong>🧩 (퍼즐 조각 모양)</strong>을 누르고, <strong>Gifty</strong> 옆의 <strong>📌 (핀 아이콘)</strong>을 클릭하시면 상단 툴바에 보라색 &apos;G&apos; 아이콘이 항상 고정됩니다!
                 </p>
               </div>
 
-              {/* Step 5 */}
-              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 space-y-1.5">
-                <span className="font-black text-emerald-900 flex items-center gap-1.5">
-                  <span className="w-5 h-5 bg-emerald-600 text-white rounded-full flex items-center justify-center text-[11px]">4</span>
+              {/* Step 4 - Naver Blog Run */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1.5">
+                <span className="font-black text-slate-900 flex items-center gap-1.5">
+                  <span className="w-5 h-5 bg-slate-800 text-white rounded-full flex items-center justify-center text-[11px]">4</span>
                   <span>네이버 블로그 화면에서 버튼 1번으로 연동!</span>
                 </span>
-                <p className="text-[11px] text-emerald-800 leading-relaxed">
+                <p className="text-[11px] text-slate-600 leading-relaxed">
                   이제 네이버 [내가 추가한 이웃] 화면에 들어가시면 화면 우측 하단에 <strong>[📊 Gifty 분석실로 보내기]</strong>와 <strong>[⚡ 1초 무소통 정리]</strong> 버튼이 자동으로 나타납니다.
                 </p>
               </div>
