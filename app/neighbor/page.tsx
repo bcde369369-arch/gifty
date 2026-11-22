@@ -1252,7 +1252,7 @@ export default function NeighborAnalyticsPage() {
                   <span className="text-amber-400">⚡</span>
                 </h3>
                 <p className="text-xs sm:text-sm text-indigo-100 leading-relaxed mt-1">
-                  다운로드 후 압축을 풀고 안의 <strong>[1초_자동설치.bat]</strong>만 더블클릭하세요. 크롬이 자동으로 켜지면서 확장 프로그램이 바로 장착되어 네이버 화면으로 이동합니다!
+                  다운로드 후 꼭 <strong>[압축 풀기]</strong>를 누른 뒤, 새 폴더 안의 <strong>[1초_자동설치.bat]</strong>만 더블클릭하세요. 크롬이 확장 프로그램을 즉시 자동 장착합니다!
                 </p>
               </div>
 
@@ -3121,6 +3121,13 @@ export default function NeighborAnalyticsPage() {
                 <p className="text-[11px] text-slate-500 leading-relaxed">
                   아래 버튼을 눌러 압축 파일(<code className="bg-slate-200 px-1 py-0.5 rounded text-[11px]">gifty-neighbor-cleaner.zip</code>)을 다운로드한 후, 바탕화면이나 편한 폴더에 압축을 풀어주세요.
                 </p>
+                <div className="text-[10px] text-amber-900 bg-amber-50 p-2.5 rounded-xl border border-amber-200/90 space-y-1">
+                  <div className="font-bold flex items-center gap-1 text-amber-800">
+                    <span>⚠️</span>
+                    <span>혹시 &apos;압축을 푸는 것이 좋습니다&apos; 팝업이 뜨면?</span>
+                  </div>
+                  <div>반드시 <span className="bg-amber-200/80 px-1.5 py-0.5 rounded font-black text-amber-950">[압축 풀기(X)]</span> 버튼을 누르셔야 정상 작동합니다! (임시 실행 X)</div>
+                </div>
                 <a
                   href="/downloads/gifty-neighbor-cleaner.zip"
                   download="gifty-neighbor-cleaner.zip"
@@ -3136,12 +3143,12 @@ export default function NeighborAnalyticsPage() {
                 <div className="flex items-center justify-between">
                   <span className="font-black text-emerald-950 flex items-center gap-1.5">
                     <span className="w-5 h-5 bg-emerald-600 text-white rounded-full flex items-center justify-center text-[11px]">2</span>
-                    <span>폴더 안의 [1초_자동설치.bat] 더블클릭! (끝 🎉)</span>
+                    <span>압축 푼 새 폴더 안의 [1초_자동설치.bat] 더블클릭! (끝 🎉)</span>
                   </span>
                   <span className="text-[10px] bg-emerald-600 text-white font-black px-2 py-0.5 rounded-full">가장 쉬움</span>
                 </div>
                 <p className="text-[11px] text-emerald-800 leading-relaxed">
-                  압축을 푼 폴더 안에서 <strong>1초_자동설치.bat</strong> 파일을 더블클릭하시면, 크롬이 확장 프로그램을 즉시 자동 장착합니다!
+                  압축이 풀린 <strong>새 일반 폴더</strong> 안에서 <strong>1초_자동설치.bat</strong> 파일을 더블클릭하시면, 크롬이 확장 프로그램을 즉시 자동 장착합니다!
                 </p>
                 <div className="text-[10px] text-emerald-800 bg-white/80 p-2.5 rounded-xl border border-emerald-200 space-y-1">
                   <div>💡 <strong>크롬이 이미 켜져 있는 경우:</strong> 검은 창에서 <span className="underline font-bold">1번(Enter)</span>만 누르시면 크롬을 재시작하며 즉시 자동 장착됩니다.</div>
