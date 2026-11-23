@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import CoupangSupportCard from '@/components/CoupangSupportCard';
 import BlogRankingView from '@/components/BlogRankingView';
+import GoogleSeoLabView from '@/components/GoogleSeoLabView';
 import {
   PostAnalysisItem,
   BlogAnalysisResult,
@@ -79,6 +80,7 @@ export default function BlogAnalyticsLabPage() {
   // ==========================================
   // [메인 탭 & 랭킹 시스템 전용 상태]
   // ==========================================
+  const [searchEngineTab, setSearchEngineTab] = useState<'naver' | 'google'>('naver');
   const [labMainTab, setLabMainTab] = useState<'ranking' | 'audit'>('ranking');
   const [rankingSubTab, setRankingSubTab] = useState<'all' | 'my'>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('전체');
@@ -371,23 +373,19 @@ export default function BlogAnalyticsLabPage() {
           </Link>
           <div className="hidden md:flex items-center gap-7 text-sm font-semibold text-slate-600">
             <Link href="/" className="hover:text-indigo-600 transition-colors">홈</Link>
+            <Link href="/guide" className="hover:text-indigo-600 transition-colors text-indigo-600 font-extrabold flex items-center gap-1">꿀팁 가이드 📚</Link>
             <Link href="/blog-lab" className="text-indigo-600 font-extrabold hover:text-indigo-700 transition-colors flex items-center gap-1">
               연구소(SEO) 🔬
+            </Link>
+            <Link href="/remove-bg" className="hover:text-indigo-600 transition-colors text-purple-600 font-extrabold">
+              이미지 스튜디오 🎨
             </Link>
             <Link href="/neighbor" className="hover:text-emerald-700 transition-colors text-emerald-600 font-extrabold flex items-center gap-1">
               이웃 소통 지표 📊
             </Link>
+            <Link href="/about" className="hover:text-indigo-600 transition-colors text-slate-600">서비스 소개</Link>
             <Link href="/community" className="hover:text-indigo-600 transition-colors text-slate-600 flex items-center gap-1">
               커뮤니티 💬
-            </Link>
-            <Link href="/experience-diary" className="hover:text-indigo-600 transition-colors text-blue-600">
-              체험단 다이어리 📓
-            </Link>
-            <Link href="/sticker" className="hover:text-pink-700 transition-colors text-pink-600 font-extrabold">
-              블로그 스티커 🎨
-            </Link>
-            <Link href="/remove-bg" className="hover:text-indigo-600 transition-colors text-purple-600 font-extrabold">
-              이미지 스튜디오 🎨
             </Link>
           </div>
           <button
@@ -401,20 +399,65 @@ export default function BlogAnalyticsLabPage() {
         {isMobileMenuOpen && (
           <div className="md:hidden bg-white border-b border-slate-100 shadow-md w-full flex flex-col p-4 gap-2 text-sm font-bold absolute top-16 left-0 z-50">
             <Link href="/" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl hover:bg-slate-50">홈</Link>
+            <Link href="/guide" className="text-indigo-600 bg-indigo-50 p-3 rounded-xl font-black">꿀팁 가이드 📚</Link>
+            <Link href="/about" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl hover:bg-slate-50">서비스 소개 ℹ️</Link>
             <Link href="/blog-lab" className="text-indigo-600 bg-indigo-50 p-3 rounded-xl font-black">연구소(SEO) 🔬</Link>
+            <Link href="/remove-bg" className="text-purple-600 hover:bg-purple-50 p-3 rounded-xl font-black">이미지 스튜디오 🎨</Link>
             <Link href="/neighbor" className="text-emerald-600 hover:bg-emerald-50 p-3 rounded-xl font-black">이웃 소통 지표 📊</Link>
             <Link href="/community" className="text-slate-700 hover:bg-slate-50 p-3 rounded-xl">커뮤니티 💬</Link>
             <Link href="/experience-diary" className="text-blue-600 hover:bg-blue-50 p-3 rounded-xl">체험단 다이어리 📓</Link>
             <Link href="/sticker" className="text-pink-600 hover:bg-pink-50 p-3 rounded-xl">블로그 스티커 🎨</Link>
-            <Link href="/remove-bg" className="text-purple-600 hover:bg-purple-50 p-3 rounded-xl font-black">이미지 스튜디오 🎨</Link>
           </div>
         )}
       </nav>
 
       {/* Main Content Area */}
       <main className="flex-grow max-w-6xl mx-auto px-4 sm:px-6 py-8 w-full space-y-6">
-        {/* 상단 메인 모드 탭 바: [전국 블로그 랭킹] vs [1:1 블로그 정밀 진단] */}
-        <div className="flex items-center p-1.5 bg-white rounded-2xl shadow-sm border border-slate-200/90 gap-1.5">
+        {/* [최상위 검색엔진 스위처] 네이버 블로그 연구소 vs 구글 웹 SEO 연구소 */}
+        <div className="bg-slate-900/95 backdrop-blur-md p-1.5 sm:p-2 rounded-3xl border border-slate-800 shadow-xl flex items-center gap-1.5 sm:gap-2">
+          <button
+            type="button"
+            onClick={() => setSearchEngineTab('naver')}
+            className={`flex-1 py-3 sm:py-3.5 px-3 sm:px-5 rounded-2xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all ${
+              searchEngineTab === 'naver'
+                ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25 scale-[1.01]'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-300 animate-pulse shrink-0"></span>
+            <span>🟢 네이버 블로그 연구소</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-white/20 text-white hidden md:inline-block">
+              스마트블록·지수
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSearchEngineTab('google')}
+            className={`flex-1 py-3 sm:py-3.5 px-3 sm:px-5 rounded-2xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all ${
+              searchEngineTab === 'google'
+                ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white shadow-lg shadow-blue-500/25 scale-[1.01]'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-cyan-300 animate-pulse shrink-0"></span>
+            <span>🔵 구글 웹 SEO 연구소</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-white/20 text-white hidden md:inline-block">
+              티스토리·워드프레스
+            </span>
+          </button>
+        </div>
+
+        {/* 구글 웹 SEO 전용 화면 */}
+        {searchEngineTab === 'google' && (
+          <GoogleSeoLabView />
+        )}
+
+        {/* 네이버 블로그 전용 화면 */}
+        {searchEngineTab === 'naver' && (
+          <>
+            {/* 상단 메인 모드 탭 바: [전국 블로그 랭킹] vs [1:1 블로그 정밀 진단] */}
+            <div className="flex items-center p-1.5 bg-white rounded-2xl shadow-sm border border-slate-200/90 gap-1.5">
           <button
             type="button"
             onClick={() => setLabMainTab('ranking')}
@@ -1453,11 +1496,13 @@ export default function BlogAnalyticsLabPage() {
         )}
           </>
         )}
+          </>
+        )}
       </main>
 
       {/* Footer */}
       <footer className="w-full bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-400">
-        <p>© 2026 Gifty. 네이버 블로거의 성장을 위한 올인원 워크스페이스.</p>
+        <p>© 2026 Gifty. 네이버 &amp; 구글 크리에이터의 성장을 위한 올인원 워크스페이스.</p>
       </footer>
     </div>
   );
