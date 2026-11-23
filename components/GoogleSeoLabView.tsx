@@ -89,12 +89,12 @@ export default function GoogleSeoLabView({
 
   // 네이버 탭의 실제 글 데이터가 나중에 로드되거나 변경되었을 때 자동 반영
   useEffect(() => {
-    if (initialNaverPosts && initialNaverPosts.length > 0 && analyzedReport.recentPosts.length <= 6 && analyzedReport.domain !== `blog.naver.com/${initialNaverBlogId}`) {
+    if (initialNaverPosts && initialNaverPosts.length > 0 && (!analyzedReport.isRealData || analyzedReport.recentPosts.length <= 6)) {
       const report = generateGoogleReportFromNaverPosts(initialNaverBlogId || 'masining', initialNaverPosts);
       setAnalyzedReport(report);
       setUrlInput(initialNaverBlogId || 'masining');
     }
-  }, [initialNaverPosts, initialNaverBlogId]);
+  }, [initialNaverPosts, initialNaverBlogId, analyzedReport.isRealData, analyzedReport.recentPosts.length]);
 
   const handleAnalyze = async (e?: React.FormEvent, customUrl?: string) => {
     if (e) e.preventDefault();
@@ -312,6 +312,13 @@ export default function GoogleSeoLabView({
               <span>⭐ 내 네이버 블로그 ({initialNaverBlogId})</span>
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => handleQuickUrl('infonavi.vip')}
+            className="px-2.5 py-1 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors text-blue-900 font-black"
+          >
+            ⭐ infonavi.vip (인포내비)
+          </button>
           <button
             type="button"
             onClick={() => handleQuickUrl('masining')}

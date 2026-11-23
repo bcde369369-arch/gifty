@@ -746,9 +746,22 @@ export function calculateGoogleRankEstimate(domain: string, postBonusCount: numb
   };
 }
 
-// 실제 외부 RSS XML 피드 가져오기 (네이버 블로그, 티스토리, 워드프레스 등)
+// 실제 외부 RSS XML 피드 가져오기 (네이버 블로그, 티스토리, 워드프레스, infonavi.vip 등 독립 사이트)
 async function fetchRealBlogRss(domain: string, platform: GoogleSeoReport['platform'], naverBlogId?: string): Promise<string | null> {
-  // 네이버 블로그의 경우 Cloudflare Pages 엣지 API 엔드포인트 먼저 시도!
+  // 1. Cloudflare Pages 엣지 API 엔드포인트 먼저 시도 (CORS 없이 모든 도메인 피드 수집 가능)
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch(`/api/blog-rss?target=${encodeURIComponent(domain || naverBlogId || '')}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.success && json?.data?.xml) {
+          return json.data.xml;
+        }
+      }
+    } catch {}
+  }
+
+  // 2. 네이버 블로그 전용 엣지 API
   if (platform === '네이버 블로그' && naverBlogId && typeof window !== 'undefined') {
     try {
       const res = await fetch(`/api/naver-rss?blogId=${encodeURIComponent(naverBlogId)}`);
@@ -768,15 +781,52 @@ async function fetchRealBlogRss(domain: string, platform: GoogleSeoReport['platf
       `http://rss.blog.naver.com/${naverBlogId}.xml`
     ];
   } else if (platform === '티스토리') {
-    rssUrls = [`https://${domain}/rss`, `http://${domain}/rss`];
+    rssUrls = [
+      `https://${domain}/rss`,
+      `https://${domain}/rss.xml`,
+      `http://${domain}/rss`
+    ];
   } else if (platform === '워드프레스') {
-    rssUrls = [`https://${domain}/feed`, `https://${domain}/?feed=rss2`];
+    rssUrls = [
+      `https://${domain}/feed`,
+      `https://${domain}/rss.xml`,
+      `https://${domain}/?feed=rss2`,
+      `https://${domain}/feed/`
+    ];
   } else if (platform === '블로그스팟') {
     rssUrls = [`https://${domain}/feeds/posts/default?alt=rss`];
   } else {
-    rssUrls = [`https://${domain}/rss`, `https://${domain}/feed`];
+    // 일반 독립 웹사이트 / 블로그 (infonavi.vip 등)
+    rssUrls = [
+      `https://${domain}/rss.xml`,
+      `https://${domain}/feed.xml`,
+      `https://${domain}/feed`,
+      `https://${domain}/rss`,
+      `https://${domain}/atom.xml`,
+      `https://${domain}/sitemap.xml`
+    ];
   }
 
+  // 3. 브라우저 직접 fetch 먼저 시도 (infonavi.vip 등 CORS 허용 사이트는 프록시 없이 0.1초 만에 바로 로드)
+  for (const rssUrl of rssUrls) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 2500);
+      const res = await fetch(rssUrl, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (res.ok) {
+        const text = await res.text();
+        const isHtml = text.trim().startsWith('<!doctype html') || text.trim().startsWith('<html');
+        if ((text.includes('<item') || text.includes('<entry') || text.includes('<urlset') || text.includes('<rss')) && !isHtml) {
+          return text;
+        }
+      }
+    } catch {
+      // Continue to next or proxies
+    }
+  }
+
+  // 4. 오픈 프록시 게이트웨이 시도
   const proxyBuilders = [
     (target: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
     (target: string) => `https://corsproxy.io/?url=${encodeURIComponent(target)}`
@@ -786,12 +836,13 @@ async function fetchRealBlogRss(domain: string, platform: GoogleSeoReport['platf
     for (const proxyFn of proxyBuilders) {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
+        const timeout = setTimeout(() => controller.abort(), 3500);
         const res = await fetch(proxyFn(rssUrl), { signal: controller.signal });
         clearTimeout(timeout);
         if (res.ok) {
           const text = await res.text();
-          if (text.includes('<rss') || text.includes('<feed') || text.includes('<item') || text.includes('<entry')) {
+          const isHtml = text.trim().startsWith('<!doctype html') || text.trim().startsWith('<html');
+          if ((text.includes('<rss') || text.includes('<feed') || text.includes('<item') || text.includes('<entry') || text.includes('<urlset')) && !isHtml) {
             return text;
           }
         }
@@ -806,7 +857,15 @@ async function fetchRealBlogRss(domain: string, platform: GoogleSeoReport['platf
 
 // RSS XML 파싱 (최대 30개 포스팅 수집)
 function parseRssContent(xmlText: string, domain: string): GoogleParsedPost[] {
-  const items = xmlText.split(/<item[\s>]/i).slice(1);
+  let itemBlocks: string[] = [];
+  if (xmlText.includes('<item')) {
+    itemBlocks = xmlText.split(/<item[\s>]/i).slice(1);
+  } else if (xmlText.includes('<entry')) {
+    itemBlocks = xmlText.split(/<entry[\s>]/i).slice(1);
+  } else if (xmlText.includes('<url>')) {
+    itemBlocks = xmlText.split(/<url[\s>]/i).slice(1);
+  }
+
   const rawParsed: Array<{
     title: string;
     link: string;
@@ -819,15 +878,40 @@ function parseRssContent(xmlText: string, domain: string): GoogleParsedPost[] {
     hasHeadings: boolean;
   }> = [];
 
-  for (let idx = 0; idx < Math.min(30, items.length); idx++) {
-    const item = items[idx];
-    const titleMatch = item.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i);
-    const title = titleMatch ? titleMatch[1].replace(/<\/?[^>]+(>|$)/g, '').trim() : '제목 없음';
+  for (let idx = 0; idx < Math.min(30, itemBlocks.length); idx++) {
+    const item = itemBlocks[idx];
+    const titleMatch = item.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i)
+      || item.match(/<title[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i);
+    let title = titleMatch ? titleMatch[1].replace(/<\/?[^>]+(>|$)/g, '').trim() : '';
 
+    let link = '';
     const linkMatch = item.match(/<link>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/link>/i);
-    const link = linkMatch ? linkMatch[1].trim() : `https://${domain}/${idx + 1}`;
+    if (linkMatch && linkMatch[1]) {
+      link = linkMatch[1].trim();
+    } else {
+      const atomLinkMatch = item.match(/<link[^>]+href=["']([^"']+)["']/i);
+      if (atomLinkMatch) {
+        link = atomLinkMatch[1].trim();
+      } else {
+        const locMatch = item.match(/<loc>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/loc>/i);
+        link = locMatch ? locMatch[1].trim() : `https://${domain}/${idx + 1}`;
+      }
+    }
 
-    const pubDateMatch = item.match(/<pubDate>([\s\S]*?)<\/pubDate>/i);
+    if (!title && link) {
+      try {
+        const pathPart = new URL(link).pathname.split('/').filter(Boolean).pop() || '';
+        title = decodeURIComponent(pathPart).replace(/[-_]/g, ' ') || `포스팅 ${idx + 1}`;
+      } catch {
+        title = `포스팅 ${idx + 1}`;
+      }
+    }
+    if (!title) title = '제목 없음';
+
+    const pubDateMatch = item.match(/<pubDate>([\s\S]*?)<\/pubDate>/i)
+      || item.match(/<published>([\s\S]*?)<\/published>/i)
+      || item.match(/<updated>([\s\S]*?)<\/updated>/i)
+      || item.match(/<lastmod>([\s\S]*?)<\/lastmod>/i);
     const rawPubDate = pubDateMatch ? pubDateMatch[1].trim() : '';
     let pubDate = '2026.11.03';
     try {
@@ -839,7 +923,7 @@ function parseRssContent(xmlText: string, domain: string): GoogleParsedPost[] {
       }
     } catch {}
 
-    const contentMatch = item.match(/<(?:content:encoded|description)>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/(?:content:encoded|description)>/i);
+    const contentMatch = item.match(/<(?:content:encoded|content|description)>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/(?:content:encoded|content|description)>/i);
     const contentHtml = contentMatch ? contentMatch[1] : '';
 
     const plainText = contentHtml.replace(/<\/?[^>]+(>|$)/g, ' ').replace(/\s+/g, ' ').trim();
