@@ -11,32 +11,46 @@ import {
   ExternalLink,
   Zap,
   FileCode2,
-  ArrowRight
+  ArrowRight,
+  BookOpen
 } from 'lucide-react';
 import {
   GoogleSeoReport,
-  generateGoogleSeoReport
+  runRealGoogleSeoAnalysis,
+  generateInitialGoogleReport
 } from '@/lib/googleSeoAnalyzer';
 import { getCurrentRankingWeekInfo } from '@/lib/blogRankingData';
 
 export default function GoogleSeoLabView() {
   const [urlInput, setUrlInput] = useState<string>('gifty.run');
   const [analyzedReport, setAnalyzedReport] = useState<GoogleSeoReport>(() =>
-    generateGoogleSeoReport('gifty.run')
+    generateInitialGoogleReport('gifty.run')
   );
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [analyzingStep, setAnalyzingStep] = useState<string>('구글봇 분석 중...');
   const weekInfo = useMemo(() => getCurrentRankingWeekInfo(), []);
 
-  const handleAnalyze = (e?: React.FormEvent, customUrl?: string) => {
+  const handleAnalyze = async (e?: React.FormEvent, customUrl?: string) => {
     if (e) e.preventDefault();
     const target = customUrl || urlInput.trim();
     if (!target) return;
 
     setIsAnalyzing(true);
-    setTimeout(() => {
-      setAnalyzedReport(generateGoogleSeoReport(target));
+    setAnalyzingStep('1. 실제 블로그 RSS 피드 및 최신 포스팅 탐색 중...');
+
+    try {
+      setTimeout(() => {
+        setAnalyzingStep('2. 본문 이미지 Alt 태그 및 H1~H3 소제목 계층 분석 중...');
+      }, 800);
+
+      const report = await runRealGoogleSeoAnalysis(target);
+      setAnalyzedReport(report);
+    } catch (err) {
+      console.warn('Real analysis error, using fallback report', err);
+      setAnalyzedReport(generateInitialGoogleReport(target));
+    } finally {
       setIsAnalyzing(false);
-    }, 450);
+    }
   };
 
   const handleQuickUrl = (url: string) => {
@@ -44,7 +58,19 @@ export default function GoogleSeoLabView() {
     handleAnalyze(undefined, url);
   };
 
-  const { totalScore, grade, items, vitals, rankInfo, platform, domain, googleLiveQueries } = analyzedReport;
+  const {
+    totalScore,
+    grade,
+    items,
+    vitals,
+    rankInfo,
+    platform,
+    domain,
+    isRealData,
+    recentPosts,
+    googleLiveQueries,
+    googleOfficialTools
+  } = analyzedReport;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -55,18 +81,25 @@ export default function GoogleSeoLabView() {
           <div className="flex items-center gap-2 mb-3 flex-wrap">
             <span className="px-3 py-1 rounded-full text-xs font-black bg-gradient-to-r from-blue-400 to-cyan-400 text-slate-950 shadow-xs flex items-center gap-1">
               <Globe size={13} />
-              <span>Google Search Console 연동 기준</span>
+              <span>실시간 구글 검색엔진 SEO 분석기</span>
             </span>
             <span className="text-xs text-blue-200 font-bold">{weekInfo.weekText}</span>
-            <span className="text-[11px] bg-white/10 text-slate-300 px-2.5 py-0.5 rounded-full border border-white/10">
-              티스토리 · 워드프레스 · 웹사이트
-            </span>
+            {isRealData ? (
+              <span className="text-[11px] bg-emerald-500/30 text-emerald-200 font-extrabold px-3 py-0.5 rounded-full border border-emerald-400/40 flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                실제 RSS 피드 실시간 연동 완료 ({recentPosts.length}개 포스팅 분석)
+              </span>
+            ) : (
+              <span className="text-[11px] bg-white/10 text-slate-300 px-2.5 py-0.5 rounded-full border border-white/10">
+                티스토리 · 워드프레스 · 웹사이트
+              </span>
+            )}
           </div>
           <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
             구글 웹마스터 <span className="text-blue-400">G-Power SEO 정밀 진단</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-300 mt-2 max-w-2xl leading-relaxed">
-            구글(Google) 알고리즘이 평가하는 <b>Core Web Vitals 속도, H1~H3 계층 구조, 이미지 Alt 누락률, 색인 상태</b>를 종합 분석하여 도메인 파워 순위와 개선책을 진단합니다.
+            구글(Google) 알고리즘이 평가하는 <b>Core Web Vitals 속도, H1~H3 계층 구조, 이미지 Alt 누락률, 실제 포스팅 텍스트</b>를 정밀 분석하여 도메인 파워 순위와 개선책을 진단합니다.
           </p>
         </div>
       </div>
@@ -92,7 +125,7 @@ export default function GoogleSeoLabView() {
             {isAnalyzing ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
-                <span>구글봇 분석 중...</span>
+                <span>{analyzingStep}</span>
               </>
             ) : (
               <>
@@ -198,7 +231,7 @@ export default function GoogleSeoLabView() {
                 const max = Math.max(...rankInfo.trend);
                 const min = Math.min(...rankInfo.trend);
                 const range = Math.max(1, max - min);
-                const heightPercent = 20 + Math.round(((max - r) / range) * 75); // 순위 숫자가 낮을수록 키가 큼
+                const heightPercent = 20 + Math.round(((max - r) / range) * 75);
                 const isCurrent = i === rankInfo.trend.length - 1;
                 return (
                   <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
@@ -250,7 +283,58 @@ export default function GoogleSeoLabView() {
         </div>
       </div>
 
-      {/* 4. 구글 5대 테크니컬 SEO 세부 진단 리포트 */}
+      {/* 4. 실제 수집된 최근 포스팅 분석 카드 (실제 데이터 검증용) */}
+      {isRealData && recentPosts.length > 0 && (
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <BookOpen className="text-blue-600" size={18} />
+              <h3 className="text-base font-bold text-slate-900">
+                실제 수집된 최근 포스팅 분석 ({recentPosts.length}건)
+              </h3>
+            </div>
+            <span className="text-xs text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full font-bold border border-emerald-200">
+              ✓ RSS 피드 본문 실시간 크롤링 완료
+            </span>
+          </div>
+
+          <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto pr-1">
+            {recentPosts.map((post, idx) => (
+              <div key={idx} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <div className="flex-1">
+                  <a
+                    href={post.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold text-slate-800 hover:text-blue-600 transition-colors line-clamp-1 flex items-center gap-1.5"
+                  >
+                    <span>{idx + 1}. {post.title}</span>
+                    <ExternalLink size={11} className="shrink-0 text-slate-400" />
+                  </a>
+                  <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
+                    {post.contentSnippet || '본문 요약 없음'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0 text-slate-500 font-medium">
+                  <span>글자 수: <strong className="text-slate-700">{post.charCount.toLocaleString()}자</strong></span>
+                  <span>사진: <strong className="text-slate-700">{post.totalImages}장</strong></span>
+                  {post.missingAltCount > 0 ? (
+                    <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md font-bold">
+                      Alt 누락 {post.missingAltCount}건
+                    </span>
+                  ) : (
+                    <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md font-bold">
+                      Alt 완벽
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 5. 구글 5대 테크니컬 SEO 세부 진단 리포트 */}
       <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div className="flex items-center gap-2.5">
@@ -290,6 +374,11 @@ export default function GoogleSeoLabView() {
                   </h4>
                 </div>
                 <div className="flex items-center gap-2 self-end sm:self-auto">
+                  {item.realMetric && (
+                    <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200">
+                      {item.realMetric}
+                    </span>
+                  )}
                   <span className={`px-2 py-0.5 rounded-md text-[11px] font-black ${
                     item.status === 'good'
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
@@ -314,7 +403,7 @@ export default function GoogleSeoLabView() {
         </div>
       </div>
 
-      {/* 5. Gifty 솔루션 연동 배너 (이미지 용량 최적화 -> LCP 속도 개선) */}
+      {/* 6. Gifty 솔루션 연동 배너 (이미지 용량 최적화 -> LCP 속도 개선) */}
       <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-3xl p-6 sm:p-8 text-white shadow-lg flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="space-y-2 text-center md:text-left">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-bold">
@@ -336,7 +425,48 @@ export default function GoogleSeoLabView() {
         </Link>
       </div>
 
-      {/* 6. 구글 실시간 검색 노출 관측 (Live Google Monitor) */}
+      {/* 7. Google 공식 검사 도구 원클릭 연동 배너 (100% 공식 데이터 증명) */}
+      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Globe className="text-blue-600" size={20} />
+          <h3 className="text-base sm:text-lg font-black text-slate-900">
+            구글 공식 웹마스터 도구 원클릭 실시간 검사
+          </h3>
+        </div>
+        <p className="text-xs sm:text-sm text-slate-500">
+          구글 본사 서버의 공식 측정 화면을 새 창에서 직접 열어 100% 공식 데이터를 교차 확인하세요.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+          {googleOfficialTools.map((tool, idx) => (
+            <a
+              key={idx}
+              href={tool.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-4 rounded-2xl border border-blue-100 bg-blue-50/40 hover:bg-blue-50 hover:border-blue-300 transition-all group flex flex-col justify-between gap-3 shadow-2xs"
+            >
+              <div>
+                <span className="text-[11px] font-black text-blue-700 block mb-1">
+                  Google 공식 도구 #{idx + 1}
+                </span>
+                <p className="text-xs font-bold text-slate-900 line-clamp-1 group-hover:text-blue-700">
+                  {tool.name}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">
+                  {tool.desc}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 text-[11px] font-extrabold text-blue-600 group-hover:translate-x-1 transition-transform self-end">
+                <span>공식 검사창 열기</span>
+                <ExternalLink size={12} />
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      {/* 8. 구글 실시간 검색 노출 관측 (Live Google Monitor) */}
       <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-4">
         <div className="flex items-center gap-2 mb-1">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
