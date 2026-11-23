@@ -34,6 +34,7 @@ import {
   RankingBlogItem,
   calculatePercentile,
   getCurrentRankingWeekInfo,
+  getWeeklyTopRankings,
   TOP_RANKING_DATA,
   RISING_BLOGS_DATA,
   NEW_ENTRY_BLOGS_DATA,
@@ -53,7 +54,7 @@ export default function BlogRankingView({ onSelectBlogForAudit }: BlogRankingVie
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedBlog, setSelectedBlog] = useState<RankingBlogItem | null>(null);
 
-  // 내 랭킹 상태
+  // 내 랭킹 상태 (주차별 동적 갱신 연동)
   const [myIdInput, setMyIdInput] = useState<string>('masining');
   const [myRankData, setMyRankData] = useState(() => calculateMyBlogRankEstimate('masining'));
   const [isSearchingMyRank, setIsSearchingMyRank] = useState<boolean>(false);
@@ -119,10 +120,11 @@ export default function BlogRankingView({ onSelectBlogForAudit }: BlogRankingVie
   }, [myIdInput]);
 
   const weekInfo = useMemo(() => getCurrentRankingWeekInfo(), []);
+  const weeklyTopList = useMemo(() => getWeeklyTopRankings(), [weekInfo]);
 
-  // 검색 및 필터 적용된 TOP 100 리스트
+  // 검색 및 필터 적용된 TOP 100 리스트 (매주 살아있는 변동 반영)
   const filteredRankingList = useMemo(() => {
-    return TOP_RANKING_DATA.filter((item) => {
+    return weeklyTopList.filter((item) => {
       // 카테고리 필터
       if (selectedCategory !== '전체' && item.category !== selectedCategory) {
         return false;
@@ -140,16 +142,28 @@ export default function BlogRankingView({ onSelectBlogForAudit }: BlogRankingVie
       }
       return true;
     });
-  }, [selectedCategory, selectedSource, searchQuery]);
+  }, [weeklyTopList, selectedCategory, selectedSource, searchQuery]);
 
-  // 내 랭킹 조회 핸들러
+  // 내 랭킹 조회 핸들러 (실제 분석된 글이 있으면 가산점 반영)
   const handleLookupMyRank = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const target = myIdInput.trim();
     if (!target) return;
     setIsSearchingMyRank(true);
+
+    let postCount = 30;
+    try {
+      const cached = localStorage.getItem(`gifty_audit_${target.toLowerCase()}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.posts?.length) {
+          postCount = parsed.posts.length;
+        }
+      }
+    } catch {}
+
     setTimeout(() => {
-      setMyRankData(calculateMyBlogRankEstimate(target));
+      setMyRankData(calculateMyBlogRankEstimate(target, postCount));
       setIsSearchingMyRank(false);
     }, 350);
   };

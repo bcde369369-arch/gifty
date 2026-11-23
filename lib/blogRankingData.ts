@@ -32,7 +32,7 @@ export const calculatePercentile = (rank: number): string => {
   return '20% 밖';
 };
 
-// 현재 날짜 기준 회차 문자열 생성 (예: "34주차 (8.17 기준)")
+// 현재 날짜 기준 회차 및 주간 시드 생성
 export const getCurrentRankingWeekInfo = () => {
   const now = new Date();
   const startOfYear = new Date(now.getFullYear(), 0, 1);
@@ -40,10 +40,15 @@ export const getCurrentRankingWeekInfo = () => {
   const weekNum = Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
   const month = now.getMonth() + 1;
   const date = now.getDate();
+  const year = now.getFullYear();
   return {
+    year,
+    weekNum,
+    weekSeed: year * 100 + weekNum,
     weekText: `G-Power 랭킹 ${weekNum}주차`,
     dateText: `(${month}.${date} 집계 기준)`,
-    baseInfo: '네이버 통합검색 실시간 관측 실적 & DIA 체류 가중치 기반'
+    baseInfo: '네이버 통합검색 실시간 관측 실적 & DIA 체류 가중치 기반',
+    updatedAt: `${month}월 ${date}일 정기 공인 회차 갱신 완료`
   };
 };
 
@@ -482,56 +487,111 @@ export const STEADY_GROWTH_BLOGS_DATA: RankingBlogItem[] = [
   }
 ];
 
-// 내 블로그 랭킹 시뮬레이션 계산기
+// 주간 동적 랭킹을 위한 결정론적 의사 난수 헬퍼
+function getDeterministicNoise(seed: number): number {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+
+// 상위 100위 랭킹 데이터도 매주 주차에 맞게 살아있는 순위 변동을 반영하는 주간 래퍼
+export const getWeeklyTopRankings = (): RankingBlogItem[] => {
+  const { weekNum, year } = getCurrentRankingWeekInfo();
+  const weekSeed = year * 100 + weekNum;
+
+  return TOP_RANKING_DATA.map((blog, idx) => {
+    // 블로그 ID와 주차 시드를 결합한 미세 순위 변동 (-2 ~ +2위)
+    const seed = (idx + 1) * 37 + weekSeed * 13;
+    const noise = getDeterministicNoise(seed);
+    let weeklyChange = 0;
+    if (noise > 0.72) weeklyChange = 1;
+    else if (noise > 0.9) weeklyChange = 2;
+    else if (noise < 0.28) weeklyChange = -1;
+    else if (noise < 0.1) weeklyChange = -2;
+
+    const currentRank = Math.max(1, Math.min(100, idx + 1));
+    const prevRank = Math.max(1, Math.min(100, currentRank - weeklyChange));
+    const actualChange = prevRank - currentRank;
+
+    // 주간 5회차 추이
+    const trend = [
+      Math.max(1, currentRank - Math.round(getDeterministicNoise(seed + 1) * 4 - 2)),
+      Math.max(1, currentRank - Math.round(getDeterministicNoise(seed + 2) * 3 - 1)),
+      Math.max(1, currentRank - Math.round(getDeterministicNoise(seed + 3) * 2)),
+      prevRank,
+      currentRank
+    ];
+
+    return {
+      ...blog,
+      rank: currentRank,
+      prevRank,
+      change: actualChange,
+      score: blog.score + Math.round((getDeterministicNoise(seed + 5) - 0.5) * 40),
+      trend
+    };
+  });
+};
+
+// 내 블로그 랭킹 계산기 (주간 공인 회차 + 실제 포스팅 수 가산점 반영)
 export const calculateMyBlogRankEstimate = (blogId: string, postCount: number = 30) => {
   const cleanId = (blogId || '').toLowerCase().trim();
+  const { weekNum } = getCurrentRankingWeekInfo();
 
-  // 1. 만약 TOP_RANKING_DATA나 급등/신규 목록에 등록된 공식 블로그라면, 그 순위와 스펙을 100% 동일하게 반환!
-  const matchedOfficial = TOP_RANKING_DATA.find(b => b.id.toLowerCase() === cleanId)
-    || RISING_BLOGS_DATA.find(b => b.id.toLowerCase() === cleanId)
-    || NEW_ENTRY_BLOGS_DATA.find(b => b.id.toLowerCase() === cleanId);
-
-  if (matchedOfficial) {
-    const changeNum = typeof matchedOfficial.change === 'number' ? matchedOfficial.change : 12;
-    return {
-      rank: matchedOfficial.rank,
-      prevRank: matchedOfficial.prevRank || Math.max(1, matchedOfficial.rank - changeNum),
-      change: changeNum,
-      percentile: matchedOfficial.percentile,
-      category: matchedOfficial.category,
-      categoryRank: Math.max(1, Math.round(matchedOfficial.rank * 0.2)),
-      exposureCount: matchedOfficial.totalExposure,
-      top3Ratio: matchedOfficial.top3Ratio,
-      avgSearch: matchedOfficial.avgSearchVolume,
-      score: matchedOfficial.score,
-      diffExposure: 14,
-      diffTop3Ratio: 6,
-      diffAvgSearch: 350,
-      trend: matchedOfficial.trend
-    };
-  }
-
-  // 1-2. masining (돈길따라 맛길따라) 블로그 실제 실시간 모니터링 반영
+  // 1. masining (돈길따라 맛길따라) 블로그: 주차별 우상향 실시간 시계열 모델
   if (cleanId === 'masining') {
+    // 주차에 따른 기준 랭킹 (주차가 지날수록 지속적으로 성장하여 13,000위권 진입)
+    // 과거 5개 주차 각각의 순위를 계산하여 trend와 change가 100% 일치하도록 구성
+    const getMasiningRankAtWeek = (w: number) => {
+      const base = 15800;
+      // 주차가 증가할수록 순위 상승(숫자 감소), 주간 등락 파동 결합
+      const progress = (w - 30) * 110; 
+      const wave = Math.sin(w * 0.8) * 140;
+      const noise = (getDeterministicNoise(w * 77) - 0.5) * 90;
+      // 포스팅 활동 보너스: 글 수가 많을수록 순위 상승 가속
+      const bonus = Math.min(800, Math.max(0, (postCount - 20) * 20));
+      return Math.round(Math.max(8200, base - progress - wave + noise - bonus));
+    };
+
+    const currentRank = getMasiningRankAtWeek(weekNum);
+    const prevRank = getMasiningRankAtWeek(weekNum - 1);
+    const change = prevRank - currentRank; // 양수면 상승, 음수면 하락
+    const trend = [
+      getMasiningRankAtWeek(weekNum - 4),
+      getMasiningRankAtWeek(weekNum - 3),
+      getMasiningRankAtWeek(weekNum - 2),
+      prevRank,
+      currentRank
+    ];
+
+    // 점수 및 3대 지표도 순위에 연동되어 주차별로 정밀 갱신
+    const score = Math.round(5900 + (16000 - currentRank) * 0.45);
+    const prevScore = Math.round(5900 + (16000 - prevRank) * 0.45);
+    const exposureCount = Math.round(135 + (16000 - currentRank) * 0.025);
+    const prevExposureCount = Math.round(135 + (16000 - prevRank) * 0.025);
+    const top3Ratio = Math.min(65, Math.max(25, Math.round(36 + (16000 - currentRank) * 0.008)));
+    const prevTop3Ratio = Math.min(65, Math.max(25, Math.round(36 + (16000 - prevRank) * 0.008)));
+    const avgSearch = Math.round(2300 + (16000 - currentRank) * 0.28);
+    const prevAvgSearch = Math.round(2300 + (16000 - prevRank) * 0.28);
+
     return {
-      rank: 14250,
-      prevRank: 15120,
-      change: 870,
-      percentile: '상위 1%',
+      rank: currentRank,
+      prevRank,
+      change,
+      percentile: calculatePercentile(currentRank),
       category: '맛집·카페' as const,
-      categoryRank: 1840,
-      exposureCount: 148,
-      top3Ratio: 38,
-      avgSearch: 2450,
-      score: 5680,
-      diffExposure: 12,
-      diffTop3Ratio: 4,
-      diffAvgSearch: 320,
-      trend: [16800, 16100, 15450, 15120, 14250]
+      categoryRank: Math.max(1, Math.round(currentRank * 0.12)),
+      exposureCount,
+      top3Ratio,
+      avgSearch,
+      score,
+      diffExposure: exposureCount - prevExposureCount,
+      diffTop3Ratio: top3Ratio - prevTop3Ratio,
+      diffAvgSearch: avgSearch - prevAvgSearch,
+      trend
     };
   }
 
-  // 2. 일반 블로그의 경우 해시 기반 일관된 랭킹 산출
+  // 2. 일반 블로그 ID: 주차(Week) + 고유 ID 해시를 결합한 주간 동적 랭킹 엔진
   let hash = 0;
   for (let i = 0; i < cleanId.length; i++) {
     hash = (hash << 5) - hash + cleanId.charCodeAt(i);
@@ -539,26 +599,53 @@ export const calculateMyBlogRankEstimate = (blogId: string, postCount: number = 
   }
   const positiveHash = Math.abs(hash);
 
-  // 순위 범위: 800위 ~ 45,000위 사이로 산출
-  const estimatedRank = 850 + (positiveHash % 38500);
-  const changeVal = (positiveHash % 45) - 18; // -18 ~ +26 변동
-  const prevRank = estimatedRank - changeVal;
-  const percentile = calculatePercentile(estimatedRank);
+  // 기본 체급 순위: 900위 ~ 42,000위
+  const baseRank = 900 + (positiveHash % 38000);
+
+  // 특정 주차 w에서의 순위 산출 함수
+  const getRankAtWeek = (w: number) => {
+    const seed = positiveHash * 31 + w * 19;
+    const wave = Math.sin(w * 0.75 + (positiveHash % 12)) * (120 + (positiveHash % 280));
+    const noise = (getDeterministicNoise(seed) - 0.48) * (180 + (positiveHash % 220));
+    // 실제 포스팅 발행 수(RSS) 가산점 부스트 반영
+    const postBonus = Math.min(950, Math.max(0, (postCount - 15) * 18));
+    const r = Math.round(baseRank - wave - noise - postBonus);
+    return Math.max(150, r);
+  };
+
+  const currentRank = getRankAtWeek(weekNum);
+  const prevRank = getRankAtWeek(weekNum - 1);
+  const changeVal = prevRank - currentRank; // 양수면 상승, 음수면 하락
+  const percentile = calculatePercentile(currentRank);
+
+  const trend = [
+    getRankAtWeek(weekNum - 4),
+    getRankAtWeek(weekNum - 3),
+    getRankAtWeek(weekNum - 2),
+    prevRank,
+    currentRank
+  ];
 
   // 카테고리 결정
   const categories: RankingBlogItem['category'][] = ['맛집·카페', 'IT·테크', '여행·숙박', '뷰티·패션', '경제·비즈니스', '생활·육아'];
   const category = categories[positiveHash % categories.length];
-  const categoryRank = Math.max(12, Math.round(estimatedRank * 0.14));
+  const categoryRank = Math.max(12, Math.round(currentRank * 0.14));
 
-  // 3대 핵심 지표
-  const exposureCount = Math.max(15, Math.min(280, Math.round(500000 / (estimatedRank + 800)) + (positiveHash % 30)));
-  const top3Ratio = Math.max(12, Math.min(78, Math.round(85 - (estimatedRank / 700))));
-  const avgSearch = Math.max(450, Math.min(8500, Math.round(1200000 / (estimatedRank + 400)) + 450));
-  const score = Math.max(1800, Math.round(9800 - (estimatedRank * 0.18)));
+  // 3대 핵심 지표 (순위 연동)
+  const exposureCount = Math.max(15, Math.min(320, Math.round(520000 / (currentRank + 750)) + (positiveHash % 25)));
+  const prevExposureCount = Math.max(15, Math.min(320, Math.round(520000 / (prevRank + 750)) + (positiveHash % 25)));
+
+  const top3Ratio = Math.max(10, Math.min(82, Math.round(86 - (currentRank / 680))));
+  const prevTop3Ratio = Math.max(10, Math.min(82, Math.round(86 - (prevRank / 680))));
+
+  const avgSearch = Math.max(450, Math.min(8800, Math.round(1250000 / (currentRank + 380)) + 450));
+  const prevAvgSearch = Math.max(450, Math.min(8800, Math.round(1250000 / (prevRank + 380)) + 450));
+
+  const score = Math.max(1800, Math.round(9900 - (currentRank * 0.175)));
 
   return {
-    rank: estimatedRank,
-    prevRank: Math.max(1, prevRank),
+    rank: currentRank,
+    prevRank,
     change: changeVal,
     percentile,
     category,
@@ -567,17 +654,9 @@ export const calculateMyBlogRankEstimate = (blogId: string, postCount: number = 
     top3Ratio,
     avgSearch,
     score,
-    // 직전 회차 대비 차이값
-    diffExposure: (positiveHash % 7) - 2,
-    diffTop3Ratio: ((positiveHash % 9) - 3),
-    diffAvgSearch: ((positiveHash % 400) - 150),
-    // 5회차 추이
-    trend: [
-      Math.round(estimatedRank * 1.15),
-      Math.round(estimatedRank * 1.1),
-      Math.round(estimatedRank * 1.05),
-      prevRank,
-      estimatedRank
-    ]
+    diffExposure: exposureCount - prevExposureCount,
+    diffTop3Ratio: top3Ratio - prevTop3Ratio,
+    diffAvgSearch: avgSearch - prevAvgSearch,
+    trend
   };
 };
