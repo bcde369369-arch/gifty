@@ -39,10 +39,13 @@ import {
   GoogleSeoReport,
   GoogleParsedPost,
   GoogleIndexStatus,
+  DeepAuditResult,
   runRealGoogleSeoAnalysis,
   generateInitialGoogleReport,
   generateGoogleReportFromNaverPosts,
-  calculateIndexSummary
+  calculateIndexSummary,
+  fetchDeepPageAudit,
+  checkGoogleIndexStatus
 } from '@/lib/googleSeoAnalyzer';
 import { getCurrentRankingWeekInfo } from '@/lib/blogRankingData';
 
@@ -80,12 +83,26 @@ export default function GoogleSeoLabView({
   const [filterStatus, setFilterStatus] = useState<'all' | 'indexed' | 'pending' | 'missing' | 'cannibalized'>('all');
   const [postSearchTerm, setPostSearchTerm] = useState<string>('');
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
-  const [diagSubTab, setDiagSubTab] = useState<Record<string, 'errors' | 'serp' | 'eeat' | 'accelerate'>>({});
+  const [diagSubTab, setDiagSubTab] = useState<Record<string, 'dom' | 'errors' | 'serp' | 'eeat' | 'accelerate'>>({});
+  const [deepAudits, setDeepAudits] = useState<Record<string, DeepAuditResult | 'loading' | 'error'>>({});
+  const [liveIndexChecks, setLiveIndexChecks] = useState<Record<string, any>>({});
   const [isBatchChecking, setIsBatchChecking] = useState<boolean>(false);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
   const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
 
   const weekInfo = useMemo(() => getCurrentRankingWeekInfo(), []);
+
+  // 실제 웹페이지 DOM 초정밀 크롤링 실행 핸들러
+  const handleRunDeepAudit = async (postId: string, url: string) => {
+    if (deepAudits[postId] && deepAudits[postId] !== 'error') return;
+    setDeepAudits(prev => ({ ...prev, [postId]: 'loading' }));
+    const result = await fetchDeepPageAudit(url);
+    if (result) {
+      setDeepAudits(prev => ({ ...prev, [postId]: result }));
+    } else {
+      setDeepAudits(prev => ({ ...prev, [postId]: 'error' }));
+    }
+  };
 
   // 네이버 탭의 실제 글 데이터가 나중에 로드되거나 변경되었을 때 자동 반영
   useEffect(() => {
@@ -140,30 +157,24 @@ export default function GoogleSeoLabView({
     setUrlInput(initialNaverBlogId || 'masining');
   };
 
-  // 구글 누락/색인 일괄 실시간 점검 시뮬레이션
+  // 구글 누락/색인 일괄 실시간 점검 (실제 site:URL 팩트체크 엔드포인트 연동)
   const handleBatchIndexCheck = async () => {
     if (isBatchChecking || analyzedReport.recentPosts.length === 0) return;
 
     setIsBatchChecking(true);
-    const total = analyzedReport.recentPosts.length;
+    const total = Math.min(analyzedReport.recentPosts.length, 30);
     setBatchProgress({ current: 0, total });
 
     for (let i = 0; i < total; i++) {
-      await new Promise((res) => setTimeout(res, 200));
+      const post = analyzedReport.recentPosts[i];
+      try {
+        const checkRes = await checkGoogleIndexStatus(post.link, post.title);
+        if (checkRes) {
+          setLiveIndexChecks(prev => ({ ...prev, [post.id]: checkRes }));
+        }
+      } catch {}
       setBatchProgress({ current: i + 1, total });
     }
-
-    setAnalyzedReport((prev) => {
-      const updatedPosts = prev.recentPosts.map((post) => ({
-        ...post,
-        indexScore: Math.min(99, post.indexScore + 1)
-      }));
-      return {
-        ...prev,
-        recentPosts: updatedPosts,
-        indexSummary: calculateIndexSummary(updatedPosts)
-      };
-    });
 
     setIsBatchChecking(false);
     setBatchProgress(null);
@@ -588,8 +599,8 @@ export default function GoogleSeoLabView({
               ) : (
                 filteredPosts.map((post, idx) => {
                   const isExpanded = expandedPostId === post.id;
-                  const subTab = diagSubTab[post.id] || 'errors';
-                  const setPostSubTab = (tab: 'errors' | 'serp' | 'eeat' | 'accelerate') => {
+                  const subTab = diagSubTab[post.id] || 'dom';
+                  const setPostSubTab = (tab: 'dom' | 'errors' | 'serp' | 'eeat' | 'accelerate') => {
                     setDiagSubTab((prev) => ({ ...prev, [post.id]: tab }));
                   };
 
@@ -663,42 +674,57 @@ export default function GoogleSeoLabView({
                           </p>
                         </div>
 
-                        {/* 우측 실시간 검증 액션 버튼 그룹 */}
-                        <div className="flex items-center gap-2 shrink-0 pt-2 md:pt-0 flex-wrap">
+                        {/* 우측 실시간 검증 액션 버튼 그룹 (방법 1, 2, 4 완벽 장착) */}
+                        <div className="flex items-center gap-1.5 shrink-0 pt-2 md:pt-0 flex-wrap">
                           <a
                             href={post.googleSearchUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-700 transition-colors flex items-center gap-1 shadow-2xs"
-                            title="구글에서 site:검색으로 실제 색인 여부 확인"
+                            className="px-3 py-1.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-xs flex items-center gap-1 active:scale-95"
+                            title="구글에서 site:검색으로 실제 색인 여부 1초 팩트체크"
                           >
                             <Search size={12} />
-                            <span>구글 검색</span>
+                            <span>구글 색인 확인 ↗</span>
                           </a>
 
                           <a
-                            href={post.searchConsoleInspectUrl}
+                            href={post.googleTitleSearchUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors flex items-center gap-1 shadow-2xs"
-                            title="구글 서치콘솔 URL 검사 창 열기"
+                            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors flex items-center gap-1"
+                            title="구글에서 큰따옴표 제목 일치 검색"
                           >
-                            <Globe size={12} />
-                            <span>서치콘솔</span>
+                            <FileText size={12} />
+                            <span>제목 일치 ↗</span>
                           </a>
 
                           <button
                             type="button"
-                            onClick={() => setExpandedPostId(isExpanded ? null : post.id)}
+                            onClick={() => {
+                              const willExpand = !isExpanded || subTab !== 'dom';
+                              setExpandedPostId(willExpand ? post.id : null);
+                              setPostSubTab('dom');
+                              handleRunDeepAudit(post.id, post.link);
+                            }}
                             className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
-                              isExpanded
-                                ? 'bg-slate-900 text-white'
-                                : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs'
+                              isExpanded && subTab === 'dom'
+                                ? 'bg-indigo-900 text-white shadow-xs'
+                                : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 shadow-2xs'
                             }`}
                           >
-                            <ShieldCheck size={13} />
-                            <span>{isExpanded ? '진단 접기' : '초정밀 진단'}</span>
-                            {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                            <Sparkles size={12} className={isExpanded && subTab === 'dom' ? 'text-amber-300' : 'text-indigo-600'} />
+                            <span>본문 100% 정밀 파싱</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setExpandedPostId(isExpanded ? null : post.id)}
+                            className={`p-1.5 rounded-xl text-slate-400 hover:text-slate-700 transition-colors ${
+                              isExpanded ? 'bg-slate-100 text-slate-700' : ''
+                            }`}
+                            title={isExpanded ? '접기' : '더보기'}
+                          >
+                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                           </button>
                         </div>
                       </div>
@@ -710,6 +736,21 @@ export default function GoogleSeoLabView({
                           <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl overflow-x-auto text-xs font-bold">
                             <button
                               type="button"
+                              onClick={() => {
+                                setPostSubTab('dom');
+                                handleRunDeepAudit(post.id, post.link);
+                              }}
+                              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                                subTab === 'dom' || !subTab
+                                  ? 'bg-indigo-600 text-white shadow-2xs font-black'
+                                  : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                            >
+                              <FileCode2 size={13} className={subTab === 'dom' || !subTab ? 'text-white' : 'text-indigo-600'} />
+                              <span>🔬 1. 본문 100% 정밀 DOM 파싱</span>
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => setPostSubTab('errors')}
                               className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
                                 subTab === 'errors'
@@ -718,7 +759,7 @@ export default function GoogleSeoLabView({
                               }`}
                             >
                               <ShieldCheck size={13} className="text-blue-600" />
-                              <span>1. 서치콘솔 오류 & 잠식 진단</span>
+                              <span>2. 서치콘솔 6대 오류 진단</span>
                             </button>
                             <button
                               type="button"
@@ -730,7 +771,7 @@ export default function GoogleSeoLabView({
                               }`}
                             >
                               <Smartphone size={13} className="text-indigo-600" />
-                              <span>2. 모바일 구글 SERP 미리보기</span>
+                              <span>3. 모바일 구글 SERP 미리보기</span>
                             </button>
                             <button
                               type="button"
@@ -742,7 +783,7 @@ export default function GoogleSeoLabView({
                               }`}
                             >
                               <Award size={13} className="text-amber-600" />
-                              <span>3. E-E-A-T 신뢰도 & 출처</span>
+                              <span>4. E-E-A-T 신뢰도 & 출처</span>
                             </button>
                             <button
                               type="button"
@@ -754,9 +795,172 @@ export default function GoogleSeoLabView({
                               }`}
                             >
                               <Send size={13} className="text-emerald-600" />
-                              <span>4. 원클릭 색인 가속 도구</span>
+                              <span>5. 색인 가속 도구</span>
                             </button>
                           </div>
+
+                          {/* [서브 탭 1] 본문 100% 정밀 DOM 파싱 결과 */}
+                          {(subTab === 'dom' || !subTab) && (
+                            <div className="space-y-3">
+                              {deepAudits[post.id] === 'loading' ? (
+                                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
+                                  <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                                  <span className="font-bold text-slate-700 block text-xs">실제 웹페이지(HTML) 접속 및 H1~H3 태그, Alt 누락 전수 분석 중...</span>
+                                  <span className="text-[11px] text-slate-400">구글봇 모바일 에이전트 기준 DOM 크롤링 실행</span>
+                                </div>
+                              ) : deepAudits[post.id] === 'error' ? (
+                                <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between text-xs text-rose-800">
+                                  <span>⚠️ 해당 포스팅의 실제 웹페이지를 불러오지 못했습니다.</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRunDeepAudit(post.id, post.link)}
+                                    className="px-3 py-1 bg-rose-600 text-white font-bold rounded-lg text-xs"
+                                  >
+                                    다시 시도
+                                  </button>
+                                </div>
+                              ) : deepAudits[post.id] ? (
+                                (() => {
+                                  const audit = deepAudits[post.id] as DeepAuditResult;
+                                  return (
+                                    <div className="space-y-3">
+                                      {/* 요약 알림 배너 */}
+                                      <div className="p-3.5 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl flex items-center justify-between flex-wrap gap-2">
+                                        <div className="flex items-center gap-2">
+                                          <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                                          <span className="font-extrabold text-slate-900 text-xs">
+                                            실제 웹페이지 DOM 100% 정밀 크롤링 완료
+                                          </span>
+                                        </div>
+                                        <span className="text-[11px] text-indigo-700 font-bold bg-white px-2.5 py-0.5 rounded-lg border border-indigo-200">
+                                          대상 URL: {post.link.replace(/^https?:\/\//, '').slice(0, 40)}...
+                                        </span>
+                                      </div>
+
+                                      {/* 4대 정밀 분석 카드 그리드 */}
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                                        {/* 카드 1: 실제 글자수 */}
+                                        <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs space-y-1">
+                                          <span className="text-[10px] text-slate-400 font-bold block">1. 순수 본문 글자수</span>
+                                          <strong className="text-sm font-black text-slate-900 block">
+                                            {audit.charCount.withSpaces.toLocaleString()}자
+                                          </strong>
+                                          <span className="text-[10px] text-slate-500 block">
+                                            (공백 제외 {audit.charCount.withoutSpaces.toLocaleString()}자)
+                                          </span>
+                                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded block text-center ${
+                                            audit.charCount.status === 'good' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                                            audit.charCount.status === 'warning' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                                            'bg-rose-50 text-rose-700 border border-rose-200'
+                                          }`}>
+                                            {audit.charCount.isThinContent ? '🔴 Thin Content 주의' : '🟢 구글봇 최적 분량'}
+                                          </span>
+                                        </div>
+
+                                        {/* 카드 2: H1~H3 헤딩 구조 */}
+                                        <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs space-y-1">
+                                          <span className="text-[10px] text-slate-400 font-bold block">2. H1~H3 소제목 계층</span>
+                                          <strong className="text-sm font-black text-slate-900 block">
+                                            H1 {audit.headings.h1Count}개 ｜ H2 {audit.headings.h2Count}개
+                                          </strong>
+                                          <span className="text-[10px] text-slate-500 block">
+                                            H3 세부소제목: {audit.headings.h3Count}개
+                                          </span>
+                                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded block text-center ${
+                                            audit.headings.isH1Single && audit.headings.hasSubheadings
+                                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                          }`}>
+                                            {audit.headings.isH1Single ? '🟢 H1 단일성 준수' : '⚠️ H1 중복 또는 누락'}
+                                          </span>
+                                        </div>
+
+                                        {/* 카드 3: 이미지 Alt 누락 전수검사 */}
+                                        <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs space-y-1">
+                                          <span className="text-[10px] text-slate-400 font-bold block">3. 이미지 Alt 누락률</span>
+                                          <strong className="text-sm font-black text-slate-900 block">
+                                            {audit.images.totalImages}개 중 {audit.images.missingAltCount}개 누락
+                                          </strong>
+                                          <span className="text-[10px] text-slate-500 block">
+                                            Alt 태그 준수율: {audit.images.altCoverageRate}%
+                                          </span>
+                                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded block text-center ${
+                                            audit.images.missingAltCount === 0
+                                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                              : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                          }`}>
+                                            {audit.images.missingAltCount === 0 ? '🟢 전체 Alt 완벽' : `🔴 Alt 누락 ${audit.images.missingAltCount}개`}
+                                          </span>
+                                        </div>
+
+                                        {/* 카드 4: 캐노니컬 대표 주소 */}
+                                        <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs space-y-1">
+                                          <span className="text-[10px] text-slate-400 font-bold block">4. Canonical 표준 URL</span>
+                                          <strong className="text-xs font-black text-slate-900 block truncate" title={audit.canonical.canonicalUrl}>
+                                            {audit.canonical.canonicalUrl ? audit.canonical.canonicalUrl.replace(/^https?:\/\//, '') : '태그 없음'}
+                                          </strong>
+                                          <span className="text-[10px] text-slate-500 block">
+                                            외부 인용 링크: {audit.links.externalLinksCount}개
+                                          </span>
+                                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded block text-center ${
+                                            audit.canonical.isCanonicalSelf
+                                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                          }`}>
+                                            {audit.canonical.isCanonicalSelf ? '🟢 대표 주소 수렴' : '⚠️ Canonical 점검 필요'}
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      {/* 실제 H2 소제목 목록 */}
+                                      {audit.headings.h2List.length > 0 && (
+                                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                                          <span className="text-[11px] font-bold text-slate-700 block flex items-center gap-1">
+                                            <FileCode2 size={12} className="text-indigo-600" />
+                                            <span>실제 감지된 H2 소제목 ({audit.headings.h2List.length}개):</span>
+                                          </span>
+                                          <div className="flex flex-wrap gap-1.5">
+                                            {audit.headings.h2List.map((h2, hIdx) => (
+                                              <span key={hIdx} className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-800 text-[11px]">
+                                                {h2}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Alt 누락 이미지 파일명 샘플 */}
+                                      {audit.images.missingAltSampleImages.length > 0 && (
+                                        <div className="p-3 bg-rose-50/70 rounded-xl border border-rose-200 space-y-1 text-[11px]">
+                                          <span className="font-bold text-rose-900 block">⚠️ Alt(대체 텍스트)가 비어 있는 이미지 샘플:</span>
+                                          <div className="flex flex-wrap gap-1">
+                                            {audit.images.missingAltSampleImages.map((src, sIdx) => (
+                                              <span key={sIdx} className="px-2 py-0.5 bg-white border border-rose-200 text-rose-800 rounded font-mono text-[10px]">
+                                                {src}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()
+                              ) : (
+                                <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-center space-y-2">
+                                  <span className="text-slate-600 block font-medium text-xs">
+                                    [본문 100% 정밀 파싱] 버튼을 누르면 실제 웹페이지를 직접 방문하여 H1~H3 소제목과 Alt 누락 이미지를 전수 조사합니다.
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRunDeepAudit(post.id, post.link)}
+                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs shadow-xs"
+                                  >
+                                    지금 본문 정밀 크롤링 실행
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
 
                           {/* [서브 탭 1] 서치콘솔 오류 및 키워드 잠식 진단 */}
                           {subTab === 'errors' && (

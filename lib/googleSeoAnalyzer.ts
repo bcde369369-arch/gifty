@@ -69,6 +69,58 @@ export interface GoogleParsedPost {
   searchConsoleInspectUrl: string;
   sitemapPingUrl: string;
   diagnostic: GooglePostDiagnostic;
+  deepAudit?: DeepAuditResult | null;
+  liveIndexCheck?: {
+    isIndexed: boolean | null;
+    isOfficialApi: boolean;
+    googleSerpUrl: string;
+    titleSearchUrl: string;
+    searchConsoleInspectUrl: string;
+  } | null;
+}
+
+export interface DeepAuditResult {
+  url: string;
+  title: string;
+  metaDescription: string;
+  canonical: {
+    hasCanonical: boolean;
+    canonicalUrl: string;
+    isCanonicalSelf: boolean;
+  };
+  isNoIndex: boolean;
+  charCount: {
+    withSpaces: number;
+    withoutSpaces: number;
+    isThinContent: boolean;
+    status: 'good' | 'warning' | 'danger';
+  };
+  headings: {
+    h1Count: number;
+    h2Count: number;
+    h3Count: number;
+    hasH1: boolean;
+    isH1Single: boolean;
+    hasSubheadings: boolean;
+    h2List: string[];
+    h3List: string[];
+  };
+  images: {
+    totalImages: number;
+    missingAltCount: number;
+    altCoverageRate: number;
+    missingAltSampleImages: string[];
+  };
+  links: {
+    internalLinksCount: number;
+    externalLinksCount: number;
+    hasOutboundReference: boolean;
+  };
+  social: {
+    hasOgTitle: boolean;
+    hasOgImage: boolean;
+    ogImageUrl: string | null;
+  };
 }
 
 export interface GoogleIndexSummary {
@@ -1344,4 +1396,38 @@ export function generateInitialGoogleReport(rawInput: string): GoogleSeoReport {
       }
     ]
   };
+}
+
+// 실제 포스팅 웹페이지 전체 DOM 초정밀 크롤링 (H1~H3 계층, Alt 누락 전수검사, Canonical, 글자수)
+export async function fetchDeepPageAudit(targetUrl: string): Promise<DeepAuditResult | null> {
+  if (typeof window === 'undefined') return null;
+  try {
+    const res = await fetch(`/api/page-deep-audit?url=${encodeURIComponent(targetUrl)}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.success && json?.data) {
+        return json.data as DeepAuditResult;
+      }
+    }
+  } catch (err) {
+    console.warn('fetchDeepPageAudit error:', err);
+  }
+  return null;
+}
+
+// 구글 실제 색인(site:URL) 상태 검증 엔드포인트 호출
+export async function checkGoogleIndexStatus(targetUrl: string, title?: string) {
+  if (typeof window === 'undefined') return null;
+  try {
+    const res = await fetch(`/api/google-index-check?url=${encodeURIComponent(targetUrl)}&title=${encodeURIComponent(title || '')}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.success) {
+        return json;
+      }
+    }
+  } catch (err) {
+    console.warn('checkGoogleIndexStatus error:', err);
+  }
+  return null;
 }
