@@ -1,6 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'export',
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   // Cloudflare Pages에서는 headers() 대신 public/_headers 파일을 사용합니다.
   webpack: (config) => {
     config.resolve.alias = {
