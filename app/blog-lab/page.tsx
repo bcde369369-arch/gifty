@@ -385,27 +385,12 @@ export default function BlogAnalyticsLabPage() {
               Gifty<span className="text-indigo-600">.</span>
             </span>
           </Link>
-          <div className="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600">
+          <div className="hidden md:flex items-center gap-7 text-sm font-semibold text-slate-600">
             <Link href="/" className="hover:text-indigo-600 transition-colors">홈</Link>
             <Link href="/guide" className="hover:text-indigo-600 transition-colors text-indigo-600 font-extrabold flex items-center gap-1">꿀팁 가이드 📚</Link>
-            <button
-              type="button"
-              onClick={() => setSearchEngineTab('google')}
-              className={`font-black flex items-center gap-1 transition-colors py-1 px-2.5 rounded-xl ${
-                searchEngineTab === 'google' ? 'bg-blue-50 text-blue-600 font-black' : 'text-slate-600 hover:text-blue-600'
-              }`}
-            >
-              구글웹 연구소 🌐
-            </button>
-            <button
-              type="button"
-              onClick={() => setSearchEngineTab('naver')}
-              className={`font-black flex items-center gap-1 transition-colors py-1 px-2.5 rounded-xl ${
-                searchEngineTab === 'naver' ? 'bg-emerald-50 text-emerald-600 font-black' : 'text-slate-600 hover:text-emerald-600'
-              }`}
-            >
-              네이버 연구소 🟢
-            </button>
+            <Link href="/blog-lab" className="text-indigo-600 font-extrabold hover:text-indigo-700 transition-colors flex items-center gap-1">
+              블로그 연구소 🔬
+            </Link>
             <Link href="/remove-bg" className="hover:text-indigo-600 transition-colors text-purple-600 font-extrabold">
               이미지 스튜디오 🎨
             </Link>
@@ -430,25 +415,7 @@ export default function BlogAnalyticsLabPage() {
             <Link href="/" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl hover:bg-slate-50">홈</Link>
             <Link href="/guide" className="text-indigo-600 bg-indigo-50 p-3 rounded-xl font-black">꿀팁 가이드 📚</Link>
             <Link href="/about" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl hover:bg-slate-50">서비스 소개 ℹ️</Link>
-            <button
-              type="button"
-              onClick={() => { setSearchEngineTab('google'); setIsMobileMenuOpen(false); }}
-              className={`text-left p-3 rounded-xl font-black flex items-center justify-between ${
-                searchEngineTab === 'google' ? 'bg-blue-50 text-blue-600' : 'text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <span>구글웹 연구소 (실시간 색인·누락) 🌐</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-extrabold">기본</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => { setSearchEngineTab('naver'); setIsMobileMenuOpen(false); }}
-              className={`text-left p-3 rounded-xl font-black flex items-center justify-between ${
-                searchEngineTab === 'naver' ? 'bg-emerald-50 text-emerald-600' : 'text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <span>네이버 연구소 (블록·지수) 🟢</span>
-            </button>
+            <Link href="/blog-lab" className="text-indigo-600 bg-indigo-50 p-3 rounded-xl font-black">블로그 연구소 🔬</Link>
             <Link href="/remove-bg" className="text-purple-600 hover:bg-purple-50 p-3 rounded-xl font-black">이미지 스튜디오 🎨</Link>
             <Link href="/neighbor" className="text-emerald-600 hover:bg-emerald-50 p-3 rounded-xl font-black">이웃 소통 지표 📊</Link>
             <Link href="/community" className="text-slate-700 hover:bg-slate-50 p-3 rounded-xl">커뮤니티 💬</Link>
@@ -460,8 +427,24 @@ export default function BlogAnalyticsLabPage() {
 
       {/* Main Content Area */}
       <main className="flex-grow max-w-6xl mx-auto px-4 sm:px-6 py-8 w-full space-y-6">
-        {/* [최상위 검색엔진 스위처] 네이버 블로그 연구소 vs 구글 웹 SEO 연구소 */}
+        {/* [최상위 검색엔진 스위처] 구글 글 누락 점검 vs 네이버 블로그 연구소 */}
         <div className="bg-slate-900/95 backdrop-blur-md p-1.5 sm:p-2 rounded-3xl border border-slate-800 shadow-xl flex items-center gap-1.5 sm:gap-2">
+          <button
+            type="button"
+            onClick={() => setSearchEngineTab('google')}
+            className={`flex-1 py-3 sm:py-3.5 px-3 sm:px-5 rounded-2xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all ${
+              searchEngineTab === 'google'
+                ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white shadow-lg shadow-blue-500/25 scale-[1.01]'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-cyan-300 animate-pulse shrink-0"></span>
+            <span>🔵 구글 글 누락 점검</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-white/20 text-white hidden md:inline-block">
+              실시간 색인 O/X
+            </span>
+          </button>
+
           <button
             type="button"
             onClick={() => setSearchEngineTab('naver')}
@@ -475,22 +458,6 @@ export default function BlogAnalyticsLabPage() {
             <span>🟢 네이버 블로그 연구소</span>
             <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-white/20 text-white hidden md:inline-block">
               스마트블록·지수
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSearchEngineTab('google')}
-            className={`flex-1 py-3 sm:py-3.5 px-3 sm:px-5 rounded-2xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all ${
-              searchEngineTab === 'google'
-                ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white shadow-lg shadow-blue-500/25 scale-[1.01]'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-            }`}
-          >
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-300 animate-pulse shrink-0"></span>
-            <span>🔵 구글 웹 SEO 연구소</span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-white/20 text-white hidden md:inline-block">
-              색인·누락점검 & 티스토리·워드프레스
             </span>
           </button>
         </div>

@@ -99,11 +99,10 @@ export default function Home() {
               Gifty<span className="text-indigo-600">.</span>
             </span>
           </div>
-          <div className="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600">
+          <div className="hidden md:flex items-center gap-7 text-sm font-semibold text-slate-600">
             <a href="/" className="hover:text-indigo-600 transition-colors">홈</a>
             <a href="/guide" className="text-indigo-600 font-extrabold hover:text-indigo-700 transition-colors flex items-center gap-1">꿀팁 가이드 📚</a>
-            <a href="/blog-lab?tab=google" className="text-blue-600 font-extrabold hover:text-blue-700 transition-colors flex items-center gap-1">구글웹 연구소 🌐</a>
-            <a href="/blog-lab?tab=naver" className="text-emerald-600 font-extrabold hover:text-emerald-700 transition-colors flex items-center gap-1">네이버 연구소 🟢</a>
+            <a href="/blog-lab" className="text-indigo-600 font-extrabold hover:text-indigo-700 transition-colors flex items-center gap-1">블로그 연구소 🔬</a>
             <a href="/remove-bg" className="hover:text-indigo-600 transition-colors text-purple-600 font-extrabold">이미지 스튜디오 🎨</a>
             <a href="/neighbor" className="hover:text-emerald-700 transition-colors text-emerald-600 font-extrabold flex items-center gap-1">이웃 소통 지표 📊</a>
             <a href="/about" className="hover:text-indigo-600 transition-colors text-slate-600">서비스 소개</a>
@@ -123,11 +122,10 @@ export default function Home() {
             <a href="/" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl hover:bg-slate-50">홈</a>
             <a href="/guide" className="text-indigo-600 bg-indigo-50 p-3 rounded-xl font-black">꿀팁 가이드 📚</a>
             <a href="/about" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl hover:bg-slate-50">서비스 소개 ℹ️</a>
-            <a href="/blog-lab?tab=google" className="text-blue-600 bg-blue-50 p-3 rounded-xl font-black flex items-center justify-between">
-              <span>구글웹 연구소 (색인·누락) 🌐</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">인기</span>
+            <a href="/blog-lab" className="text-indigo-600 bg-indigo-50 p-3 rounded-xl font-black flex items-center justify-between">
+              <span>블로그 연구소 (네이버·구글) 🔬</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-bold">인기</span>
             </a>
-            <a href="/blog-lab?tab=naver" className="text-emerald-600 bg-emerald-50 p-3 rounded-xl font-black">네이버 연구소 (블록·지수) 🟢</a>
             <a href="/remove-bg" className="text-purple-600 hover:bg-purple-50 p-3 rounded-xl font-black">이미지 스튜디오 🎨</a>
             <a href="/neighbor" className="text-emerald-600 hover:bg-emerald-50 p-3 rounded-xl font-black">이웃 소통 지표 📊</a>
             <a href="/community" className="text-slate-700 hover:bg-slate-50 p-3 rounded-xl">커뮤니티 💬</a>
@@ -143,8 +141,8 @@ export default function Home() {
           <a href="/guide" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-indigo-50 text-indigo-700 font-black text-[12px] rounded-xl border border-indigo-300 shadow-sm active:scale-95 transition-transform">
             📚 꿀팁 가이드
           </a>
-          <a href="/blog-lab?tab=google" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-blue-50 text-blue-700 font-black text-[12px] rounded-xl border border-blue-200 shadow-sm active:scale-95 transition-transform">
-            🌐 구글웹 SEO
+          <a href="/blog-lab" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-indigo-50 text-indigo-700 font-black text-[12px] rounded-xl border border-indigo-200 shadow-sm active:scale-95 transition-transform">
+            🔬 블로그 연구소
           </a>
           <a href="/remove-bg" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-purple-50 text-purple-700 font-bold text-[12px] rounded-xl border border-purple-200/60 shadow-sm active:scale-95 transition-transform">
             🎨 스튜디오
