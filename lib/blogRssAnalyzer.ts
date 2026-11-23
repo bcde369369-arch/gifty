@@ -2,7 +2,7 @@
  * G-Inspect™ 차세대 네이버 블로그 실시간 정밀 진단 & 랭킹 엔진
  * 1단계: 네이버 공식 블로그 탭(ssc=tab.blog.all) 문서 색인(인덱싱) 검사
  * 2단계: 네이버 모바일 스마트블록/VIEW(where=m_view) 실시간 키워드 순위 검사
- * 3단계: 색인 완료 여부 vs 스마트블록 미반영(블라이식 누락) 정밀 분리 판정
+ * 3단계: 색인 완료 여부 vs 스마트블록 미반영(순위 밖) 정밀 분리 판정
  */
 
 import { calculateMyBlogRankEstimate } from '@/lib/blogRankingData';
@@ -13,7 +13,7 @@ export type PostRankStatus =
   | 'rank6_30'          // 🥈 노출권 (6~30위)
   | 'rank2_30'          // 레거시 호환 (2~30위)
   | 'rank30plus'        // 레거시 호환 (30위 밖)
-  | 'smartblock_miss'   // 🟡 색인 정상 / 스마트블록 미반영 (블라이에서 '누락'으로 뜨는 상태)
+  | 'smartblock_miss'   // 🟡 색인 정상 / 스마트블록 미반영 (외부 사이트에서 단순 누락으로 오판정하기 쉬운 상태)
   | 'total_missing'     // 🔴 완전 누락 (네이버 미색인 / 검색 불가)
   | 'missing'           // 레거시 호환
   | 'pending';          // ⚪ 실시간 진단 대기
@@ -377,7 +377,7 @@ export async function checkNaverPostRank(
         rankStatus = 'smartblock_miss';
         rankText = '스마트블록 미반영';
         statusBadge = '색인 정상 / 순위 밖';
-        diagnosticNote = '색인은 정상 완료되었으나 해당 키워드로 스마트블록 30위 밖입니다. (블라이에서 누락으로 표시되는 상태)';
+        diagnosticNote = '색인은 정상 완료되었으나 해당 키워드로 스마트블록 30위 밖입니다. (외부 툴에서 단순 누락으로 오판정하기 쉬운 상태)';
       } else {
         rankStatus = 'total_missing';
         rankText = '완전 누락';

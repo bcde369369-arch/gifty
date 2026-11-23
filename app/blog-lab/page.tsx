@@ -912,14 +912,14 @@ export default function BlogAnalyticsLabPage() {
                 </div>
               </div>
 
-              {/* 블라이(외부 솔루션) 누락 오판정 방지 안내 알림창 */}
+              {/* 외부 솔루션 누락 오판정 방지 안내 알림창 */}
               <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-4 text-xs space-y-1.5">
                 <div className="flex items-center gap-2 text-amber-900 font-black">
                   <Info size={16} className="text-amber-600 shrink-0" />
-                  <span>💡 [필독] 외부 사이트(블라이 등)는 왜 '누락'이라 뜨는데 네이버에선 검색될까요?</span>
+                  <span>💡 [필독] 일반 외부 사이트는 왜 &apos;누락&apos;이라 뜨는데 네이버에선 검색될까요?</span>
                 </div>
                 <p className="text-slate-600 leading-relaxed pl-6">
-                  외부 분석 사이트는 특정 키워드로 <strong>모바일 스마트블록 30위 안에 없으면 단순 '누락'으로 잘못 판정</strong>합니다.
+                  일부 외부 분석 사이트는 특정 키워드로 <strong>모바일 스마트블록 30위 안에 없으면 단순 &apos;누락&apos;으로 잘못 판정</strong>합니다.
                   하지만 실제 네이버에는 문서가 <strong>정상 색인(수집 완료)</strong>되어 제목이나 본문 검색 시 잘 노출됩니다.
                   Gifty G-Inspect™ 엔진은 <strong className="text-emerald-700">공식 색인 완료</strong>와 <strong className="text-amber-700">스마트블록 순위 밖</strong>을 정밀 분리하여 불필요한 혼란을 없애드립니다.
                 </p>
