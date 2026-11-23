@@ -443,14 +443,17 @@ export default function BlogAnalyticsLabPage() {
             <span className="w-2.5 h-2.5 rounded-full bg-cyan-300 animate-pulse shrink-0"></span>
             <span>🔵 구글 웹 SEO 연구소</span>
             <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-white/20 text-white hidden md:inline-block">
-              티스토리·워드프레스
+              색인·누락점검 & 티스토리·워드프레스
             </span>
           </button>
         </div>
 
         {/* 구글 웹 SEO 전용 화면 */}
         {searchEngineTab === 'google' && (
-          <GoogleSeoLabView />
+          <GoogleSeoLabView
+            initialNaverBlogId={blogIdInput}
+            initialNaverPosts={blogData?.posts}
+          />
         )}
 
         {/* 네이버 블로그 전용 화면 */}
