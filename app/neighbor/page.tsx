@@ -242,7 +242,7 @@ export default function NeighborAnalyticsPage() {
     const neighbors: ParsedNeighbor[] = [];
     const seenNicks = new Set<string>();
 
-    const addNeighbor = (nick: string, rawId?: string, group?: string) => {
+    const addNeighbor = (nick: string, rawId?: string, group?: string, addedDate?: string) => {
       const cleanedNick = cleanNickname(nick);
       if (!cleanedNick || isSystemNoise(cleanedNick) || cleanedNick.length < 2) return;
       // 추가 안전장치: 닉네임에 한글 또는 영문 알파벳이 반드시 포함되어야 함 (날짜, 기호 방지)
@@ -267,6 +267,7 @@ export default function NeighborAnalyticsPage() {
       neighbors.push({
         id: validId || cleanedNick,
         nickname: cleanedNick,
+        addedDate,
         group: group || '서로이웃'
       });
     };
@@ -274,6 +275,10 @@ export default function NeighborAnalyticsPage() {
     // 1단계: 탭(\t) 구분 테이블 행 우선 처리 (가장 흔함)
     const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
     for (const line of lines) {
+      // 행에서 날짜 패턴(추가일) 추출: 보통 마지막 날짜가 추가일
+      const dateMatches = line.match(/\b\d{2,4}\.\d{1,2}\.\d{1,2}\b/g);
+      const rowAddedDate = dateMatches && dateMatches.length > 0 ? dateMatches[dateMatches.length - 1] : undefined;
+
       // 파이프(|)가 포함된 라인은 네이버 [닉네임 | 블로그제목] 형태
       if (line.includes('|')) {
         const tabParts = line.split(/[\t]+/).map((p) => p.trim()).filter(Boolean);
@@ -287,7 +292,7 @@ export default function NeighborAnalyticsPage() {
         // 그룹명 추출 (새그룹, 기본그룹, 서로이웃 등)
         const groupPart = tabParts.find((p) => p.includes('그룹') || p.includes('이웃'));
 
-        addNeighbor(pipePart, extractedId, groupPart);
+        addNeighbor(pipePart, extractedId, groupPart, rowAddedDate);
         continue;
       }
 
@@ -297,14 +302,14 @@ export default function NeighborAnalyticsPage() {
         const candidateNick = tabParts.find((p) => !isSystemNoise(p));
         if (candidateNick) {
           const candidateId = tabParts.find((p) => p !== candidateNick && isValidNaverId(p));
-          addNeighbor(candidateNick, candidateId);
+          addNeighbor(candidateNick, candidateId, undefined, rowAddedDate);
           continue;
         }
       }
 
       // 2단계: 줄바꿈된 텍스트 중 단독 닉네임 라인 처리
       if (!isSystemNoise(line)) {
-        addNeighbor(line);
+        addNeighbor(line, undefined, undefined, rowAddedDate);
       }
     }
 
@@ -592,12 +597,28 @@ export default function NeighborAnalyticsPage() {
         return { isComm: false, count: 0, reason: '' };
       };
 
-      // C. 실제 소통 찐이웃과 비소통 이웃 엄격 분리
+      // C. 실제 소통 찐이웃과 비소통 이웃 엄격 분리 + 신규 새이웃(30일 이내) 100% 원천 보호
       type VerifiedNeighbor = ParsedNeighbor & { commentCount: number; commReason: string };
       const verifiedCommunicators: VerifiedNeighbor[] = [];
+      const newProtectedNeighbors: ParsedNeighbor[] = []; // 30일 이내 신규 이웃 (소통 기간 부족으로 무조건 보호)
       const uncommunicatedList: ParsedNeighbor[] = [];
 
       parsedList.forEach((item) => {
+        // 추가일 파싱하여 30일 이내 신규 이웃인지 정밀 판별
+        let daysSinceAdded = 999;
+        if (item.addedDate) {
+          const clean = item.addedDate.replace(/[^0-9.]/g, '').trim();
+          const parts = clean.split('.').filter(Boolean).map(Number);
+          if (parts.length >= 3) {
+            const year = parts[0] < 100 ? parts[0] + 2000 : parts[0];
+            const d = new Date(year, parts[1] - 1, parts[2]);
+            if (!isNaN(d.getTime())) {
+              daysSinceAdded = Math.max(0, Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24)));
+            }
+          }
+        }
+        const isNewNeighbor = daysSinceAdded <= 30; // 맺은 지 30일(1달) 이내인 신규 이웃
+
         const check = checkRealCommunicator(item);
         if (check.isComm) {
           verifiedCommunicators.push({
@@ -605,13 +626,17 @@ export default function NeighborAnalyticsPage() {
             commentCount: check.count,
             commReason: check.reason
           });
+        } else if (isNewNeighbor) {
+          // 신규 이웃은 아직 소통할 기간이 부족하므로 무소통 목록에서 원천 배제하여 안전 보호!
+          newProtectedNeighbors.push(item);
         } else {
+          // 맺은 지 30일이 넘었는데도 소통이 없는 이웃만 무소통 후보로 등록
           uncommunicatedList.push(item);
         }
       });
 
       // D. 무소통 이웃 선별:
-      // ★ 핵심: 소통 이웃은 단 1명도 들어갈 수 없음! 오직 uncommunicatedList 중에서만 하위 N% 선별!
+      // ★ 핵심: 소통 이웃 및 30일 이내 신규 이웃은 단 1명도 들어갈 수 없음! 오직 30일 초과 uncommunicatedList 중에서만 선별!
       const inactiveCount = Math.max(1, Math.round(uncommunicatedList.length * cutoffRatio));
       const rawInactives = uncommunicatedList.slice(uncommunicatedList.length - inactiveCount);
 
@@ -620,16 +645,16 @@ export default function NeighborAnalyticsPage() {
         nickname: item.nickname,
         group: item.group || '기본그룹',
         reason: logNos.length > 0 
-          ? `최근 글 댓글 소통 0회 & 새글 장기 미발행` 
-          : `새글순 기준 장기 미활동 (하위 ${Math.round(cutoffRatio * 100)}%)`,
+          ? `맺은 지 30일 초과 & 최근 댓글 소통 0회` 
+          : `맺은 지 30일 초과 & 장기 미활동 (하위 ${Math.round(cutoffRatio * 100)}%)`,
         selected: false // ★ 소통 이웃이 실수로 일괄 삭제되는 것을 100% 방지하기 위해 기본 선택 해제
       }));
       setInactiveNeighbors(formattedInactives);
 
       // E. 찐이웃 랭킹 구성 및 이전 히스토리 대비 지표 산출
       // 1순위: 실제 댓글 작성자 및 보호 이웃 (100% 실데이터)
-      // 2순위: 새글순 최상위 활성 이웃
-      const remainingTops = uncommunicatedList.slice(0, Math.max(0, 10 - verifiedCommunicators.length));
+      // 2순위: 신규 새이웃 및 최상위 활성 이웃
+      const remainingTops = [...newProtectedNeighbors, ...uncommunicatedList].slice(0, Math.max(0, 10 - verifiedCommunicators.length));
       const combinedTops = [...verifiedCommunicators, ...remainingTops];
 
       // 이전 기록 불러오기 (비교용)
@@ -1057,26 +1082,89 @@ export default function NeighborAnalyticsPage() {
         if (!t) return;
         const cb = r.querySelector('input[type="checkbox"]');
 
-        // [A] 공감/댓글 소통 이웃 100% 보호 (체크 해제 및 초록색 강조)
+        // [A-1] 공감/댓글 소통 이웃 확인
         let isSafe = false;
         liveSafeNicks.forEach(sn => {
           if (t.includes(sn)) isSafe = true;
         });
 
-        if (isSafe) {
+        // [A-2] 그룹 화이트리스트 절대 보호: '찐이웃', '지인', '가족' 등 지정 그룹 무조건 100% 안전 보호
+        const isProtectedGroup = ['찐이웃', '지인', '가족', 'vip', '보호', '서포터즈', '기자단', '단골'].some(kw => t.includes(kw));
+
+        // [A-3] 신규 맺은 이웃(30일 이내) 100% 무조건 안심 보호
+        let addedDate = null;
+        const tds = r.querySelectorAll('td');
+        if (tds && tds.length >= 6) {
+          const addedTdText = (tds[tds.length - 1]?.innerText || '').replace(/[^0-9.]/g, '').trim();
+          const p = addedTdText.split('.').filter(Boolean).map(Number);
+          if (p.length >= 3) {
+            let y = p[0] < 100 ? p[0] + 2000 : p[0];
+            addedDate = new Date(y, p[1] - 1, p[2]);
+          }
+        }
+        if (!addedDate) {
+          const dMatches = t.match(/\\b\\d{2,4}\\.\\d{1,2}\\.\\d{1,2}\\b/g) || [];
+          if (dMatches.length > 0) {
+            const p = dMatches[dMatches.length - 1].replace(/[^0-9.]/g, '').split('.').filter(Boolean).map(Number);
+            if (p.length >= 3) {
+              let y = p[0] < 100 ? p[0] + 2000 : p[0];
+              addedDate = new Date(y, p[1] - 1, p[2]);
+            }
+          }
+        }
+
+        const now = Date.now();
+        const daysSinceAdded = addedDate ? Math.max(0, Math.floor((now - addedDate.getTime()) / 86400000)) : 0;
+        const isNewNeighbor = daysSinceAdded <= 30; // 30일(1달) 이내 신규 이웃
+
+        // 뱃지 부착 헬퍼
+        const blogLink = r.querySelector('a[href*="blog.naver.com"]');
+        const badgeTarget = blogLink || (tds.length >= 4 ? tds[3] : r);
+        function attachBadge(txt, color, bg) {
+          try {
+            badgeTarget.querySelectorAll('.gifty-reason-badge').forEach(b => b.remove());
+            const b = document.createElement('span');
+            b.className = 'gifty-reason-badge';
+            b.style.cssText = 'display:inline-block;margin-left:6px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:bold;color:' + color + ';background:' + bg + ';vertical-align:middle;';
+            b.innerText = txt;
+            badgeTarget.appendChild(b);
+          } catch(e){}
+        }
+
+        // 소통 이웃이거나 찐이웃 그룹, 또는 30일 이내 신규 이웃은 100% 안전 보호 (체크 해제 및 초록색 강조)
+        if (isSafe || isProtectedGroup || isNewNeighbor) {
           if (cb && cb.checked) {
             cb.checked = false;
             cb.dispatchEvent(new Event('change', { bubbles: true }));
           }
           r.style.backgroundColor = '#dcfce7';
           r.style.outline = '2px solid #22c55e';
+          
+          if (isProtectedGroup) attachBadge('🛡️ 찐이웃 그룹', '#047857', '#ecfdf5');
+          else if (isNewNeighbor) attachBadge('🛡️ 새이웃 (D+' + daysSinceAdded + '일)', '#047857', '#ecfdf5');
+          else attachBadge('🛡️ 찐소통 이웃', '#047857', '#ecfdf5');
+
           protectedCount++;
           return;
         }
 
-        // [B] 무소통 이웃 자동 체크 (체크 선택 및 분홍색 강조)
+        // [B-1] 탈퇴/비공개 블로그 1순위 타겟팅
+        const isDeletedOrPrivate = !blogLink || t.includes('비공개') || t.includes('탈퇴') || t.includes('존재하지 않는');
+        if (isDeletedOrPrivate && cb) {
+          if (!cb.checked) {
+            cb.checked = true;
+            cb.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+          r.style.backgroundColor = '#ffe4e6';
+          r.style.outline = '2px solid #f43f5e';
+          attachBadge('❌ 탈퇴/비공개 의심', '#6d28d9', '#f5f3ff');
+          checkedCount++;
+          return;
+        }
+
+        // [B-2] 무소통 이웃 자동 체크 (30일 초과된 이웃 중 대상자만 체크 선택 및 분홍색 강조)
         const isTarget = targets.some(n => t.includes(n.toLowerCase()));
-        if (isTarget && cb) {
+        if (isTarget && !isNewNeighbor && cb) {
           if (!cb.checked) {
             cb.checked = true;
             cb.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1084,6 +1172,7 @@ export default function NeighborAnalyticsPage() {
           }
           r.style.backgroundColor = '#ffe4e6';
           r.style.outline = '2px solid #f43f5e';
+          attachBadge('❌ 30일 초과 무소통', '#be123c', '#fff1f2');
           checkedCount++;
         }
       });
@@ -1097,9 +1186,10 @@ export default function NeighborAnalyticsPage() {
 
   if (checkedCount > 0 || protectedCount > 0) {
     alert('🎉 [Gifty 스마트 이웃 정리 완료]\\n\\n' +
-      '🛡️ 공감·댓글 찐이웃 보호: ' + protectedCount + '명 (초록색 표시 & 체크 해제)\\n' +
-      '❌ 무소통 이웃 자동 선택: ' + checkedCount + '명 (분홍색 표시 & 체크 완료)\\n\\n' +
-      '소통 이웃은 안전하게 보호되었습니다! 상단의 [이웃 삭제] 버튼을 누르시면 안전하게 정리됩니다.');
+      '🛡️ 찐이웃·신규이웃(30일 이내) 보호: ' + protectedCount + '명 (초록색 표시 & 체크 해제)\\n' +
+      '❌ 30일 초과 무소통 이웃 자동 선택: ' + checkedCount + '명 (분홍색 표시 & 체크 완료)\\n\\n' +
+      '※ 맺은 지 1달(30일) 이내의 새이웃은 억울하게 삭제되지 않도록 100% 안전 보호(초록색)되었습니다.\\n' +
+      '상단의 [이웃 삭제] 버튼을 누르시면 안전하게 정리됩니다.');
   } else {
     alert('💡 [알림] 네이버 내부 프레임(mainFrame) 선택이 필요합니다!\\n\\n' +
       '1. 현재 F12 콘솔 창 상단의 [top ▾] 버튼을 클릭해 주세요.\\n' +

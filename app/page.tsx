@@ -101,12 +101,12 @@ export default function Home() {
           </div>
           <div className="hidden md:flex items-center gap-7 text-sm font-semibold text-slate-600">
             <a href="/" className="hover:text-indigo-600 transition-colors">홈</a>
-            <a href="/blog-lab" className="text-indigo-600 font-extrabold hover:text-indigo-700 transition-colors flex items-center gap-1">연구소(SEO) 🔬</a>
-            <a href="/neighbor" className="hover:text-emerald-700 transition-colors text-emerald-600 font-extrabold flex items-center gap-1">이웃 소통 지표 📊</a>
-            <a href="/community" className="hover:text-indigo-600 transition-colors text-slate-600 flex items-center gap-1">커뮤니티 💬</a>
-            <a href="/experience-diary" className="hover:text-indigo-600 transition-colors text-blue-600">체험단 다이어리 📓</a>
-            <a href="/sticker" className="hover:text-pink-700 transition-colors text-pink-600 font-extrabold">블로그 스티커 🎨</a>
+            <a href="/guide" className="text-indigo-600 font-extrabold hover:text-indigo-700 transition-colors flex items-center gap-1">꿀팁 가이드 📚</a>
+            <a href="/blog-lab" className="text-slate-600 hover:text-indigo-600 transition-colors flex items-center gap-1">연구소(SEO) 🔬</a>
             <a href="/remove-bg" className="hover:text-indigo-600 transition-colors text-purple-600 font-extrabold">이미지 스튜디오 🎨</a>
+            <a href="/neighbor" className="hover:text-emerald-700 transition-colors text-emerald-600 font-extrabold flex items-center gap-1">이웃 소통 지표 📊</a>
+            <a href="/about" className="hover:text-indigo-600 transition-colors text-slate-600">서비스 소개</a>
+            <a href="/community" className="hover:text-indigo-600 transition-colors text-slate-600 flex items-center gap-1">커뮤니티 💬</a>
           </div>
           <button 
             className="md:hidden text-slate-500 hover:text-slate-800"
@@ -120,12 +120,14 @@ export default function Home() {
         {isMobileMenuOpen && (
           <div className="md:hidden bg-white border-b border-slate-100 shadow-md w-full flex flex-col p-4 gap-2 text-sm font-bold absolute top-16 left-0">
             <a href="/" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl hover:bg-slate-50">홈</a>
-            <a href="/blog-lab" className="text-indigo-600 bg-indigo-50 p-3 rounded-xl font-black">연구소(SEO) 🔬</a>
+            <a href="/guide" className="text-indigo-600 bg-indigo-50 p-3 rounded-xl font-black">꿀팁 가이드 📚</a>
+            <a href="/about" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl hover:bg-slate-50">서비스 소개 ℹ️</a>
+            <a href="/blog-lab" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl">연구소(SEO) 🔬</a>
+            <a href="/remove-bg" className="text-purple-600 hover:bg-purple-50 p-3 rounded-xl font-black">이미지 스튜디오 🎨</a>
             <a href="/neighbor" className="text-emerald-600 hover:bg-emerald-50 p-3 rounded-xl font-black">이웃 소통 지표 📊</a>
             <a href="/community" className="text-slate-700 hover:bg-slate-50 p-3 rounded-xl">커뮤니티 💬</a>
             <a href="/experience-diary" className="text-blue-600 hover:bg-blue-50 p-3 rounded-xl">체험단 다이어리 📓</a>
             <a href="/sticker" className="text-pink-600 hover:bg-pink-50 p-3 rounded-xl">블로그 스티커 🎨</a>
-            <a href="/remove-bg" className="text-purple-600 hover:bg-purple-50 p-3 rounded-xl font-black">이미지 스튜디오 🎨</a>
           </div>
         )}
       </nav>
@@ -133,23 +135,23 @@ export default function Home() {
       {/* Mobile Quick Links (Category Bar - 모바일 전체 카테고리 노출) */}
       <div className="md:hidden w-full bg-white border-b border-slate-200/80 p-2.5 shadow-sm z-40 relative">
         <div className="grid grid-cols-3 gap-1.5 text-center">
-          <a href="/blog-lab" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-indigo-50 text-indigo-700 font-black text-[12px] rounded-xl border border-indigo-300 shadow-sm active:scale-95 transition-transform">
+          <a href="/guide" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-indigo-50 text-indigo-700 font-black text-[12px] rounded-xl border border-indigo-300 shadow-sm active:scale-95 transition-transform">
+            📚 꿀팁 가이드
+          </a>
+          <a href="/blog-lab" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-slate-50 text-slate-700 font-bold text-[12px] rounded-xl border border-slate-200 shadow-sm active:scale-95 transition-transform">
             🔬 연구소(SEO)
+          </a>
+          <a href="/remove-bg" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-purple-50 text-purple-700 font-bold text-[12px] rounded-xl border border-purple-200/60 shadow-sm active:scale-95 transition-transform">
+            🎨 스튜디오
           </a>
           <a href="/neighbor" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-emerald-50 text-emerald-800 font-bold text-[12px] rounded-xl border border-emerald-300 shadow-sm active:scale-95 transition-transform">
             📊 이웃 소통
           </a>
-          <a href="/sticker" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-pink-50 text-pink-700 font-bold text-[12px] rounded-xl border border-pink-200/60 shadow-sm active:scale-95 transition-transform">
-            🎨 스티커
-          </a>
-          <a href="/experience-diary" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-blue-50 text-blue-700 font-bold text-[12px] rounded-xl border border-blue-200/60 shadow-sm active:scale-95 transition-transform">
-            📓 체험단
+          <a href="/about" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-blue-50 text-blue-700 font-bold text-[12px] rounded-xl border border-blue-200/60 shadow-sm active:scale-95 transition-transform">
+            ℹ️ 소개
           </a>
           <a href="/community" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-slate-100 text-slate-700 font-bold text-[12px] rounded-xl border border-slate-200 shadow-sm active:scale-95 transition-transform">
             💬 커뮤니티
-          </a>
-          <a href="/remove-bg" className="flex items-center justify-center gap-1 py-2 px-1.5 bg-purple-50 text-purple-700 font-bold text-[12px] rounded-xl border border-purple-200/60 shadow-sm active:scale-95 transition-transform">
-            🎨 이미지스튜디오
           </a>
         </div>
       </div>
@@ -174,7 +176,7 @@ export default function Home() {
         {/* Text Area */}
         <div className="flex-1 text-center md:text-left z-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold mb-6 tracking-wide uppercase">
-            <Wand2 size={14} /> {isLoaded ? settings.heroTagline : '로딩 중...'}
+            <Wand2 size={14} /> {isLoaded ? settings.heroTagline : '100% 무료 고화질 움짤 메이커'}
           </div>
           <h1 className="text-5xl md:text-6xl font-extrabold text-slate-900 leading-tight mb-6">
             동영상을 올리면 <br />
@@ -220,8 +222,8 @@ export default function Home() {
             <CoupangSupportCard category="general" />
           </div>
 
-          {/* Global Coupang Partners Banner (업로드 상자 바로 밑에 밀착 배치) */}
-          {isLoaded && (
+          {/* Global Coupang Partners Banner (심사 클린 모드에서는 안전하게 숨김) */}
+          {isLoaded && settings.showCoupangAds && (
             <div className="mt-3.5 flex flex-col justify-center items-center">
               {/* PC Banner */}
               {settings.coupangBannerHtml && (
@@ -280,23 +282,25 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Affiliate Marketing Banner */}
-      <section className="max-w-4xl mx-auto px-6 py-12">
-        <a href={settings.affiliateLink} target="_blank" rel="noopener noreferrer" className="block group">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl p-8 md:p-10 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl transform transition-transform group-hover:-translate-y-1">
-            <div>
-              <div className="text-blue-200 text-sm font-bold tracking-widest uppercase mb-2">Sponsor</div>
-              <h3 className="text-2xl md:text-3xl font-bold mb-2">{isLoaded ? settings.affiliateTitle : '로딩 중...'}</h3>
-              <p className="text-blue-100 text-lg">{isLoaded ? settings.affiliateSubtitle : ''}</p>
-            </div>
-            <div className="flex-shrink-0">
-              <div className="px-6 py-3 bg-white text-indigo-700 font-extrabold rounded-full flex items-center gap-2 group-hover:bg-blue-50 transition-colors shadow-lg">
-                무료 체험하기 <ExternalLink size={18} />
+      {/* Affiliate Marketing Banner (애드센스 심사 클린 모드에서는 안전하게 숨김) */}
+      {isLoaded && settings.showCoupangAds && settings.affiliateLink && (
+        <section className="max-w-4xl mx-auto px-6 py-12">
+          <a href={settings.affiliateLink} target="_blank" rel="noopener noreferrer" className="block group">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl p-8 md:p-10 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl transform transition-transform group-hover:-translate-y-1">
+              <div>
+                <div className="text-blue-200 text-sm font-bold tracking-widest uppercase mb-2">Sponsor</div>
+                <h3 className="text-2xl md:text-3xl font-bold mb-2">{isLoaded ? settings.affiliateTitle : '스폰서 안내'}</h3>
+                <p className="text-blue-100 text-lg">{isLoaded ? settings.affiliateSubtitle : ''}</p>
+              </div>
+              <div className="flex-shrink-0">
+                <div className="px-6 py-3 bg-white text-indigo-700 font-extrabold rounded-full flex items-center gap-2 group-hover:bg-blue-50 transition-colors shadow-lg">
+                  무료 체험하기 <ExternalLink size={18} />
+                </div>
               </div>
             </div>
-          </div>
-        </a>
-      </section>
+          </a>
+        </section>
+      )}
 
       {/* Community Preview */}
       <CommunityPreview />

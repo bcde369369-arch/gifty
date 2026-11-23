@@ -3,14 +3,16 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { MessageSquare, ArrowRight, ThumbsUp, MessageCircle, PenTool } from 'lucide-react';
-import { Post, getPosts, CATEGORY_LABELS } from '@/lib/community';
+import { Post, getPosts, CATEGORY_LABELS, INITIAL_POSTS } from '@/lib/community';
 
 export default function CommunityPreview() {
-  const [recentPosts, setRecentPosts] = useState<Post[]>([]);
+  const [recentPosts, setRecentPosts] = useState<Post[]>(() => INITIAL_POSTS.slice(0, 3));
 
   useEffect(() => {
     const all = getPosts();
-    setRecentPosts(all.slice(0, 3));
+    if (all && all.length > 0) {
+      setRecentPosts(all.slice(0, 3));
+    }
   }, []);
 
   return (

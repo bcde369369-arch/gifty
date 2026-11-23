@@ -22,7 +22,8 @@ import {
   CATEGORIES, 
   CATEGORY_LABELS, 
   getPosts, 
-  savePosts 
+  savePosts,
+  INITIAL_POSTS 
 } from '@/lib/community';
 import { generateSmartComments } from '@/lib/autoResponder';
 import { 
@@ -35,7 +36,7 @@ import { useSiteSettings } from '@/lib/settings';
 
 export default function CommunityPage() {
   const { settings, isLoaded } = useSiteSettings();
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -528,14 +529,14 @@ export default function CommunityPage() {
           </Link>
           <div className="hidden md:flex items-center gap-7 text-sm font-semibold text-slate-600">
             <Link href="/" className="hover:text-indigo-600 transition-colors">홈</Link>
-            <Link href="/blog-lab" className="hover:text-indigo-600 transition-colors text-indigo-600 font-extrabold flex items-center gap-1">연구소(SEO) 🔬</Link>
+            <Link href="/guide" className="hover:text-indigo-600 transition-colors text-indigo-600 font-extrabold flex items-center gap-1">꿀팁 가이드 📚</Link>
+            <Link href="/blog-lab" className="hover:text-indigo-600 transition-colors text-slate-600 flex items-center gap-1">연구소(SEO) 🔬</Link>
+            <Link href="/remove-bg" className="hover:text-indigo-600 transition-colors text-purple-600 font-extrabold">이미지 스튜디오 🎨</Link>
             <Link href="/neighbor" className="hover:text-emerald-700 transition-colors text-emerald-600 font-extrabold flex items-center gap-1">이웃 소통 지표 📊</Link>
+            <Link href="/about" className="hover:text-indigo-600 transition-colors text-slate-600">서비스 소개</Link>
             <Link href="/community" className="text-indigo-600 font-extrabold flex items-center gap-1">
               커뮤니티 💬 <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
             </Link>
-            <Link href="/experience-diary" className="hover:text-indigo-600 transition-colors text-blue-600">체험단 다이어리 📓</Link>
-            <Link href="/sticker" className="hover:text-pink-700 transition-colors text-pink-600 font-extrabold">블로그 스티커 🎨</Link>
-            <Link href="/remove-bg" className="hover:text-indigo-600 transition-colors text-purple-600 font-extrabold">이미지 스튜디오 🎨</Link>
           </div>
           <button 
             className="md:hidden text-slate-500 hover:text-slate-800"
@@ -549,12 +550,14 @@ export default function CommunityPage() {
         {isMobileMenuOpen && (
           <div className="md:hidden bg-white border-b border-slate-100 shadow-md w-full flex flex-col p-4 gap-2 text-sm font-bold absolute top-16 left-0 z-50">
             <Link href="/" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl hover:bg-slate-50">홈</Link>
-            <Link href="/blog-lab" className="text-indigo-600 bg-indigo-50 p-3 rounded-xl font-black">연구소(SEO) 🔬</Link>
+            <Link href="/guide" className="text-indigo-600 bg-indigo-50 p-3 rounded-xl font-black">꿀팁 가이드 📚</Link>
+            <Link href="/about" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl hover:bg-slate-50">서비스 소개 ℹ️</Link>
+            <Link href="/blog-lab" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl">연구소(SEO) 🔬</Link>
+            <Link href="/remove-bg" className="text-purple-600 hover:bg-purple-50 p-3 rounded-xl font-black">이미지 스튜디오 🎨</Link>
             <Link href="/neighbor" className="text-emerald-600 hover:bg-emerald-50 p-3 rounded-xl font-black">이웃 소통 지표 📊</Link>
             <Link href="/community" className="text-indigo-600 bg-indigo-50 p-3 rounded-xl">커뮤니티 💬</Link>
             <Link href="/experience-diary" className="text-blue-600 hover:bg-blue-50 p-3 rounded-xl">체험단 다이어리 📓</Link>
             <Link href="/sticker" className="text-pink-600 hover:bg-pink-50 p-3 rounded-xl">블로그 스티커 🎨</Link>
-            <Link href="/remove-bg" className="text-purple-600 hover:bg-purple-50 p-3 rounded-xl font-black">이미지 스튜디오 🎨</Link>
           </div>
         )}
       </nav>
