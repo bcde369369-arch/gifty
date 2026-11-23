@@ -80,18 +80,21 @@ export default function BlogAnalyticsLabPage() {
   // ==========================================
   // [메인 탭 & 랭킹 시스템 전용 상태]
   // ==========================================
-  const [searchEngineTab, setSearchEngineTab] = useState<'naver' | 'google'>('naver');
+  // 기본값을 'google'로 설정하여 접속 즉시 구글 웹 연구소(누락글 점검)가 바로 열리도록 설정
+  const [searchEngineTab, setSearchEngineTab] = useState<'naver' | 'google'>('google');
   const [labMainTab, setLabMainTab] = useState<'ranking' | 'audit'>('ranking');
   const [rankingSubTab, setRankingSubTab] = useState<'all' | 'my'>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('전체');
   const [selectedSource, setSelectedSource] = useState<string>('전체');
 
-  // URL 쿼리 파라미터 (?tab=google 또는 ?engine=google 또는 ?google=true) 감지 시 구글 연구소 자동 선택
+  // URL 쿼리 파라미터 (?tab=google 또는 ?tab=naver 또는 ?engine=...) 감지
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get('tab') || params.get('engine');
-      if (tab === 'google' || params.has('google')) {
+      if (tab === 'naver') {
+        setSearchEngineTab('naver');
+      } else if (tab === 'google') {
         setSearchEngineTab('google');
       }
     }
@@ -382,12 +385,27 @@ export default function BlogAnalyticsLabPage() {
               Gifty<span className="text-indigo-600">.</span>
             </span>
           </Link>
-          <div className="hidden md:flex items-center gap-7 text-sm font-semibold text-slate-600">
+          <div className="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600">
             <Link href="/" className="hover:text-indigo-600 transition-colors">홈</Link>
             <Link href="/guide" className="hover:text-indigo-600 transition-colors text-indigo-600 font-extrabold flex items-center gap-1">꿀팁 가이드 📚</Link>
-            <Link href="/blog-lab" className="text-indigo-600 font-extrabold hover:text-indigo-700 transition-colors flex items-center gap-1">
-              연구소(SEO) 🔬
-            </Link>
+            <button
+              type="button"
+              onClick={() => setSearchEngineTab('google')}
+              className={`font-black flex items-center gap-1 transition-colors py-1 px-2.5 rounded-xl ${
+                searchEngineTab === 'google' ? 'bg-blue-50 text-blue-600 font-black' : 'text-slate-600 hover:text-blue-600'
+              }`}
+            >
+              구글웹 연구소 🌐
+            </button>
+            <button
+              type="button"
+              onClick={() => setSearchEngineTab('naver')}
+              className={`font-black flex items-center gap-1 transition-colors py-1 px-2.5 rounded-xl ${
+                searchEngineTab === 'naver' ? 'bg-emerald-50 text-emerald-600 font-black' : 'text-slate-600 hover:text-emerald-600'
+              }`}
+            >
+              네이버 연구소 🟢
+            </button>
             <Link href="/remove-bg" className="hover:text-indigo-600 transition-colors text-purple-600 font-extrabold">
               이미지 스튜디오 🎨
             </Link>
@@ -412,7 +430,25 @@ export default function BlogAnalyticsLabPage() {
             <Link href="/" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl hover:bg-slate-50">홈</Link>
             <Link href="/guide" className="text-indigo-600 bg-indigo-50 p-3 rounded-xl font-black">꿀팁 가이드 📚</Link>
             <Link href="/about" className="text-slate-700 hover:text-indigo-600 p-3 rounded-xl hover:bg-slate-50">서비스 소개 ℹ️</Link>
-            <Link href="/blog-lab" className="text-indigo-600 bg-indigo-50 p-3 rounded-xl font-black">연구소(SEO) 🔬</Link>
+            <button
+              type="button"
+              onClick={() => { setSearchEngineTab('google'); setIsMobileMenuOpen(false); }}
+              className={`text-left p-3 rounded-xl font-black flex items-center justify-between ${
+                searchEngineTab === 'google' ? 'bg-blue-50 text-blue-600' : 'text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <span>구글웹 연구소 (실시간 색인·누락) 🌐</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-extrabold">기본</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSearchEngineTab('naver'); setIsMobileMenuOpen(false); }}
+              className={`text-left p-3 rounded-xl font-black flex items-center justify-between ${
+                searchEngineTab === 'naver' ? 'bg-emerald-50 text-emerald-600' : 'text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <span>네이버 연구소 (블록·지수) 🟢</span>
+            </button>
             <Link href="/remove-bg" className="text-purple-600 hover:bg-purple-50 p-3 rounded-xl font-black">이미지 스튜디오 🎨</Link>
             <Link href="/neighbor" className="text-emerald-600 hover:bg-emerald-50 p-3 rounded-xl font-black">이웃 소통 지표 📊</Link>
             <Link href="/community" className="text-slate-700 hover:bg-slate-50 p-3 rounded-xl">커뮤니티 💬</Link>
