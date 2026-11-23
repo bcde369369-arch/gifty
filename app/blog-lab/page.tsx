@@ -86,6 +86,17 @@ export default function BlogAnalyticsLabPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('전체');
   const [selectedSource, setSelectedSource] = useState<string>('전체');
 
+  // URL 쿼리 파라미터 (?tab=google 또는 ?engine=google 또는 ?google=true) 감지 시 구글 연구소 자동 선택
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab') || params.get('engine');
+      if (tab === 'google' || params.has('google')) {
+        setSearchEngineTab('google');
+      }
+    }
+  }, []);
+
   // 발행일 YYYY.MM.DD (년.월.일) 정밀 포맷터 (예: 2026.11.03)
   const formatDateToDot = (dateStr?: string): string => {
     if (!dateStr) return '2026.11.03';
