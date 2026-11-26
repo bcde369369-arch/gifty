@@ -2265,7 +2265,7 @@ export default function ImageStudioPage() {
             className="px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs sm:text-sm rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer active:scale-95"
           >
             <Crop size={16} />
-            <span>🎯 원하는 영역 지정 캡처 &amp; 부분 녹화 (모바비식)</span>
+            <span>🎯 원하는 영역 지정 캡처 &amp; 부분 녹화</span>
             <span className="text-[10px] bg-white text-orange-600 font-black px-1.5 py-0.5 rounded-full">
               HOT
             </span>
@@ -2340,7 +2340,7 @@ export default function ImageStudioPage() {
                     className="px-3.5 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-bold rounded-xl border border-orange-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
                     <Crop size={14} />
-                    <span>영역 지정 캡처 (모바비식)</span>
+                    <span>자유 영역 지정 캡처</span>
                   </button>
                   <button
                     type="button"
@@ -2672,7 +2672,7 @@ export default function ImageStudioPage() {
                     className="px-3.5 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-bold rounded-xl border border-orange-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
                     <Crop size={14} />
-                    <span>영역 지정 캡처 (모바비식)</span>
+                    <span>자유 영역 지정 캡처</span>
                   </button>
                   <button
                     type="button"
@@ -3501,7 +3501,7 @@ export default function ImageStudioPage() {
                     className="px-4 py-2.5 bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs sm:text-sm font-bold rounded-xl border border-orange-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
                     <Crop size={15} />
-                    <span>영역 지정 캡처 (모바비식)</span>
+                    <span>자유 영역 지정 캡처</span>
                   </button>
                   <button
                     type="button"

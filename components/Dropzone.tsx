@@ -80,7 +80,7 @@ export default function Dropzone({ onFileSelect, onOpenRecord }: DropzoneProps) 
             className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs md:text-sm font-black rounded-full shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
           >
             <Crop size={15} />
-            <span>🎯 영역 지정 녹화 (모바비식)</span>
+            <span>🎯 원하는 영역 지정 녹화</span>
           </button>
         )}
       </div>

@@ -53,7 +53,7 @@ export default function ScreenCaptureModal({
   const [activeTab, setActiveTab] = useState<'movavi' | 'screenshot' | 'record'>(initialTab);
   const [isSupported, setIsSupported] = useState(true);
 
-  // 모바비 스타일 스튜디오 상태
+  // 자유 영역 지정 스튜디오 상태
   const [isMovaviOpen, setIsMovaviOpen] = useState(false);
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -88,7 +88,7 @@ export default function ScreenCaptureModal({
     stageH: number;
   } | null>(null);
 
-  // 녹화 관련 상태 (모바비 스튜디오 내부 및 단독 녹화 공용)
+  // 녹화 관련 상태 (자유 영역 스튜디오 내부 및 단독 녹화 공용)
   const [recordDuration, setRecordDuration] = useState<number>(10); // 초 단위 (5, 10, 15, 0=무제한)
   const [includeAudio, setIncludeAudio] = useState<boolean>(false);
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -146,7 +146,7 @@ export default function ScreenCaptureModal({
   };
 
   // =========================================================
-  // [1] 모바비 스타일 인터랙티브 캡처 스튜디오 시작
+  // [1] 자유 영역 인터랙티브 캡처 스튜디오 시작
   // =========================================================
   const launchMovaviStudio = async () => {
     try {
@@ -328,7 +328,7 @@ export default function ScreenCaptureModal({
   const isSafeSize = parseFloat(estimatedGifSizeMB) <= 19.5;
 
   // =========================================================
-  // [2] 모바비 오렌지 프레임 내부 스크린샷 캡처 (100% 무손실 DPI)
+  // [2] 오렌지 프레임 내부 스크린샷 캡처 (100% 무손실 DPI)
   // =========================================================
   const captureMovaviAreaScreenshot = () => {
     if (!videoRef.current) return;
@@ -365,7 +365,7 @@ export default function ScreenCaptureModal({
   };
 
   // =========================================================
-  // [3] 모바비 오렌지 프레임 내부만 '실시간 부분 화면 녹화'
+  // [3] 오렌지 프레임 내부만 '실시간 부분 화면 녹화'
   // =========================================================
   const startMovaviAreaRecording = () => {
     if (!videoRef.current || !videoStream) return;
@@ -503,7 +503,7 @@ export default function ScreenCaptureModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200">
       {/* ========================================================================= */}
-      {/* [A] 모바비 스타일 전체 인터랙티브 스튜디오 오버레이 (화면 선택 시 풀스크린 가동) */}
+      {/* [A] 자유 영역 전체 인터랙티브 스튜디오 오버레이 (화면 선택 시 풀스크린 가동) */}
       {/* ========================================================================= */}
       {isMovaviOpen ? (
         <div className="relative w-full h-[96vh] max-w-7xl bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-slate-700 flex flex-col">
@@ -512,7 +512,7 @@ export default function ScreenCaptureModal({
             <div className="flex items-center gap-3">
               <div className="px-3 py-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg text-xs font-black shadow-xs flex items-center gap-1.5">
                 <Crop size={14} />
-                <span>모바비식 영역 선택 스튜디오</span>
+                <span>자유 영역 지정 스튜디오</span>
               </div>
               <span className="text-xs font-bold text-orange-400 bg-orange-950/80 border border-orange-800/80 px-2.5 py-1 rounded-md">
                 📐 {currentPixelWidth} × {currentPixelHeight} px
@@ -617,7 +617,7 @@ export default function ScreenCaptureModal({
                   </div>
                 </div>
 
-                {/* 8방향 리사이즈 핸들러 (모바비 스타일) */}
+                {/* 8방향 리사이즈 핸들러 */}
                 {!isRecording && (
                   <>
                     <div
@@ -658,7 +658,7 @@ export default function ScreenCaptureModal({
             </div>
           </div>
 
-          {/* 하단 모바비 플로팅 조작 툴바 (이 영역 캡처 vs 이 영역 녹화) */}
+          {/* 하단 플로팅 조작 툴바 (이 영역 캡처 vs 이 영역 녹화) */}
           <div className="bg-slate-900 border-t border-slate-800 px-6 py-4 flex flex-wrap items-center justify-between gap-4 z-30">
             {/* 용량 및 네이버 블로그 안전 배지 */}
             <div className="flex items-center gap-3 text-xs">
@@ -792,7 +792,7 @@ export default function ScreenCaptureModal({
                   화면 캡처 &amp; 녹화 스튜디오
                 </h3>
                 <p className="text-xs text-slate-500 font-medium">
-                  모바비처럼 원하는 크기를 오렌지 프레임으로 직접 지정합니다
+                  원하는 크기를 조절 프레임으로 자유롭게 직접 지정합니다
                 </p>
               </div>
             </div>
@@ -815,7 +815,7 @@ export default function ScreenCaptureModal({
               }`}
             >
               <Crop size={16} />
-              <span>🎯 영역 지정 (모바비식)</span>
+              <span>🎯 자유 영역 지정</span>
               <span className="text-[10px] font-black bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">
                 BEST
               </span>
@@ -859,7 +859,7 @@ export default function ScreenCaptureModal({
             </div>
           ) : (
             <div className="p-6">
-              {/* [탭 1: 모바비식 영역 지정 캡처 & 부분 녹화 (추천)] */}
+              {/* [탭 1: 자유 영역 지정 캡처 & 부분 녹화 (추천)] */}
               {activeTab === 'movavi' && (
                 <div className="space-y-4">
                   <div className="p-4 bg-orange-50/70 border border-orange-200 rounded-2xl">
@@ -871,7 +871,7 @@ export default function ScreenCaptureModal({
                         <strong className="text-sm font-black text-orange-900 block mb-1">
                           내가 원하는 크기와 위치만 쏙!
                         </strong>
-                        화면을 선택하면 <strong>모바비 스타일의 오렌지색 조절 프레임</strong>이 뜹니다.
+                        화면을 선택하면 <strong>자유롭게 크기를 맞추는 조절 프레임</strong>이 뜹니다.
                         마우스로 원하는 크기로 자유롭게 늘리고 줄여서 <strong>스크린샷 캡처</strong> 또는 <strong>그 영역만 부분 녹화</strong>하세요!
                       </div>
                     </div>
@@ -997,7 +997,7 @@ export default function ScreenCaptureModal({
               {activeTab === 'record' && (
                 <div className="space-y-4">
                   <p className="text-xs text-slate-600 leading-relaxed">
-                    특정 영역만 잘라서 녹화하려면 상단의 <strong>[🎯 영역 지정 (모바비식)]</strong> 탭을 이용해 주세요.
+                    특정 영역만 잘라서 녹화하려면 상단의 <strong>[🎯 자유 영역 지정]</strong> 탭을 이용해 주세요.
                   </p>
                   <button
                     type="button"
