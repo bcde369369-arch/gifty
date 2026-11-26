@@ -47,6 +47,7 @@ import {
   Leaf,
   Camera,
   Video,
+  Crop,
   Sunset,
   Gem,
   ShoppingBag,
@@ -345,7 +346,7 @@ export default function ImageStudioPage() {
   // 상단 메인 모드 탭: 'remove-bg' (AI 배경제거) vs 'enhance' (사진 보정 & 그림자 복원) vs 'design' (미리캔버스 썸네일 디자인)
   const [currentTab, setCurrentTab] = useState<'remove-bg' | 'enhance' | 'design'>('remove-bg');
   const [isCaptureModalOpen, setIsCaptureModalOpen] = useState<boolean>(false);
-  const [captureModalTab, setCaptureModalTab] = useState<'screenshot' | 'record'>('screenshot');
+  const [captureModalTab, setCaptureModalTab] = useState<'movavi' | 'screenshot' | 'record'>('movavi');
 
   // ==========================================
   // [미리캔버스 모드: 썸네일 & 타이포 디자인 전용 상태]
@@ -2258,13 +2259,27 @@ export default function ImageStudioPage() {
           <button
             type="button"
             onClick={() => {
+              setCaptureModalTab('movavi');
+              setIsCaptureModalOpen(true);
+            }}
+            className="px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs sm:text-sm rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+          >
+            <Crop size={16} />
+            <span>🎯 원하는 영역 지정 캡처 &amp; 부분 녹화 (모바비식)</span>
+            <span className="text-[10px] bg-white text-orange-600 font-black px-1.5 py-0.5 rounded-full">
+              HOT
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               setCaptureModalTab('screenshot');
               setIsCaptureModalOpen(true);
             }}
-            className="px-4 py-2 bg-white hover:bg-purple-50 text-purple-700 font-extrabold text-xs sm:text-sm rounded-2xl border border-purple-200 shadow-xs hover:shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+            className="px-4 py-2.5 bg-white hover:bg-purple-50 text-purple-700 font-extrabold text-xs sm:text-sm rounded-2xl border border-purple-200 shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
           >
             <Camera size={16} className="text-purple-600" />
-            <span>📸 화면 캡처 (스크린샷)</span>
+            <span>⚡ 전체 캡처</span>
           </button>
           <button
             type="button"
@@ -2272,13 +2287,10 @@ export default function ImageStudioPage() {
               setCaptureModalTab('record');
               setIsCaptureModalOpen(true);
             }}
-            className="px-4 py-2 bg-white hover:bg-indigo-50 text-indigo-700 font-extrabold text-xs sm:text-sm rounded-2xl border border-indigo-200 shadow-xs hover:shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+            className="px-4 py-2.5 bg-white hover:bg-indigo-50 text-indigo-700 font-extrabold text-xs sm:text-sm rounded-2xl border border-indigo-200 shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
           >
             <Video size={16} className="text-red-500 animate-pulse" />
-            <span>🎥 화면 녹화 &amp; 움짤</span>
-            <span className="text-[10px] bg-red-100 text-red-600 font-black px-1.5 py-0.5 rounded-full">
-              HOT
-            </span>
+            <span>🎥 전체 녹화</span>
           </button>
         </div>
 
@@ -2322,24 +2334,24 @@ export default function ImageStudioPage() {
                   <button
                     type="button"
                     onClick={() => {
+                      setCaptureModalTab('movavi');
+                      setIsCaptureModalOpen(true);
+                    }}
+                    className="px-3.5 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-bold rounded-xl border border-orange-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Crop size={14} />
+                    <span>영역 지정 캡처 (모바비식)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
                       setCaptureModalTab('screenshot');
                       setIsCaptureModalOpen(true);
                     }}
                     className="px-3.5 py-1.5 bg-white hover:bg-purple-50 text-purple-700 text-xs font-bold rounded-xl border border-purple-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
                     <Camera size={14} />
-                    <span>화면 캡처</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCaptureModalTab('record');
-                      setIsCaptureModalOpen(true);
-                    }}
-                    className="px-3.5 py-1.5 bg-white hover:bg-indigo-50 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Video size={14} className="text-red-500" />
-                    <span>화면 녹화</span>
+                    <span>전체 캡처</span>
                   </button>
                 </div>
                 <p className="text-xs text-slate-400 mt-2">JPG, PNG, WEBP 등 모든 이미지 지원</p>
@@ -2654,24 +2666,24 @@ export default function ImageStudioPage() {
                   <button
                     type="button"
                     onClick={() => {
+                      setCaptureModalTab('movavi');
+                      setIsCaptureModalOpen(true);
+                    }}
+                    className="px-3.5 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-bold rounded-xl border border-orange-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Crop size={14} />
+                    <span>영역 지정 캡처 (모바비식)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
                       setCaptureModalTab('screenshot');
                       setIsCaptureModalOpen(true);
                     }}
                     className="px-3.5 py-1.5 bg-white hover:bg-indigo-50 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
                     <Camera size={14} />
-                    <span>화면 캡처</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCaptureModalTab('record');
-                      setIsCaptureModalOpen(true);
-                    }}
-                    className="px-3.5 py-1.5 bg-white hover:bg-purple-50 text-purple-700 text-xs font-bold rounded-xl border border-purple-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Video size={14} className="text-red-500" />
-                    <span>화면 녹화</span>
+                    <span>전체 캡처</span>
                   </button>
                 </div>
                 <p className="text-xs text-slate-400 mt-2">질감 뭉개짐 없이 조명만 역계산하여 그림자를 완벽 복원합니다.</p>
@@ -3483,24 +3495,24 @@ export default function ImageStudioPage() {
                   <button
                     type="button"
                     onClick={() => {
+                      setCaptureModalTab('movavi');
+                      setIsCaptureModalOpen(true);
+                    }}
+                    className="px-4 py-2.5 bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs sm:text-sm font-bold rounded-xl border border-orange-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Crop size={15} />
+                    <span>영역 지정 캡처 (모바비식)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
                       setCaptureModalTab('screenshot');
                       setIsCaptureModalOpen(true);
                     }}
                     className="px-4 py-2.5 bg-white hover:bg-rose-50 text-rose-700 text-xs sm:text-sm font-bold rounded-xl border border-rose-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
                     <Camera size={15} />
-                    <span>화면 캡처</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCaptureModalTab('record');
-                      setIsCaptureModalOpen(true);
-                    }}
-                    className="px-4 py-2.5 bg-white hover:bg-indigo-50 text-indigo-700 text-xs sm:text-sm font-bold rounded-xl border border-indigo-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Video size={15} className="text-red-500" />
-                    <span>화면 녹화</span>
+                    <span>전체 캡처</span>
                   </button>
                 </div>
 

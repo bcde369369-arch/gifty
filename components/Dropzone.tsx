@@ -1,6 +1,6 @@
 'use client';
 
-import { UploadCloud, FileVideo, Video } from 'lucide-react';
+import { UploadCloud, FileVideo, Video, Crop } from 'lucide-react';
 import React, { useCallback, useState } from 'react';
 
 interface DropzoneProps {
@@ -77,10 +77,10 @@ export default function Dropzone({ onFileSelect, onOpenRecord }: DropzoneProps) 
               e.stopPropagation();
               onOpenRecord();
             }}
-            className="px-4 py-2 bg-white hover:bg-indigo-50 text-indigo-700 text-xs md:text-sm font-extrabold rounded-full border border-indigo-200 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs md:text-sm font-black rounded-full shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
           >
-            <Video size={15} className="text-red-500 animate-pulse" />
-            <span>화면 녹화</span>
+            <Crop size={15} />
+            <span>🎯 영역 지정 녹화 (모바비식)</span>
           </button>
         )}
       </div>

@@ -245,7 +245,7 @@ export default function Home() {
           <ScreenCaptureModal
             isOpen={isRecordModalOpen}
             onClose={() => setIsRecordModalOpen(false)}
-            initialTab="record"
+            initialTab="movavi"
             onRecordingComplete={(file) => setVideoFile(file)}
           />
 

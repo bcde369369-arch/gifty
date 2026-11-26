@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Camera,
   Video,
@@ -18,7 +18,12 @@ import {
   Wand2,
   Layers,
   ChevronRight,
-  Info
+  Info,
+  Crop,
+  Move,
+  Maximize2,
+  Check,
+  ShieldCheck
 } from 'lucide-react';
 import {
   captureScreenshotFromDisplay,
@@ -30,28 +35,60 @@ import { useRouter } from 'next/navigation';
 interface ScreenCaptureModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'screenshot' | 'record';
+  initialTab?: 'movavi' | 'screenshot' | 'record';
   onScreenshotCaptured?: (file: File) => void;
   onRecordingComplete?: (file: File) => void;
 }
 
+type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'move';
+
 export default function ScreenCaptureModal({
   isOpen,
   onClose,
-  initialTab = 'screenshot',
+  initialTab = 'movavi',
   onScreenshotCaptured,
   onRecordingComplete
 }: ScreenCaptureModalProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'screenshot' | 'record'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'movavi' | 'screenshot' | 'record'>(initialTab);
   const [isSupported, setIsSupported] = useState(true);
 
-  // 스크린샷 관련 상태
-  const [isCapturing, setIsCapturing] = useState(false);
-  const [countdown, setCountdown] = useState<number | null>(null);
-  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // 모바비 스타일 스튜디오 상태
+  const [isMovaviOpen, setIsMovaviOpen] = useState(false);
+  const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
 
-  // 화면 녹화 관련 상태
+  // 오렌지색 조절 프레임 (0.0 ~ 1.0 비율 좌표계)
+  const [frameNorm, setFrameNorm] = useState<{ x: number; y: number; w: number; h: number }>({
+    x: 0.15,
+    y: 0.15,
+    w: 0.7,
+    h: 0.7
+  });
+  const frameNormRef = useRef(frameNorm);
+  frameNormRef.current = frameNorm;
+
+  const [activePreset, setActivePreset] = useState<'free' | 'blog' | 'square' | 'wide' | 'full'>('blog');
+  const [videoResolution, setVideoResolution] = useState<{ width: number; height: number }>({
+    width: 1920,
+    height: 1080
+  });
+
+  // 드래그 및 리사이즈 상태 관리
+  const dragInfoRef = useRef<{
+    handle: ResizeHandle;
+    startX: number;
+    startY: number;
+    initX: number;
+    initY: number;
+    initW: number;
+    initH: number;
+    stageW: number;
+    stageH: number;
+  } | null>(null);
+
+  // 녹화 관련 상태 (모바비 스튜디오 내부 및 단독 녹화 공용)
   const [recordDuration, setRecordDuration] = useState<number>(10); // 초 단위 (5, 10, 15, 0=무제한)
   const [includeAudio, setIncludeAudio] = useState<boolean>(false);
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -62,11 +99,15 @@ export default function ScreenCaptureModal({
   const [recordedFile, setRecordedFile] = useState<File | null>(null);
   const [isNavigating, setIsNavigating] = useState<boolean>(false);
 
+  // 스크린샷 탭 관련 상태
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const activeStreamRef = useRef<MediaStream | null>(null);
-  const liveVideoPreviewRef = useRef<HTMLVideoElement | null>(null);
+  const isCropLoopRunningRef = useRef<boolean>(false);
 
   useEffect(() => {
     setIsSupported(isScreenCaptureSupported());
@@ -75,25 +116,27 @@ export default function ScreenCaptureModal({
   useEffect(() => {
     if (isOpen) {
       setActiveTab(initialTab);
-      resetRecordingState();
+      resetAllState();
     } else {
-      cleanupStream();
+      cleanupStreams();
     }
   }, [isOpen, initialTab]);
 
-  const cleanupStream = () => {
-    if (activeStreamRef.current) {
-      activeStreamRef.current.getTracks().forEach((t) => t.stop());
-      activeStreamRef.current = null;
+  const cleanupStreams = () => {
+    isCropLoopRunningRef.current = false;
+    if (videoStream) {
+      videoStream.getTracks().forEach((t) => t.stop());
+      setVideoStream(null);
     }
     if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
     if (recordTimerRef.current) clearInterval(recordTimerRef.current);
     setCountdown(null);
     setRecordCountdown(null);
+    setIsMovaviOpen(false);
   };
 
-  const resetRecordingState = () => {
-    cleanupStream();
+  const resetAllState = () => {
+    cleanupStreams();
     setIsRecording(false);
     setElapsedTime(0);
     setRecordedBlob(null);
@@ -102,169 +145,331 @@ export default function ScreenCaptureModal({
     setRecordedFile(null);
   };
 
-  // ==========================================
-  // [1] 스크린샷 캡처 핸들러
-  // ==========================================
-  const handleImmediateScreenshot = async () => {
-    setIsCapturing(true);
+  // =========================================================
+  // [1] 모바비 스타일 인터랙티브 캡처 스튜디오 시작
+  // =========================================================
+  const launchMovaviStudio = async () => {
     try {
-      const file = await captureScreenshotFromDisplay();
-      onScreenshotCaptured?.(file);
-      onClose();
-    } catch (err: any) {
-      if (err.name !== 'NotAllowedError') {
-        alert(err.message || '화면 캡처 중 오류가 발생했습니다.');
-      }
-    } finally {
-      setIsCapturing(false);
-    }
-  };
-
-  const handleCountdownScreenshot = () => {
-    setIsCapturing(true);
-    setCountdown(3);
-    let count = 3;
-
-    countdownTimerRef.current = setInterval(async () => {
-      count -= 1;
-      if (count > 0) {
-        setCountdown(count);
-      } else {
-        clearInterval(countdownTimerRef.current!);
-        setCountdown(null);
-        try {
-          const file = await captureScreenshotFromDisplay();
-          onScreenshotCaptured?.(file);
-          onClose();
-        } catch (err: any) {
-          if (err.name !== 'NotAllowedError') {
-            alert(err.message || '화면 캡처 중 오류가 발생했습니다.');
-          }
-        } finally {
-          setIsCapturing(false);
-        }
-      }
-    }, 1000);
-  };
-
-  // ==========================================
-  // [2] 화면 녹화 핸들러
-  // ==========================================
-  const startRecordingFlow = async () => {
-    try {
-      // 1. 디스플레이 스트림 획득
-      const displayStream = await navigator.mediaDevices.getDisplayMedia({
+      const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           displaySurface: 'monitor'
         } as any,
         audio: includeAudio
       });
 
-      // 유저가 오디오 녹음도 원할 때 마이크 추가
-      let combinedStream = displayStream;
+      // 오디오 추가 병합
+      let combinedStream = stream;
       if (includeAudio) {
         try {
-          const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          const audioTracks = [...displayStream.getAudioTracks(), ...micStream.getAudioTracks()];
-          combinedStream = new MediaStream([...displayStream.getVideoTracks(), ...audioTracks]);
-        } catch {
-          // 마이크 권한 거부 시 디스플레이 스트림만 유지
-        }
+          const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+          combinedStream = new MediaStream([...stream.getVideoTracks(), ...mic.getAudioTracks()]);
+        } catch {}
       }
 
-      activeStreamRef.current = combinedStream;
+      setVideoStream(combinedStream);
+      setIsMovaviOpen(true);
+      resetRecordingStateOnly();
 
-      // 화면 공유 중지 버튼을 브라우저 바에서 누를 때 자동 종료 처리
-      displayStream.getVideoTracks()[0].onended = () => {
-        stopRecording();
-      };
-
-      // 3초 카운트다운 시작
-      setRecordCountdown(3);
-      let count = 3;
-
-      const countdownInterval = setInterval(() => {
-        count -= 1;
-        if (count > 0) {
-          setRecordCountdown(count);
-        } else {
-          clearInterval(countdownInterval);
-          setRecordCountdown(null);
-          beginActualRecording(combinedStream);
+      // 스트림 연결 대기
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = combinedStream;
+          videoRef.current.play().then(() => {
+            if (videoRef.current) {
+              const vw = videoRef.current.videoWidth || 1920;
+              const vh = videoRef.current.videoHeight || 1080;
+              setVideoResolution({ width: vw, height: vh });
+              // 블로그 최적 4:3 또는 800x600 기본 세팅
+              applyPresetDimensions('blog', vw, vh);
+            }
+          }).catch(console.error);
         }
-      }, 1000);
+      }, 100);
+
+      stream.getVideoTracks()[0].onended = () => {
+        cleanupStreams();
+      };
     } catch (err: any) {
       if (err.name !== 'NotAllowedError') {
-        alert(err.message || '화면 녹화 권한을 가져오지 못했습니다.');
+        alert(err.message || '화면 공유 권한을 가져오지 못했습니다.');
       }
-      resetRecordingState();
     }
   };
 
-  const beginActualRecording = (stream: MediaStream) => {
+  const resetRecordingStateOnly = () => {
+    setIsRecording(false);
+    setElapsedTime(0);
+    setRecordedBlob(null);
+    if (recordedVideoUrl) URL.revokeObjectURL(recordedVideoUrl);
+    setRecordedVideoUrl(null);
+    setRecordedFile(null);
+  };
+
+  // 프리셋 크기 적용
+  const applyPresetDimensions = (preset: 'free' | 'blog' | 'square' | 'wide' | 'full', vw = videoResolution.width, vh = videoResolution.height) => {
+    setActivePreset(preset);
+    if (preset === 'full') {
+      setFrameNorm({ x: 0, y: 0, w: 1, h: 1 });
+    } else if (preset === 'blog') {
+      // 800 x 600 (4:3)
+      const targetRatio = 4 / 3;
+      const screenRatio = vw / vh;
+      let w = 0.6;
+      let h = (w * screenRatio) / targetRatio;
+      if (h > 0.85) {
+        h = 0.85;
+        w = (h * targetRatio) / screenRatio;
+      }
+      setFrameNorm({ x: (1 - w) / 2, y: (1 - h) / 2, w, h });
+    } else if (preset === 'square') {
+      // 1:1 정사각형
+      const targetRatio = 1;
+      const screenRatio = vw / vh;
+      let w = 0.55;
+      let h = (w * screenRatio) / targetRatio;
+      if (h > 0.85) {
+        h = 0.85;
+        w = (h * targetRatio) / screenRatio;
+      }
+      setFrameNorm({ x: (1 - w) / 2, y: (1 - h) / 2, w, h });
+    } else if (preset === 'wide') {
+      // 16:9 와이드
+      const targetRatio = 16 / 9;
+      const screenRatio = vw / vh;
+      let w = 0.75;
+      let h = (w * screenRatio) / targetRatio;
+      if (h > 0.85) {
+        h = 0.85;
+        w = (h * targetRatio) / screenRatio;
+      }
+      setFrameNorm({ x: (1 - w) / 2, y: (1 - h) / 2, w, h });
+    }
+  };
+
+  // 마우스 드래그 & 핸들 리사이즈 핸들러
+  const handleMouseDown = (e: React.MouseEvent, handle: ResizeHandle) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!stageRef.current) return;
+    const rect = stageRef.current.getBoundingClientRect();
+    dragInfoRef.current = {
+      handle,
+      startX: e.clientX,
+      startY: e.clientY,
+      initX: frameNorm.x,
+      initY: frameNorm.y,
+      initW: frameNorm.w,
+      initH: frameNorm.h,
+      stageW: rect.width,
+      stageH: rect.height
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    const info = dragInfoRef.current;
+    if (!info) return;
+
+    const dx = (e.clientX - info.startX) / info.stageW;
+    const dy = (e.clientY - info.startY) / info.stageH;
+
+    let { initX, initY, initW, initH } = info;
+    let newX = initX;
+    let newY = initY;
+    let newW = initW;
+    let newH = initH;
+
+    const MIN_SIZE = 0.05;
+
+    if (info.handle === 'move') {
+      newX = Math.max(0, Math.min(1 - newW, initX + dx));
+      newY = Math.max(0, Math.min(1 - newH, initY + dy));
+    } else {
+      setActivePreset('free');
+      if (info.handle.includes('e')) {
+        newW = Math.max(MIN_SIZE, Math.min(1 - initX, initW + dx));
+      }
+      if (info.handle.includes('s')) {
+        newH = Math.max(MIN_SIZE, Math.min(1 - initY, initH + dy));
+      }
+      if (info.handle.includes('w')) {
+        const potentialW = initW - dx;
+        if (potentialW >= MIN_SIZE && initX + dx >= 0) {
+          newX = initX + dx;
+          newW = potentialW;
+        }
+      }
+      if (info.handle.includes('n')) {
+        const potentialH = initH - dy;
+        if (potentialH >= MIN_SIZE && initY + dy >= 0) {
+          newY = initY + dy;
+          newH = potentialH;
+        }
+      }
+    }
+
+    setFrameNorm({ x: newX, y: newY, w: newW, h: newH });
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    dragInfoRef.current = null;
+    window.removeEventListener('mousemove', handleMouseMove);
+    window.removeEventListener('mouseup', handleMouseUp);
+  }, [handleMouseMove]);
+
+  // 실시간 선택 박스 픽셀 치수 계산
+  const currentPixelWidth = Math.round(frameNorm.w * videoResolution.width);
+  const currentPixelHeight = Math.round(frameNorm.h * videoResolution.height);
+
+  // 실시간 예상 GIF 용량 계산 (10초 기준)
+  const estimatedGifSizeMB = ((currentPixelWidth * currentPixelHeight * 0.000045 * Math.min(15, recordDuration || 10))).toFixed(1);
+  const isSafeSize = parseFloat(estimatedGifSizeMB) <= 19.5;
+
+  // =========================================================
+  // [2] 모바비 오렌지 프레임 내부 스크린샷 캡처 (100% 무손실 DPI)
+  // =========================================================
+  const captureMovaviAreaScreenshot = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+
+    const cropX = Math.round(frameNorm.x * vw);
+    const cropY = Math.round(frameNorm.y * vh);
+    const cropW = Math.max(1, Math.round(frameNorm.w * vw));
+    const cropH = Math.max(1, Math.round(frameNorm.h * vh));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = cropW;
+    canvas.height = cropH;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // 무손실 원본 픽셀 1:1 크롭
+    ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      const file = new File([blob], `gifty_crop_${timestamp}.png`, { type: 'image/png' });
+
+      onScreenshotCaptured?.(file);
+      cleanupStreams();
+      onClose();
+    }, 'image/png');
+  };
+
+  // =========================================================
+  // [3] 모바비 오렌지 프레임 내부만 '실시간 부분 화면 녹화'
+  // =========================================================
+  const startMovaviAreaRecording = () => {
+    if (!videoRef.current || !videoStream) return;
+
+    setRecordCountdown(3);
+    let count = 3;
+
+    const interval = setInterval(() => {
+      count -= 1;
+      if (count > 0) {
+        setRecordCountdown(count);
+      } else {
+        clearInterval(interval);
+        setRecordCountdown(null);
+        beginActualCroppedRecording();
+      }
+    }, 1000);
+  };
+
+  const beginActualCroppedRecording = () => {
+    if (!videoRef.current || !videoStream) return;
+    const video = videoRef.current;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+
+    const cropW = Math.max(2, Math.round(frameNormRef.current.w * vw));
+    const cropH = Math.max(2, Math.round(frameNormRef.current.h * vh));
+
+    const cropCanvas = document.createElement('canvas');
+    cropCanvas.width = cropW;
+    cropCanvas.height = cropH;
+    const ctx = cropCanvas.getContext('2d', { alpha: false });
+    if (!ctx) return;
+
+    isCropLoopRunningRef.current = true;
+
+    // 30fps 실시간 크롭 렌더 루프
+    const renderCropFrame = () => {
+      if (!isCropLoopRunningRef.current) return;
+      const curX = Math.round(frameNormRef.current.x * video.videoWidth);
+      const curY = Math.round(frameNormRef.current.y * video.videoHeight);
+      const curW = Math.max(1, Math.round(frameNormRef.current.w * video.videoWidth));
+      const curH = Math.max(1, Math.round(frameNormRef.current.h * video.videoHeight));
+
+      ctx.drawImage(video, curX, curY, curW, curH, 0, 0, cropCanvas.width, cropCanvas.height);
+      requestAnimationFrame(renderCropFrame);
+    };
+    requestAnimationFrame(renderCropFrame);
+
+    const croppedStream = cropCanvas.captureStream(30);
+
+    // 오디오 트랙이 있다면 추가
+    videoStream.getAudioTracks().forEach((track) => croppedStream.addTrack(track));
+
     recordedChunksRef.current = [];
+    const mimeTypes = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'];
+    const selectedMime = mimeTypes.find((m) => MediaRecorder.isTypeSupported(m)) || '';
 
-    // 최적 지원 MIME 타입 선택
-    const mimeTypes = [
-      'video/webm;codecs=vp9,opus',
-      'video/webm;codecs=vp8,opus',
-      'video/webm',
-      'video/mp4'
-    ];
-    let selectedMime = mimeTypes.find((m) => MediaRecorder.isTypeSupported(m)) || '';
-
-    const recorder = new MediaRecorder(stream, selectedMime ? { mimeType: selectedMime } : undefined);
+    const recorder = new MediaRecorder(croppedStream, selectedMime ? { mimeType: selectedMime } : undefined);
     mediaRecorderRef.current = recorder;
 
     recorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) {
-        recordedChunksRef.current.push(e.data);
-      }
+      if (e.data && e.data.size > 0) recordedChunksRef.current.push(e.data);
     };
 
     recorder.onstop = () => {
-      const blob = new Blob(recordedChunksRef.current, {
-        type: selectedMime || 'video/webm'
-      });
+      isCropLoopRunningRef.current = false;
+      const blob = new Blob(recordedChunksRef.current, { type: selectedMime || 'video/webm' });
       const url = URL.createObjectURL(blob);
       const now = new Date();
       const pad = (n: number) => String(n).padStart(2, '0');
       const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-      const file = new File([blob], `gifty_record_${timestamp}.webm`, {
-        type: blob.type
-      });
+      const file = new File([blob], `gifty_record_area_${timestamp}.webm`, { type: blob.type });
 
       setRecordedBlob(blob);
       setRecordedVideoUrl(url);
       setRecordedFile(file);
       setIsRecording(false);
-      cleanupStream();
     };
 
-    recorder.start(250); // 250ms 단위 청크
+    recorder.start(250);
     setIsRecording(true);
     setElapsedTime(0);
 
-    // 경과 시간 및 제한 타이머
     const startTime = Date.now();
     recordTimerRef.current = setInterval(() => {
       const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
       setElapsedTime(elapsedSec);
 
       if (recordDuration > 0 && elapsedSec >= recordDuration) {
-        stopRecording();
+        stopCroppedRecording();
       }
     }, 250);
   };
 
-  const stopRecording = () => {
+  const stopCroppedRecording = () => {
+    isCropLoopRunningRef.current = false;
     if (recordTimerRef.current) clearInterval(recordTimerRef.current);
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
   };
 
-  // 녹화 영상을 Gifty 메인 GIF 메이커로 전송
+  // 녹화된 영상을 Gifty 메인 GIF 변환기로 전달
   const handleTransferToGifEditor = async () => {
     if (!recordedFile && !recordedBlob) return;
     setIsNavigating(true);
@@ -273,8 +478,8 @@ export default function ScreenCaptureModal({
       const blob = recordedBlob || (recordedFile as Blob);
       await saveRecordedVideo(blob, recordedFile?.name || 'screen-recording.webm');
       onRecordingComplete?.(recordedFile!);
+      cleanupStreams();
       onClose();
-      // 메인 홈으로 이동하여 VideoEditor 자동 시작
       router.push('/?from=record');
     } catch (err) {
       console.error(err);
@@ -296,352 +501,518 @@ export default function ScreenCaptureModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col">
-        {/* 모달 상단 헤더 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-purple-600 text-white rounded-xl shadow-xs">
-              {activeTab === 'screenshot' ? <Camera size={18} /> : <Video size={18} />}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200">
+      {/* ========================================================================= */}
+      {/* [A] 모바비 스타일 전체 인터랙티브 스튜디오 오버레이 (화면 선택 시 풀스크린 가동) */}
+      {/* ========================================================================= */}
+      {isMovaviOpen ? (
+        <div className="relative w-full h-[96vh] max-w-7xl bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-slate-700 flex flex-col">
+          {/* 상단 컨트롤 바 */}
+          <div className="bg-slate-900/90 border-b border-slate-800 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 z-30 select-none">
+            <div className="flex items-center gap-3">
+              <div className="px-3 py-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg text-xs font-black shadow-xs flex items-center gap-1.5">
+                <Crop size={14} />
+                <span>모바비식 영역 선택 스튜디오</span>
+              </div>
+              <span className="text-xs font-bold text-orange-400 bg-orange-950/80 border border-orange-800/80 px-2.5 py-1 rounded-md">
+                📐 {currentPixelWidth} × {currentPixelHeight} px
+              </span>
             </div>
-            <div>
-              <h3 className="text-base sm:text-lg font-black text-slate-900">
-                {activeTab === 'screenshot' ? '화면 스크린샷 캡처' : '화면 녹화 & 움짤 만들기'}
-              </h3>
-              <p className="text-xs text-slate-500 font-medium">
-                별도 프로그램 설치 없이 브라우저에서 바로 가져옵니다
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-full transition-colors"
-          >
-            <X size={18} />
-          </button>
-        </div>
 
-        {/* 상단 탭 전환 */}
-        <div className="flex border-b border-slate-200 px-6 pt-3 bg-white">
-          <button
-            onClick={() => {
-              resetRecordingState();
-              setActiveTab('screenshot');
-            }}
-            disabled={isRecording}
-            className={`pb-3 px-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all ${
-              activeTab === 'screenshot'
-                ? 'border-purple-600 text-purple-700 font-black'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Camera size={16} />
-            <span>📸 스크린샷 캡처</span>
-          </button>
-          <button
-            onClick={() => {
-              cleanupStream();
-              setActiveTab('record');
-            }}
-            disabled={isCapturing}
-            className={`pb-3 px-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all ${
-              activeTab === 'record'
-                ? 'border-indigo-600 text-indigo-700 font-black'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Video size={16} />
-            <span>🎥 화면 녹화 (움짤용)</span>
-            <span className="text-[10px] font-extrabold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full">
-              HOT
-            </span>
-          </button>
-        </div>
-
-        {/* 브라우저 미지원 안내 */}
-        {!isSupported ? (
-          <div className="p-8 text-center flex flex-col items-center">
-            <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mb-4">
-              <AlertCircle size={32} />
+            {/* 프리셋 선택 버튼 그룹 */}
+            <div className="flex items-center gap-1.5 bg-slate-800/90 p-1 rounded-xl border border-slate-700 text-xs">
+              <button
+                type="button"
+                onClick={() => applyPresetDimensions('blog')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  activePreset === 'blog' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                블로그(4:3) ⭐
+              </button>
+              <button
+                type="button"
+                onClick={() => applyPresetDimensions('wide')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  activePreset === 'wide' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                와이드(16:9)
+              </button>
+              <button
+                type="button"
+                onClick={() => applyPresetDimensions('square')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  activePreset === 'square' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                정사각형(1:1)
+              </button>
+              <button
+                type="button"
+                onClick={() => applyPresetDimensions('full')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  activePreset === 'full' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                전체 화면
+              </button>
             </div>
-            <h4 className="text-lg font-bold text-slate-800 mb-2">화면 캡처 미지원 브라우저</h4>
-            <p className="text-sm text-slate-600 max-w-sm mb-6 leading-relaxed">
-              화면 캡처 및 화면 녹화는 보안 정책상 <strong>PC 크롬(Chrome), 웨일(Whale), 엣지(Edge)</strong> 브라우저에서만 동작합니다.
-              <br />
-              모바일 또는 인앱 브라우저에서는 <strong>[파일 업로드]</strong>나 <strong>[사진 촬영]</strong>을 이용해주세요!
-            </p>
+
             <button
-              onClick={onClose}
-              className="px-6 py-2.5 bg-slate-800 text-white font-bold rounded-xl text-sm"
+              onClick={cleanupStreams}
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
             >
-              닫기
+              <X size={20} />
             </button>
           </div>
-        ) : (
-          <div className="p-6">
-            {/* ========================================================= */}
-            {/* 1. 스크린샷 탭 내용 */}
-            {/* ========================================================= */}
-            {activeTab === 'screenshot' && (
-              <div className="space-y-5">
-                {countdown !== null ? (
-                  <div className="py-12 flex flex-col items-center justify-center text-center animate-pulse">
-                    <div className="w-24 h-24 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-4xl font-black mb-4 shadow-inner">
-                      {countdown}
-                    </div>
-                    <p className="text-base font-bold text-slate-800 mb-1">
-                      원하는 화면이나 창으로 이동해주세요!
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {countdown}초 후 화면 선택 창이 나타납니다.
-                    </p>
+
+          {/* 중앙 인터랙티브 캔버스 스테이지 */}
+          <div className="relative flex-1 bg-black overflow-hidden flex items-center justify-center p-4">
+            <div
+              ref={stageRef}
+              className="relative w-full h-full max-h-[82vh] flex items-center justify-center select-none"
+            >
+              {/* 원본 비디오 스트림 (배경) */}
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="max-w-full max-h-full object-contain pointer-events-none rounded-lg"
+              />
+
+              {/* 오렌지색 조절 프레임 (Movavi Signature) */}
+              <div
+                style={{
+                  left: `${frameNorm.x * 100}%`,
+                  top: `${frameNorm.y * 100}%`,
+                  width: `${frameNorm.w * 100}%`,
+                  height: `${frameNorm.h * 100}%`
+                }}
+                className={`absolute border-2 border-orange-500 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)] transition-shadow duration-100 ${
+                  isRecording ? 'border-red-500 animate-pulse' : ''
+                }`}
+              >
+                {/* 프레임 상단 실시간 치수 및 상태 배지 */}
+                <div className="absolute -top-7 left-0 flex items-center gap-1.5 pointer-events-none">
+                  <span className="bg-orange-500 text-white text-[11px] font-black px-2 py-0.5 rounded shadow-sm">
+                    {currentPixelWidth} × {currentPixelHeight}
+                  </span>
+                  {isRecording && (
+                    <span className="bg-red-600 text-white text-[11px] font-black px-2 py-0.5 rounded flex items-center gap-1 animate-pulse">
+                      <div className="w-2 h-2 bg-white rounded-full" />
+                      REC 00:{String(elapsedTime).padStart(2, '0')}
+                    </span>
+                  )}
+                </div>
+
+                {/* 가운데 드래그 이동 영역 (핸들) */}
+                <div
+                  onMouseDown={(e) => handleMouseDown(e, 'move')}
+                  className="w-full h-full cursor-move flex items-center justify-center bg-orange-500/5 hover:bg-orange-500/10 transition-colors"
+                >
+                  <div className="p-2 bg-black/50 text-white/80 rounded-full backdrop-blur-xs opacity-0 hover:opacity-100 transition-opacity pointer-events-none flex items-center gap-1 text-xs">
+                    <Move size={14} /> 드래그하여 이동
                   </div>
-                ) : (
+                </div>
+
+                {/* 8방향 리사이즈 핸들러 (모바비 스타일) */}
+                {!isRecording && (
                   <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      {/* 즉시 캡처 버튼 */}
-                      <button
-                        type="button"
-                        onClick={handleImmediateScreenshot}
-                        disabled={isCapturing}
-                        className="p-5 border-2 border-purple-200 hover:border-purple-500 bg-purple-50/50 hover:bg-purple-50 rounded-2xl flex flex-col items-center text-center transition-all group shadow-xs hover:shadow-md cursor-pointer"
-                      >
-                        <div className="w-12 h-12 bg-white text-purple-600 rounded-2xl flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform">
-                          <Camera size={26} />
-                        </div>
-                        <span className="text-sm font-black text-slate-800 mb-1">
-                          ⚡ 지금 바로 캡처
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          화면, 특정 창, 브라우저 탭 선택 후 1초 만에 로드
-                        </span>
-                      </button>
-
-                      {/* 3초 카운트다운 캡처 버튼 */}
-                      <button
-                        type="button"
-                        onClick={handleCountdownScreenshot}
-                        disabled={isCapturing}
-                        className="p-5 border-2 border-indigo-200 hover:border-indigo-500 bg-indigo-50/50 hover:bg-indigo-50 rounded-2xl flex flex-col items-center text-center transition-all group shadow-xs hover:shadow-md cursor-pointer"
-                      >
-                        <div className="w-12 h-12 bg-white text-indigo-600 rounded-2xl flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform">
-                          <Clock size={26} />
-                        </div>
-                        <span className="text-sm font-black text-slate-800 mb-1">
-                          ⏱️ 3초 후 캡처
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          원하는 프로그램이나 웹페이지로 전환할 시간 제공
-                        </span>
-                      </button>
-                    </div>
-
-                    {/* 꿀팁 박스: Ctrl+V 안내 */}
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-start gap-3">
-                      <div className="p-1.5 bg-amber-100 text-amber-700 rounded-lg shrink-0 mt-0.5">
-                        <Sparkles size={16} />
-                      </div>
-                      <div className="text-xs text-slate-600 leading-relaxed">
-                        <strong className="text-slate-800 font-extrabold block mb-1">
-                          초간단 단축키 꿀팁!
-                        </strong>
-                        키보드의 <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded shadow-xs font-bold text-purple-600">Win + Shift + S</kbd> (Mac은 <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded shadow-xs font-bold text-purple-600">Cmd + Shift + 4</kbd>)로 화면을 자른 뒤, 스튜디오 어디서나 <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded shadow-xs font-bold text-purple-600">Ctrl + V</kbd>를 누르면 즉시 편집창에 뜹니다.
-                      </div>
-                    </div>
+                    <div
+                      onMouseDown={(e) => handleMouseDown(e, 'nw')}
+                      className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-orange-400 border-2 border-white rounded-xs cursor-nwse-resize shadow-md"
+                    />
+                    <div
+                      onMouseDown={(e) => handleMouseDown(e, 'n')}
+                      className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-4 h-2.5 bg-orange-400 border border-white rounded-xs cursor-ns-resize shadow-md"
+                    />
+                    <div
+                      onMouseDown={(e) => handleMouseDown(e, 'ne')}
+                      className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-orange-400 border-2 border-white rounded-xs cursor-nesw-resize shadow-md"
+                    />
+                    <div
+                      onMouseDown={(e) => handleMouseDown(e, 'e')}
+                      className="absolute top-1/2 -translate-y-1/2 -right-1.5 w-2.5 h-4 bg-orange-400 border border-white rounded-xs cursor-ew-resize shadow-md"
+                    />
+                    <div
+                      onMouseDown={(e) => handleMouseDown(e, 'se')}
+                      className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-orange-400 border-2 border-white rounded-xs cursor-nwse-resize shadow-md"
+                    />
+                    <div
+                      onMouseDown={(e) => handleMouseDown(e, 's')}
+                      className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-2.5 bg-orange-400 border border-white rounded-xs cursor-ns-resize shadow-md"
+                    />
+                    <div
+                      onMouseDown={(e) => handleMouseDown(e, 'sw')}
+                      className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 bg-orange-400 border-2 border-white rounded-xs cursor-nesw-resize shadow-md"
+                    />
+                    <div
+                      onMouseDown={(e) => handleMouseDown(e, 'w')}
+                      className="absolute top-1/2 -translate-y-1/2 -left-1.5 w-2.5 h-4 bg-orange-400 border border-white rounded-xs cursor-ew-resize shadow-md"
+                    />
                   </>
                 )}
               </div>
-            )}
+            </div>
+          </div>
 
-            {/* ========================================================= */}
-            {/* 2. 화면 녹화 탭 내용 */}
-            {/* ========================================================= */}
-            {activeTab === 'record' && (
-              <div className="space-y-4">
-                {/* 2-A: 녹화 전 옵션 설정 */}
-                {!isRecording && !recordedBlob && recordCountdown === null && (
-                  <>
-                    <div className="p-4 bg-indigo-50/70 border border-indigo-100 rounded-2xl mb-4">
-                      <label className="text-xs font-extrabold text-indigo-900 block mb-2">
-                        ⏱️ 녹화 시간 프리셋 (권장)
-                      </label>
-                      <div className="grid grid-cols-4 gap-2">
-                        {[
-                          { sec: 5, label: '5초' },
-                          { sec: 10, label: '10초 (추천⭐)' },
-                          { sec: 15, label: '15초' },
-                          { sec: 0, label: '무제한' }
-                        ].map((item) => (
-                          <button
-                            key={item.sec}
-                            type="button"
-                            onClick={() => setRecordDuration(item.sec)}
-                            className={`py-2 px-1 text-xs font-bold rounded-xl transition-all border ${
-                              recordDuration === item.sec
-                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs scale-[1.02]'
-                                : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-300'
-                            }`}
-                          >
-                            {item.label}
-                          </button>
-                        ))}
+          {/* 하단 모바비 플로팅 조작 툴바 (이 영역 캡처 vs 이 영역 녹화) */}
+          <div className="bg-slate-900 border-t border-slate-800 px-6 py-4 flex flex-wrap items-center justify-between gap-4 z-30">
+            {/* 용량 및 네이버 블로그 안전 배지 */}
+            <div className="flex items-center gap-3 text-xs">
+              <div
+                className={`px-3 py-1.5 rounded-xl border flex items-center gap-1.5 font-bold ${
+                  isSafeSize
+                    ? 'bg-emerald-950/60 border-emerald-700/70 text-emerald-300'
+                    : 'bg-amber-950/60 border-amber-700/70 text-amber-300'
+                }`}
+              >
+                <ShieldCheck size={16} />
+                <span>
+                  예상 움짤 용량: 약 {estimatedGifSizeMB} MB{' '}
+                  {isSafeSize ? '(네이버 20MB 완벽 안전 ✅)' : '(용량 주의 ⚠️)'}
+                </span>
+              </div>
+            </div>
+
+            {/* 메인 실행 버튼들 */}
+            <div className="flex items-center gap-3">
+              {!isRecording ? (
+                <>
+                  {/* 스크린샷 캡처 버튼 */}
+                  <button
+                    type="button"
+                    onClick={captureMovaviAreaScreenshot}
+                    className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    <Camera size={17} />
+                    <span>📸 이 영역 스크린샷 캡처</span>
+                  </button>
+
+                  {/* 부분 화면 녹화 시작 버튼 */}
+                  <button
+                    type="button"
+                    onClick={startMovaviAreaRecording}
+                    className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-black text-sm rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    <Video size={17} className="animate-pulse" />
+                    <span>🔴 이 영역만 녹화 ({recordDuration > 0 ? `${recordDuration}초` : '수동'})</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={stopCroppedRecording}
+                  className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white font-black text-sm rounded-xl flex items-center gap-2 shadow-lg animate-bounce cursor-pointer"
+                >
+                  <Square size={16} fill="white" />
+                  <span>⏹️ 녹화 즉시 종료</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 녹화 완료 모달 팝업 */}
+          {recordedBlob && recordedVideoUrl && (
+            <div className="absolute inset-0 z-40 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-3xl p-6 text-white shadow-2xl space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 size={20} className="text-emerald-400" />
+                    <h4 className="text-base font-black">지정 영역 녹화 완료!</h4>
+                  </div>
+                  <span className="text-xs text-slate-400">
+                    약 {(recordedBlob.size / (1024 * 1024)).toFixed(2)} MB
+                  </span>
+                </div>
+
+                <div className="aspect-video bg-black rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center">
+                  <video src={recordedVideoUrl} controls autoPlay className="max-w-full max-h-full" />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleTransferToGifEditor}
+                    disabled={isNavigating}
+                    className="py-3 px-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    <Wand2 size={16} />
+                    <span>{isNavigating ? '편집기로 이동 중...' : '✨ 움짤(GIF)로 만들기'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDownloadVideo}
+                    className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Download size={16} />
+                    <span>WebM 영상 저장</span>
+                  </button>
+                </div>
+
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={resetRecordingStateOnly}
+                    className="text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    🔄 다시 영역 지정해서 녹화하기
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 3초 카운트다운 오버레이 */}
+          {recordCountdown !== null && (
+            <div className="absolute inset-0 z-50 bg-black/80 flex flex-col items-center justify-center">
+              <div className="w-28 h-28 rounded-full bg-red-500/20 text-red-500 border-4 border-red-500 flex items-center justify-center text-5xl font-black mb-4 animate-ping">
+                {recordCountdown}
+              </div>
+              <p className="text-lg font-bold text-white">원하는 액션을 준비하세요!</p>
+              <p className="text-xs text-slate-400 mt-1">지정한 오렌지 사각형 영역 내부만 녹화됩니다.</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* ========================================================================= */
+        /* [B] 일반 모달 다이얼로그 (모드 선택 창) */
+        /* ========================================================================= */
+        <div className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col">
+          {/* 모달 상단 헤더 */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-xl shadow-xs">
+                <Crop size={18} />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900">
+                  화면 캡처 &amp; 녹화 스튜디오
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  모바비처럼 원하는 크기를 오렌지 프레임으로 직접 지정합니다
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-full transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* 상단 탭 전환 */}
+          <div className="flex border-b border-slate-200 px-6 pt-3 bg-white">
+            <button
+              onClick={() => setActiveTab('movavi')}
+              className={`pb-3 px-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+                activeTab === 'movavi'
+                  ? 'border-orange-500 text-orange-600 font-black'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Crop size={16} />
+              <span>🎯 영역 지정 (모바비식)</span>
+              <span className="text-[10px] font-black bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">
+                BEST
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('screenshot')}
+              className={`pb-3 px-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+                activeTab === 'screenshot'
+                  ? 'border-purple-600 text-purple-700 font-black'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Camera size={16} />
+              <span>전체 캡처</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('record')}
+              className={`pb-3 px-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+                activeTab === 'record'
+                  ? 'border-indigo-600 text-indigo-700 font-black'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Video size={16} />
+              <span>전체 녹화</span>
+            </button>
+          </div>
+
+          {!isSupported ? (
+            <div className="p-8 text-center flex flex-col items-center">
+              <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mb-4">
+                <AlertCircle size={32} />
+              </div>
+              <h4 className="text-lg font-bold text-slate-800 mb-2">화면 캡처 미지원 브라우저</h4>
+              <p className="text-sm text-slate-600 max-w-sm mb-6 leading-relaxed">
+                화면 캡처 및 화면 녹화는 보안 정책상 <strong>PC 크롬, 웨일, 엣지</strong> 브라우저에서만 동작합니다.
+              </p>
+              <button onClick={onClose} className="px-6 py-2.5 bg-slate-800 text-white font-bold rounded-xl text-sm">
+                닫기
+              </button>
+            </div>
+          ) : (
+            <div className="p-6">
+              {/* [탭 1: 모바비식 영역 지정 캡처 & 부분 녹화 (추천)] */}
+              {activeTab === 'movavi' && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-orange-50/70 border border-orange-200 rounded-2xl">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-orange-500 text-white rounded-xl shrink-0 mt-0.5">
+                        <Crop size={18} />
                       </div>
-                      <p className="text-[11px] text-indigo-600/90 mt-2 font-medium">
-                        💡 네이버 블로그 업로드 제한(20MB)을 위해 <strong>10초 이하</strong> 녹화를 강력 권장합니다.
+                      <div className="text-xs text-slate-700 leading-relaxed">
+                        <strong className="text-sm font-black text-orange-900 block mb-1">
+                          내가 원하는 크기와 위치만 쏙!
+                        </strong>
+                        화면을 선택하면 <strong>모바비 스타일의 오렌지색 조절 프레임</strong>이 뜹니다.
+                        마우스로 원하는 크기로 자유롭게 늘리고 줄여서 <strong>스크린샷 캡처</strong> 또는 <strong>그 영역만 부분 녹화</strong>하세요!
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 녹화 시간 프리셋 선택 */}
+                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                    <span className="text-xs font-bold text-slate-700 block mb-2">
+                      ⏱️ 부분 녹화 시 권장 시간
+                    </span>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[
+                        { sec: 5, label: '5초' },
+                        { sec: 10, label: '10초 (추천⭐)' },
+                        { sec: 15, label: '15초' },
+                        { sec: 0, label: '무제한' }
+                      ].map((item) => (
+                        <button
+                          key={item.sec}
+                          type="button"
+                          onClick={() => setRecordDuration(item.sec)}
+                          className={`py-2 px-1 text-xs font-bold rounded-xl transition-all border cursor-pointer ${
+                            recordDuration === item.sec
+                              ? 'bg-orange-500 text-white border-orange-500 shadow-xs'
+                              : 'bg-white text-slate-700 border-slate-200 hover:border-orange-300'
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 메인 실행 버튼 */}
+                  <button
+                    type="button"
+                    onClick={launchMovaviStudio}
+                    className="w-full py-4 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black rounded-2xl text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    <Crop size={18} />
+                    <span>🎯 오렌지 프레임 영역 선택 스튜디오 열기</span>
+                    <ChevronRight size={18} />
+                  </button>
+
+                  {/* 단축키 꿀팁 */}
+                  <div className="text-center pt-1 text-[11px] text-slate-500">
+                    💡 캡처 후 스튜디오에서 <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded font-bold text-orange-600">Ctrl + V</kbd>를 눌러도 즉시 로드됩니다.
+                  </div>
+                </div>
+              )}
+
+              {/* [탭 2: 전체 캡처] */}
+              {activeTab === 'screenshot' && (
+                <div className="space-y-4">
+                  {countdown !== null ? (
+                    <div className="py-12 flex flex-col items-center justify-center text-center animate-pulse">
+                      <div className="w-20 h-20 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-3xl font-black mb-3">
+                        {countdown}
+                      </div>
+                      <p className="text-sm font-bold text-slate-800">
+                        {countdown}초 후 화면 선택 창이 나타납니다.
                       </p>
                     </div>
-
-                    <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-2xl mb-4">
-                      <div className="flex items-center gap-2.5">
-                        {includeAudio ? (
-                          <Mic size={18} className="text-indigo-600" />
-                        ) : (
-                          <MicOff size={18} className="text-slate-400" />
-                        )}
-                        <div>
-                          <span className="text-xs font-bold text-slate-800 block">
-                            오디오(마이크/시스템 소리) 포함
-                          </span>
-                          <span className="text-[11px] text-slate-400">
-                            움짤(GIF)은 소리가 없으므로 끄는 것을 권장합니다
-                          </span>
-                        </div>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={includeAudio}
-                        onChange={(e) => setIncludeAudio(e.target.checked)}
-                        className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
-                      />
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={startRecordingFlow}
-                      className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-black rounded-2xl text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 group cursor-pointer"
-                    >
-                      <div className="w-3 h-3 bg-red-400 rounded-full animate-ping group-hover:bg-white" />
-                      <span>화면 녹화 시작하기</span>
-                      <ChevronRight size={18} />
-                    </button>
-                  </>
-                )}
-
-                {/* 2-B: 시작 전 카운트다운 */}
-                {recordCountdown !== null && (
-                  <div className="py-12 flex flex-col items-center justify-center text-center">
-                    <div className="w-24 h-24 rounded-full bg-red-50 text-red-600 flex items-center justify-center text-4xl font-black mb-4 border-2 border-red-200 animate-bounce">
-                      {recordCountdown}
-                    </div>
-                    <p className="text-base font-bold text-slate-800 mb-1">
-                      준비하세요! 곧 녹화가 시작됩니다
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      공유창으로 선택한 화면이 기록됩니다.
-                    </p>
-                  </div>
-                )}
-
-                {/* 2-C: 녹화 진행 중 UI */}
-                {isRecording && (
-                  <div className="p-6 bg-slate-900 rounded-3xl text-white flex flex-col items-center justify-center space-y-4">
-                    <div className="flex items-center gap-2 px-3 py-1 bg-red-600/30 border border-red-500/50 rounded-full">
-                      <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
-                      <span className="text-xs font-black tracking-wider text-red-300 uppercase">
-                        REC 녹화 중
-                      </span>
-                    </div>
-
-                    <div className="text-4xl font-black tracking-wider font-mono">
-                      00:{String(elapsedTime).padStart(2, '0')}
-                      {recordDuration > 0 && (
-                        <span className="text-slate-400 text-2xl">
-                          {' '}
-                          / 00:{String(recordDuration).padStart(2, '0')}
-                        </span>
-                      )}
-                    </div>
-
-                    {recordDuration > 0 && (
-                      <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-                        <div
-                          className="bg-gradient-to-r from-red-500 to-indigo-500 h-full transition-all duration-300"
-                          style={{
-                            width: `${Math.min(100, (elapsedTime / recordDuration) * 100)}%`
-                          }}
-                        />
-                      </div>
-                    )}
-
-                    <p className="text-xs text-slate-400 text-center">
-                      녹화를 마치려면 아래 정지 버튼을 누르거나 화면 상단 공유 중지를 클릭하세요.
-                    </p>
-
-                    <button
-                      type="button"
-                      onClick={stopRecording}
-                      className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-extrabold rounded-2xl flex items-center gap-2 text-sm shadow-lg transition-transform active:scale-95 cursor-pointer"
-                    >
-                      <Square size={16} fill="white" />
-                      <span>녹화 종료하기</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* 2-D: 녹화 완료 후 미리보기 및 전송 */}
-                {recordedBlob && recordedVideoUrl && (
-                  <div className="space-y-4">
-                    <div className="w-full rounded-2xl overflow-hidden border border-slate-200 bg-black aspect-video flex items-center justify-center relative">
-                      <video
-                        src={recordedVideoUrl}
-                        controls
-                        autoPlay
-                        className="max-h-full max-w-full"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs text-slate-500 px-1">
-                      <span className="font-bold text-slate-700">
-                        🎬 녹화 완료: 약 {(recordedBlob.size / (1024 * 1024)).toFixed(2)} MB
-                      </span>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       <button
                         type="button"
-                        onClick={resetRecordingState}
-                        className="flex items-center gap-1 text-slate-500 hover:text-red-600 transition-colors font-medium cursor-pointer"
+                        onClick={async () => {
+                          setIsCapturing(true);
+                          try {
+                            const file = await captureScreenshotFromDisplay();
+                            onScreenshotCaptured?.(file);
+                            onClose();
+                          } catch (err: any) {
+                            if (err.name !== 'NotAllowedError') alert(err.message || '오류 발생');
+                          } finally {
+                            setIsCapturing(false);
+                          }
+                        }}
+                        className="p-5 border-2 border-purple-200 hover:border-purple-500 bg-purple-50/50 hover:bg-purple-50 rounded-2xl flex flex-col items-center text-center transition-all group cursor-pointer"
                       >
-                        <RotateCcw size={13} />
-                        <span>다시 녹화</span>
-                      </button>
-                    </div>
-
-                    {/* 액션 버튼 그룹 */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                      <button
-                        type="button"
-                        onClick={handleTransferToGifEditor}
-                        disabled={isNavigating}
-                        className="py-3.5 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-black text-sm rounded-2xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
-                      >
-                        <Wand2 size={16} />
-                        <span>{isNavigating ? '편집기로 이동 중...' : '✨ 움짤(GIF)로 만들기'}</span>
+                        <Camera size={26} className="text-purple-600 mb-2" />
+                        <span className="text-sm font-black text-slate-800 mb-1">⚡ 전체 바로 캡처</span>
+                        <span className="text-xs text-slate-500">화면/창 전체를 1초 만에 로드</span>
                       </button>
 
                       <button
                         type="button"
-                        onClick={handleDownloadVideo}
-                        className="py-3.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold text-sm rounded-2xl flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                        onClick={() => {
+                          setIsCapturing(true);
+                          setCountdown(3);
+                          let c = 3;
+                          countdownTimerRef.current = setInterval(async () => {
+                            c -= 1;
+                            if (c > 0) setCountdown(c);
+                            else {
+                              clearInterval(countdownTimerRef.current!);
+                              setCountdown(null);
+                              try {
+                                const file = await captureScreenshotFromDisplay();
+                                onScreenshotCaptured?.(file);
+                                onClose();
+                              } catch (err: any) {
+                                if (err.name !== 'NotAllowedError') alert(err.message || '오류 발생');
+                              } finally {
+                                setIsCapturing(false);
+                              }
+                            }
+                          }, 1000);
+                        }}
+                        className="p-5 border-2 border-indigo-200 hover:border-indigo-500 bg-indigo-50/50 hover:bg-indigo-50 rounded-2xl flex flex-col items-center text-center transition-all group cursor-pointer"
                       >
-                        <Download size={16} />
-                        <span>영상 파일(WebM) 저장</span>
+                        <Clock size={26} className="text-indigo-600 mb-2" />
+                        <span className="text-sm font-black text-slate-800 mb-1">⏱️ 3초 후 전체 캡처</span>
+                        <span className="text-xs text-slate-500">다른 창으로 전환할 시간 제공</span>
                       </button>
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+                  )}
+                </div>
+              )}
+
+              {/* [탭 3: 전체 녹화] */}
+              {activeTab === 'record' && (
+                <div className="space-y-4">
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    특정 영역만 잘라서 녹화하려면 상단의 <strong>[🎯 영역 지정 (모바비식)]</strong> 탭을 이용해 주세요.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={launchMovaviStudio}
+                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Video size={18} />
+                    <span>화면 녹화기 실행하기</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
