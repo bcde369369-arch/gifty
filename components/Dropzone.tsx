@@ -1,13 +1,14 @@
 'use client';
 
-import { UploadCloud, FileVideo } from 'lucide-react';
+import { UploadCloud, FileVideo, Video } from 'lucide-react';
 import React, { useCallback, useState } from 'react';
 
 interface DropzoneProps {
   onFileSelect: (file: File) => void;
+  onOpenRecord?: () => void;
 }
 
-export default function Dropzone({ onFileSelect }: DropzoneProps) {
+export default function Dropzone({ onFileSelect, onOpenRecord }: DropzoneProps) {
   const [isDragOver, setIsDragOver] = useState(false);
 
   const handleDrop = useCallback(
@@ -64,9 +65,24 @@ export default function Dropzone({ onFileSelect }: DropzoneProps) {
         MP4, WebM 등 대부분의 형식을 지원합니다. (최대 100MB)
       </p>
       
-      <div className="px-5 py-2 bg-indigo-600 text-white text-xs md:text-sm font-bold rounded-full shadow-md hover:bg-indigo-700 transition-colors pointer-events-none flex items-center gap-2">
-        <FileVideo size={16} />
-        파일 선택하기
+      <div className="flex flex-wrap items-center justify-center gap-2 relative z-20">
+        <div className="px-5 py-2 bg-indigo-600 text-white text-xs md:text-sm font-bold rounded-full shadow-md hover:bg-indigo-700 transition-colors pointer-events-none flex items-center gap-2">
+          <FileVideo size={16} />
+          파일 선택하기
+        </div>
+        {onOpenRecord && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenRecord();
+            }}
+            className="px-4 py-2 bg-white hover:bg-indigo-50 text-indigo-700 text-xs md:text-sm font-extrabold rounded-full border border-indigo-200 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <Video size={15} className="text-red-500 animate-pulse" />
+            <span>화면 녹화</span>
+          </button>
+        )}
       </div>
     </div>
   );

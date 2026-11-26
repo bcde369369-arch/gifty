@@ -62,6 +62,7 @@ import { removeBackground } from '@imgly/background-removal';
 import CoupangBanner from '@/components/CoupangBanner';
 import CoupangSupportCard from '@/components/CoupangSupportCard';
 import { useSiteSettings } from '@/lib/settings';
+import ScreenCaptureModal from '@/components/ScreenCaptureModal';
 
 // 누끼 배경 프리셋
 const COLOR_PRESETS = [
@@ -342,6 +343,8 @@ export default function ImageStudioPage() {
 
   // 상단 메인 모드 탭: 'remove-bg' (AI 배경제거) vs 'enhance' (사진 보정 & 그림자 복원) vs 'design' (미리캔버스 썸네일 디자인)
   const [currentTab, setCurrentTab] = useState<'remove-bg' | 'enhance' | 'design'>('remove-bg');
+  const [isCaptureModalOpen, setIsCaptureModalOpen] = useState<boolean>(false);
+  const [captureModalTab, setCaptureModalTab] = useState<'screenshot' | 'record'>('screenshot');
 
   // ==========================================
   // [미리캔버스 모드: 썸네일 & 타이포 디자인 전용 상태]
@@ -472,9 +475,12 @@ export default function ImageStudioPage() {
           if (file) {
             if (currentTab === 'remove-bg') {
               processFile(file);
-            } else {
+            } else if (currentTab === 'enhance') {
               processEnhanceFile(file);
+            } else {
+              processDesignFile(file);
             }
+            setCopyFeedback('📋 클립보드 이미지가 성공적으로 로드되었습니다!');
             break;
           }
         }
@@ -483,6 +489,18 @@ export default function ImageStudioPage() {
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
   }, [currentTab]);
+
+  // 스크린샷 캡처 완료 핸들러
+  const handleScreenshotCaptured = (file: File) => {
+    if (currentTab === 'remove-bg') {
+      processFile(file);
+    } else if (currentTab === 'enhance') {
+      processEnhanceFile(file);
+    } else {
+      processDesignFile(file);
+    }
+    setCopyFeedback('📸 화면 스크린샷이 성공적으로 로드되었습니다! 원하는 대로 편집해보세요.');
+  };
 
   // ==========================================
   // [누끼 관련 핸들러]
@@ -2195,7 +2213,7 @@ export default function ImageStudioPage() {
         </div>
 
         {/* 상단 탭 전환 스위처 */}
-        <div className="w-full max-w-xl bg-slate-200/80 p-1.5 rounded-2xl flex items-center mb-7 shadow-inner">
+        <div className="w-full max-w-xl bg-slate-200/80 p-1.5 rounded-2xl flex items-center mb-4 shadow-inner">
           <button
             type="button"
             onClick={() => setCurrentTab('remove-bg')}
@@ -2234,6 +2252,35 @@ export default function ImageStudioPage() {
           </button>
         </div>
 
+        {/* 상단 스크린샷 캡처 & 화면 녹화 액션 바 */}
+        <div className="flex flex-wrap items-center justify-center gap-2.5 mb-6">
+          <button
+            type="button"
+            onClick={() => {
+              setCaptureModalTab('screenshot');
+              setIsCaptureModalOpen(true);
+            }}
+            className="px-4 py-2 bg-white hover:bg-purple-50 text-purple-700 font-extrabold text-xs sm:text-sm rounded-2xl border border-purple-200 shadow-xs hover:shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+          >
+            <Camera size={16} className="text-purple-600" />
+            <span>📸 화면 캡처 (스크린샷)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setCaptureModalTab('record');
+              setIsCaptureModalOpen(true);
+            }}
+            className="px-4 py-2 bg-white hover:bg-indigo-50 text-indigo-700 font-extrabold text-xs sm:text-sm rounded-2xl border border-indigo-200 shadow-xs hover:shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+          >
+            <Video size={16} className="text-red-500 animate-pulse" />
+            <span>🎥 화면 녹화 &amp; 움짤</span>
+            <span className="text-[10px] bg-red-100 text-red-600 font-black px-1.5 py-0.5 rounded-full">
+              HOT
+            </span>
+          </button>
+        </div>
+
         {/* 공통 피드백 토스트 */}
         {copyFeedback && (
           <div className="w-full max-w-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm font-bold py-3 px-4 rounded-2xl flex items-center justify-center gap-2 mb-6 shadow-sm animate-in fade-in slide-in-from-top-1">
@@ -2269,6 +2316,30 @@ export default function ImageStudioPage() {
                   <span>💡 캡처 후</span>
                   <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded shadow-xs text-purple-600 font-extrabold">Ctrl + V</kbd>
                   <span>로 바로 붙여넣기도 가능해요!</span>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-4 z-10" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCaptureModalTab('screenshot');
+                      setIsCaptureModalOpen(true);
+                    }}
+                    className="px-3.5 py-1.5 bg-white hover:bg-purple-50 text-purple-700 text-xs font-bold rounded-xl border border-purple-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Camera size={14} />
+                    <span>화면 캡처</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCaptureModalTab('record');
+                      setIsCaptureModalOpen(true);
+                    }}
+                    className="px-3.5 py-1.5 bg-white hover:bg-indigo-50 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Video size={14} className="text-red-500" />
+                    <span>화면 녹화</span>
+                  </button>
                 </div>
                 <p className="text-xs text-slate-400 mt-2">JPG, PNG, WEBP 등 모든 이미지 지원</p>
               </div>
@@ -2577,6 +2648,30 @@ export default function ImageStudioPage() {
                   <span>💡 캡처 후</span>
                   <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded shadow-xs text-indigo-600 font-extrabold">Ctrl + V</kbd>
                   <span>로 바로 붙여넣기도 가능해요!</span>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-4 z-10" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCaptureModalTab('screenshot');
+                      setIsCaptureModalOpen(true);
+                    }}
+                    className="px-3.5 py-1.5 bg-white hover:bg-indigo-50 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Camera size={14} />
+                    <span>화면 캡처</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCaptureModalTab('record');
+                      setIsCaptureModalOpen(true);
+                    }}
+                    className="px-3.5 py-1.5 bg-white hover:bg-purple-50 text-purple-700 text-xs font-bold rounded-xl border border-purple-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Video size={14} className="text-red-500" />
+                    <span>화면 녹화</span>
+                  </button>
                 </div>
                 <p className="text-xs text-slate-400 mt-2">질감 뭉개짐 없이 조명만 역계산하여 그림자를 완벽 복원합니다.</p>
               </div>
@@ -3379,9 +3474,39 @@ export default function ImageStudioPage() {
                 <p className="text-xs sm:text-sm text-slate-500 mb-4 max-w-sm mx-auto">
                   클릭하거나 사진을 드래그하세요. 네이버 1등 블로그 스타일의 대표 썸네일을 1초 만에 완성합니다.
                 </p>
-                <div className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 px-6 rounded-xl text-xs sm:text-sm shadow-sm transition-transform active:scale-95">
-                  <Upload size={16} />
-                  <span>사진 선택하기</span>
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-4 z-10" onClick={(e) => e.stopPropagation()}>
+                  <div className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 px-6 rounded-xl text-xs sm:text-sm shadow-sm transition-transform active:scale-95 cursor-pointer">
+                    <Upload size={16} />
+                    <span>사진 선택하기</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCaptureModalTab('screenshot');
+                      setIsCaptureModalOpen(true);
+                    }}
+                    className="px-4 py-2.5 bg-white hover:bg-rose-50 text-rose-700 text-xs sm:text-sm font-bold rounded-xl border border-rose-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Camera size={15} />
+                    <span>화면 캡처</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCaptureModalTab('record');
+                      setIsCaptureModalOpen(true);
+                    }}
+                    className="px-4 py-2.5 bg-white hover:bg-indigo-50 text-indigo-700 text-xs sm:text-sm font-bold rounded-xl border border-indigo-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Video size={15} className="text-red-500" />
+                    <span>화면 녹화</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-center gap-1.5 mt-3 px-3 py-1 bg-slate-100 rounded-full text-xs font-semibold text-slate-600 max-w-fit mx-auto">
+                  <span>💡 캡처 후</span>
+                  <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded shadow-xs text-rose-600 font-extrabold">Ctrl + V</kbd>
+                  <span>로 바로 붙여넣기도 가능해요!</span>
                 </div>
 
                 {/* 템플릿 소개 카드 프리뷰 */}
@@ -3953,6 +4078,14 @@ export default function ImageStudioPage() {
             </div>
           </div>
         )}
+
+        {/* 화면 캡처 & 녹화 공용 모달 */}
+        <ScreenCaptureModal
+          isOpen={isCaptureModalOpen}
+          onClose={() => setIsCaptureModalOpen(false)}
+          initialTab={captureModalTab}
+          onScreenshotCaptured={handleScreenshotCaptured}
+        />
       </main>
       
       <div className="mt-auto"></div>

@@ -11,13 +11,32 @@ import AdSenseBanner from '@/components/AdSenseBanner';
 import { Sparkles, Video, Wand2, DownloadCloud, Menu, ExternalLink, X, AlertTriangle, CheckCircle2, HelpCircle, ShieldCheck, Layers, BookOpen } from 'lucide-react';
 import { useSiteSettings } from '@/lib/settings';
 import CommunityPreview from '@/components/CommunityPreview';
+import ScreenCaptureModal from '@/components/ScreenCaptureModal';
+import { getRecordedVideo, clearRecordedVideo } from '@/lib/screenCapture';
 
 export default function Home() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [showBanner, setShowBanner] = useState(true);
   const [showInAppWarning, setShowInAppWarning] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
   const { settings, isLoaded } = useSiteSettings();
+
+  useEffect(() => {
+    // 화면 녹화 등에서 전달된 동영상(IndexedDB) 자동 로드
+    const checkRecordedVideo = async () => {
+      try {
+        const file = await getRecordedVideo();
+        if (file) {
+          setVideoFile(file);
+          await clearRecordedVideo();
+        }
+      } catch (e) {
+        console.error('Failed to load recorded video:', e);
+      }
+    };
+    checkRecordedVideo();
+  }, []);
 
   useEffect(() => {
     const userAgent = navigator.userAgent.toLowerCase();
@@ -214,11 +233,21 @@ export default function Home() {
           
           <div className="bg-white/80 backdrop-blur-xl border border-slate-200/60 p-4 sm:p-6 rounded-3xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] relative min-h-[300px]">
             {!videoFile ? (
-              <Dropzone onFileSelect={setVideoFile} />
+              <Dropzone
+                onFileSelect={setVideoFile}
+                onOpenRecord={() => setIsRecordModalOpen(true)}
+              />
             ) : (
               <VideoEditor videoFile={videoFile} onReset={() => setVideoFile(null)} />
             )}
           </div>
+
+          <ScreenCaptureModal
+            isOpen={isRecordModalOpen}
+            onClose={() => setIsRecordModalOpen(false)}
+            initialTab="record"
+            onRecordingComplete={(file) => setVideoFile(file)}
+          />
 
           {/* 메인 첫 화면 상단: 쿠팡 로켓배송 최저가 검색 & 무료 응원 카드 (스크롤 없이 바로 노출) */}
           <div className="mt-4 max-w-4xl mx-auto w-full">
