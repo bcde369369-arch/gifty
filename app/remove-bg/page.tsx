@@ -46,6 +46,7 @@ import {
   Plane,
   Leaf,
   Camera,
+  Video,
   Sunset,
   Gem,
   ShoppingBag,
