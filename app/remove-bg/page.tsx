@@ -4248,8 +4248,18 @@ export default function ImageStudioPage() {
                     윈도우 바탕화면 위에 진짜 속이 뚫린 투명 프레임을 띄워놓고 어떤 프로그램이든 자유롭게 드래그하며 즉시 1:1 캡처합니다.
                   </p>
                 </div>
-                <div className="bg-slate-800/90 p-2.5 rounded-xl border border-slate-700 text-[11px] text-slate-300 mb-2">
-                  💡 폴더의 <code className="text-orange-400 font-bold">[실제모니터_자유프레임_실행].bat</code> 더블 클릭 실행! (창 없이 깔끔 실행은 .vbs 클릭)
+                <div className="mt-3">
+                  <a
+                    href="/downloads/gifty-desktop-cam.zip"
+                    download="gifty-desktop-cam.zip"
+                    className="w-full py-2.5 px-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs sm:text-sm rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 text-center"
+                  >
+                    <Download size={15} />
+                    <span>💾 투명 프레임 도구 다운로드 (.zip)</span>
+                  </a>
+                  <p className="text-[11px] text-slate-400 mt-2 text-center">
+                    다운로드 후 압축을 풀고 <strong className="text-orange-400">[실제모니터_자유프레임_실행].vbs</strong>를 더블 클릭하시면 즉시 화면 위에 뜹니다!
+                  </p>
                 </div>
               </div>
             </div>
