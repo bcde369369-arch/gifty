@@ -59,7 +59,8 @@ import {
   Type,
   LayoutTemplate,
   BookmarkCheck,
-  Laptop
+  Laptop,
+  Play
 } from 'lucide-react';
 import { removeBackground } from '@imgly/background-removal';
 import CoupangBanner from '@/components/CoupangBanner';
@@ -4248,17 +4249,27 @@ export default function ImageStudioPage() {
                     윈도우 바탕화면 위에 진짜 속이 뚫린 투명 프레임을 띄워놓고 어떤 프로그램이든 자유롭게 드래그하며 즉시 1:1 캡처합니다.
                   </p>
                 </div>
-                <div className="mt-3">
+                <div className="mt-3 flex flex-col gap-2">
+                  <button
+                    onClick={() => {
+                      window.location.href = 'giftycam://open';
+                    }}
+                    type="button"
+                    className="w-full py-2.5 px-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-black text-xs sm:text-sm rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 text-center"
+                  >
+                    <Play size={16} className="fill-current" />
+                    <span>🚀 Gifty Cam 바로 실행하기 (재실행)</span>
+                  </button>
                   <a
                     href="/downloads/gifty-desktop-cam.zip"
                     download="gifty-desktop-cam.zip"
-                    className="w-full py-2.5 px-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs sm:text-sm rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 text-center"
+                    className="w-full py-2 px-3 bg-slate-850 hover:bg-slate-800 text-slate-200 border border-slate-700 font-bold text-xs rounded-xl shadow-xs hover:shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 text-center"
                   >
-                    <Download size={15} />
-                    <span>💾 투명 프레임 도구 다운로드 (.zip)</span>
+                    <Download size={14} />
+                    <span>💾 최초 다운로드 (.zip 무설치 11KB)</span>
                   </a>
-                  <p className="text-[11px] text-slate-400 mt-2 text-center">
-                    다운로드 후 압축을 풀고 <strong className="text-orange-400">GiftyCam.exe</strong>를 더블 클릭하시면 즉시 화면 위에 투명 프레임이 뜹니다! (무설치 단독 실행)
+                  <p className="text-[11px] text-slate-400 mt-1 text-center leading-relaxed">
+                    최초 1회 다운로드 후 <strong className="text-orange-400">GiftyCam.exe</strong>를 한 번 실행해두시면, 이후 언제든 위 <span className="text-emerald-400 font-bold">[🚀 바로 실행하기]</span> 버튼만 누르면 브라우저에서 바로 열립니다!
                   </p>
                 </div>
               </div>
