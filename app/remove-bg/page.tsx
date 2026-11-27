@@ -4258,7 +4258,7 @@ export default function ImageStudioPage() {
                     <span>💾 투명 프레임 도구 다운로드 (.zip)</span>
                   </a>
                   <p className="text-[11px] text-slate-400 mt-2 text-center">
-                    다운로드 후 압축을 풀고 <strong className="text-orange-400">[실제모니터_자유프레임_실행].vbs</strong>를 더블 클릭하시면 즉시 화면 위에 뜹니다!
+                    다운로드 후 압축을 풀고 <strong className="text-orange-400">GiftyCam.exe</strong>를 더블 클릭하시면 즉시 화면 위에 투명 프레임이 뜹니다! (무설치 단독 실행)
                   </p>
                 </div>
               </div>
