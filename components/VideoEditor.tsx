@@ -151,6 +151,7 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
 
   const [playbackSpeed, setPlaybackSpeed] = useState<string>('1.0');
   const [isBoomerang, setIsBoomerang] = useState<boolean>(false);
+  const [smart20mbCompress, setSmart20mbCompress] = useState<boolean>(true);
   const [videoFilter, setVideoFilter] = useState<'none' | 'grayscale' | 'sepia' | 'bright'>('none');
   const [watermarkType, setWatermarkType] = useState<'text' | 'image'>('text');
   const [textWatermark, setTextWatermark] = useState<string>('');
@@ -786,6 +787,7 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
         null,
         {
           isBoomerang,
+          smart20mbCompress,
           textWatermark: watermarkType === 'text' ? textWatermark : undefined,
           mosaicBoxes: mosaicBoxes.length > 0 ? mosaicBoxes : undefined,
         }
@@ -1312,6 +1314,31 @@ export default function VideoEditor({ videoFile, onReset }: VideoEditorProps) {
                 isBoomerang ? 'bg-indigo-600 text-white shadow-xs' : 'bg-slate-100 text-slate-500'
               }`}>
                 {isBoomerang ? '적용 ON ✨' : 'OFF'}
+              </span>
+            </button>
+
+            {/* Smart 20MB Auto Compression for Bloggers */}
+            <button
+              type="button"
+              onClick={() => setSmart20mbCompress(!smart20mbCompress)}
+              disabled={isConverting}
+              className={`w-full py-2.5 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-between ${
+                smart20mbCompress
+                  ? 'border-emerald-600 bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-800 shadow-xs ring-1 ring-emerald-500'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              } disabled:opacity-50`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-base">🛡️</span>
+                <div className="text-left">
+                  <span className="block font-bold">네이버 블로그 20MB 칼맞춤 스마트 압축</span>
+                  <span className="block text-[10px] text-emerald-600 font-normal">정지 프레임 드랍(mpdecimate) & 240색 동적 팔레트로 20MB 미만 칼맞춤</span>
+                </div>
+              </div>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                smart20mbCompress ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-100 text-slate-500'
+              }`}>
+                {smart20mbCompress ? '안심 보호 ON 🟢' : 'OFF'}
               </span>
             </button>
           </div>

@@ -23,7 +23,13 @@ import {
   Move,
   Maximize2,
   Check,
-  ShieldCheck
+  ShieldCheck,
+  Laptop,
+  MousePointer,
+  ZoomIn,
+  Magnet,
+  Smartphone,
+  Columns
 } from 'lucide-react';
 import {
   captureScreenshotFromDisplay,
@@ -74,7 +80,7 @@ export default function ScreenCaptureModal({
   const frameNormRef = useRef(frameNorm);
   frameNormRef.current = frameNorm;
 
-  const [activePreset, setActivePreset] = useState<'free' | 'blog' | 'square' | 'wide' | 'full'>('blog');
+  const [activePreset, setActivePreset] = useState<'free' | 'blog' | 'square' | 'wide' | 'shorts' | 'split-left' | 'split-right' | 'full'>('blog');
   const [videoResolution, setVideoResolution] = useState<{ width: number; height: number }>({
     width: 1920,
     height: 1080
@@ -113,6 +119,62 @@ export default function ScreenCaptureModal({
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isCropLoopRunningRef = useRef<boolean>(false);
+
+  // =========================================================
+  // [1, 2, 3단계 혁신 기능 상태 관리]
+  // =========================================================
+  // 1단계: Mac 창틀 래핑
+  const [isMacFrameEnabled, setIsMacFrameEnabled] = useState<boolean>(false);
+  const isMacFrameRef = useRef(isMacFrameEnabled);
+  isMacFrameRef.current = isMacFrameEnabled;
+
+  // 2단계: Screen Studio 스타일 스무스 줌인 & 클릭 리플 & 키스트로크
+  const [isSmoothZoomEnabled, setIsSmoothZoomEnabled] = useState<boolean>(false);
+  const isSmoothZoomRef = useRef(isSmoothZoomEnabled);
+  isSmoothZoomRef.current = isSmoothZoomEnabled;
+
+  const [currentZoomLevel, setCurrentZoomLevel] = useState<number>(1.0);
+  const targetZoomRef = useRef<number>(1.0);
+  const targetFocusNormXRef = useRef<number>(0.5);
+  const targetFocusNormYRef = useRef<number>(0.5);
+
+  const [isClickRippleEnabled, setIsClickRippleEnabled] = useState<boolean>(true);
+  const isClickRippleRef = useRef(isClickRippleEnabled);
+  isClickRippleRef.current = isClickRippleEnabled;
+
+  // 실시간 클릭 리플 큐
+  const ripplesRef = useRef<Array<{ x: number; y: number; r: number; alpha: number; color: string }>>([]);
+
+  // 실시간 키스트로크 뱃지
+  const activeKeyRef = useRef<{ key: string; expireAt: number } | null>(null);
+  const [activeKeyDisplay, setActiveKeyDisplay] = useState<string | null>(null);
+
+  // 3단계: 마그네틱 스냅
+  const [isMagneticSnapActive, setIsMagneticSnapActive] = useState<boolean>(true);
+
+  // 녹화 중 키보드 입력 감지 (단축키 시각화 뱃지)
+  useEffect(() => {
+    if (!isRecording) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['F5', 'F12'].includes(e.key)) return;
+      const parts = [];
+      if (e.ctrlKey) parts.push('Ctrl');
+      if (e.metaKey) parts.push('Cmd');
+      if (e.altKey) parts.push('Alt');
+      if (e.shiftKey && e.key !== 'Shift') parts.push('Shift');
+      if (!['Control', 'Meta', 'Alt', 'Shift'].includes(e.key)) {
+        parts.push(e.key.length === 1 ? e.key.toUpperCase() : e.key);
+      }
+      if (parts.length > 0) {
+        const text = parts.join(' + ');
+        activeKeyRef.current = { key: text, expireAt: Date.now() + 1500 };
+        setActiveKeyDisplay(text);
+        setTimeout(() => setActiveKeyDisplay(null), 1500);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isRecording]);
 
   useEffect(() => {
     setIsSupported(isScreenCaptureSupported());
@@ -232,10 +294,29 @@ export default function ScreenCaptureModal({
   };
 
   // 프리셋 크기 적용
-  const applyPresetDimensions = (preset: 'free' | 'blog' | 'square' | 'wide' | 'full', vw = videoResolution.width, vh = videoResolution.height) => {
+  const applyPresetDimensions = (
+    preset: 'free' | 'blog' | 'square' | 'wide' | 'shorts' | 'split-left' | 'split-right' | 'full',
+    vw = videoResolution.width,
+    vh = videoResolution.height
+  ) => {
     setActivePreset(preset);
     if (preset === 'full') {
       setFrameNorm({ x: 0, y: 0, w: 1, h: 1 });
+    } else if (preset === 'split-left') {
+      setFrameNorm({ x: 0, y: 0, w: 0.5, h: 1 });
+    } else if (preset === 'split-right') {
+      setFrameNorm({ x: 0.5, y: 0, w: 0.5, h: 1 });
+    } else if (preset === 'shorts') {
+      // 9:16 유튜브 쇼츠 & 인스타 릴스
+      const targetRatio = 9 / 16;
+      const screenRatio = vw / vh;
+      let h = 0.85;
+      let w = (h * targetRatio) / screenRatio;
+      if (w > 0.85) {
+        w = 0.85;
+        h = (w * screenRatio) / targetRatio;
+      }
+      setFrameNorm({ x: (1 - w) / 2, y: (1 - h) / 2, w, h });
     } else if (preset === 'blog') {
       // 800 x 600 (4:3)
       const targetRatio = 4 / 3;
@@ -308,36 +389,65 @@ export default function ScreenCaptureModal({
     let newH = initH;
 
     const MIN_SIZE = 0.05;
+    const SNAP_THRESHOLD = 0.025; // 2.5% 자석 스냅 감도
 
     if (info.handle === 'move') {
       newX = Math.max(0, Math.min(1 - newW, initX + dx));
       newY = Math.max(0, Math.min(1 - newH, initY + dy));
+
+      if (isMagneticSnapActive) {
+        // 좌우 가장자리 자석 스냅
+        if (Math.abs(newX) < SNAP_THRESHOLD) newX = 0;
+        if (Math.abs(newX + newW - 1) < SNAP_THRESHOLD) newX = 1 - newW;
+        // 상하 가장자리 자석 스냅
+        if (Math.abs(newY) < SNAP_THRESHOLD) newY = 0;
+        if (Math.abs(newY + newH - 1) < SNAP_THRESHOLD) newY = 1 - newH;
+        // 정중앙 자석 스냅
+        if (Math.abs(newX + newW / 2 - 0.5) < SNAP_THRESHOLD) newX = 0.5 - newW / 2;
+        if (Math.abs(newY + newH / 2 - 0.5) < SNAP_THRESHOLD) newY = 0.5 - newH / 2;
+      }
     } else {
       setActivePreset('free');
       if (info.handle.includes('e')) {
         newW = Math.max(MIN_SIZE, Math.min(1 - initX, initW + dx));
+        if (isMagneticSnapActive && Math.abs(initX + newW - 1) < SNAP_THRESHOLD) {
+          newW = 1 - initX;
+        }
       }
       if (info.handle.includes('s')) {
         newH = Math.max(MIN_SIZE, Math.min(1 - initY, initH + dy));
+        if (isMagneticSnapActive && Math.abs(initY + newH - 1) < SNAP_THRESHOLD) {
+          newH = 1 - initY;
+        }
       }
       if (info.handle.includes('w')) {
-        const potentialW = initW - dx;
-        if (potentialW >= MIN_SIZE && initX + dx >= 0) {
-          newX = initX + dx;
+        let potentialW = initW - dx;
+        let potentialX = initX + dx;
+        if (isMagneticSnapActive && Math.abs(potentialX) < SNAP_THRESHOLD) {
+          potentialW += potentialX;
+          potentialX = 0;
+        }
+        if (potentialW >= MIN_SIZE && potentialX >= 0) {
+          newX = potentialX;
           newW = potentialW;
         }
       }
       if (info.handle.includes('n')) {
-        const potentialH = initH - dy;
-        if (potentialH >= MIN_SIZE && initY + dy >= 0) {
-          newY = initY + dy;
+        let potentialH = initH - dy;
+        let potentialY = initY + dy;
+        if (isMagneticSnapActive && Math.abs(potentialY) < SNAP_THRESHOLD) {
+          potentialH += potentialY;
+          potentialY = 0;
+        }
+        if (potentialH >= MIN_SIZE && potentialY >= 0) {
+          newY = potentialY;
           newH = potentialH;
         }
       }
     }
 
     setFrameNorm({ x: newX, y: newY, w: newW, h: newH });
-  }, []);
+  }, [isMagneticSnapActive]);
 
   const handleMouseUp = useCallback(() => {
     dragInfoRef.current = null;
@@ -354,7 +464,7 @@ export default function ScreenCaptureModal({
   const isSafeSize = parseFloat(estimatedGifSizeMB) <= 19.5;
 
   // =========================================================
-  // [2] 오렌지 프레임 내부 스크린샷 캡처 (100% 무손실 DPI)
+  // [2] 오렌지 프레임 내부 스크린샷 캡처 (100% 무손실 DPI & Mac 프레임 옵션)
   // =========================================================
   const captureMovaviAreaScreenshot = () => {
     if (!videoRef.current) return;
@@ -367,15 +477,44 @@ export default function ScreenCaptureModal({
     const cropW = Math.max(1, Math.round(frameNorm.w * vw));
     const cropH = Math.max(1, Math.round(frameNorm.h * vh));
 
+    const topBarH = isMacFrameEnabled ? 38 : 0;
     const canvas = document.createElement('canvas');
     canvas.width = cropW;
-    canvas.height = cropH;
+    canvas.height = cropH + topBarH;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Mac 창틀 래핑 적용
+    if (isMacFrameEnabled) {
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(0, 0, cropW, topBarH);
+
+      // 맥북 3색 조작 버튼 (빨/노/초)
+      ctx.beginPath();
+      ctx.arc(20, topBarH / 2, 6, 0, Math.PI * 2);
+      ctx.fillStyle = '#EF4444';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(38, topBarH / 2, 6, 0, Math.PI * 2);
+      ctx.fillStyle = '#F59E0B';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(56, topBarH / 2, 6, 0, Math.PI * 2);
+      ctx.fillStyle = '#10B981';
+      ctx.fill();
+
+      // 모던 윈도우 타이틀
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Gifty Studio', cropW / 2, topBarH / 2 + 4);
+    }
+
     // 무손실 원본 픽셀 1:1 크롭
-    ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+    ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, topBarH, cropW, cropH);
 
     canvas.toBlob((blob) => {
       if (!blob) return;
@@ -391,7 +530,7 @@ export default function ScreenCaptureModal({
   };
 
   // =========================================================
-  // [3] 오렌지 프레임 내부만 '실시간 부분 화면 녹화'
+  // [3] 오렌지 프레임 내부 'Screen Studio 스무스 줌 + 클릭 리플 + 키스트로크' 녹화
   // =========================================================
   const startMovaviAreaRecording = () => {
     if (!videoRef.current || !videoStream) return;
@@ -419,24 +558,124 @@ export default function ScreenCaptureModal({
 
     const cropW = Math.max(2, Math.round(frameNormRef.current.w * vw));
     const cropH = Math.max(2, Math.round(frameNormRef.current.h * vh));
+    const topBarH = isMacFrameRef.current ? 38 : 0;
 
     const cropCanvas = document.createElement('canvas');
     cropCanvas.width = cropW;
-    cropCanvas.height = cropH;
+    cropCanvas.height = cropH + topBarH;
     const ctx = cropCanvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
     isCropLoopRunningRef.current = true;
 
-    // 30fps 실시간 크롭 렌더 루프
+    // Screen Studio 스무스 줌 상태 초기화
+    let currentZoom = 1.0;
+    let currentCenterNormX = 0.5;
+    let currentCenterNormY = 0.5;
+
+    // 30fps 실시간 크롭 & 모션 렌더 루프
     const renderCropFrame = () => {
       if (!isCropLoopRunningRef.current) return;
-      const curX = Math.round(frameNormRef.current.x * video.videoWidth);
-      const curY = Math.round(frameNormRef.current.y * video.videoHeight);
-      const curW = Math.max(1, Math.round(frameNormRef.current.w * video.videoWidth));
-      const curH = Math.max(1, Math.round(frameNormRef.current.h * video.videoHeight));
 
-      ctx.drawImage(video, curX, curY, curW, curH, 0, 0, cropCanvas.width, cropCanvas.height);
+      const baseCurX = frameNormRef.current.x * video.videoWidth;
+      const baseCurY = frameNormRef.current.y * video.videoHeight;
+      const baseCurW = Math.max(1, frameNormRef.current.w * video.videoWidth);
+      const baseCurH = Math.max(1, frameNormRef.current.h * video.videoHeight);
+
+      // Screen Studio 스타일 스무스 줌 보간 (Smooth Dynamic Zoom & Pan)
+      if (isSmoothZoomRef.current) {
+        currentZoom += (targetZoomRef.current - currentZoom) * 0.08;
+        currentCenterNormX += (targetFocusNormXRef.current - currentCenterNormX) * 0.08;
+        currentCenterNormY += (targetFocusNormYRef.current - currentCenterNormY) * 0.08;
+      } else {
+        currentZoom = 1.0;
+        currentCenterNormX = 0.5;
+        currentCenterNormY = 0.5;
+      }
+
+      const effectiveW = baseCurW / currentZoom;
+      const effectiveH = baseCurH / currentZoom;
+      const centerVidX = baseCurX + baseCurW * currentCenterNormX;
+      const centerVidY = baseCurY + baseCurH * currentCenterNormY;
+      const actualX = Math.max(baseCurX, Math.min(baseCurX + baseCurW - effectiveW, centerVidX - effectiveW / 2));
+      const actualY = Math.max(baseCurY, Math.min(baseCurY + baseCurH - effectiveH, centerVidY - effectiveH / 2));
+
+      // 1. Mac 헤더 바 렌더링
+      if (isMacFrameRef.current) {
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, cropCanvas.width, topBarH);
+
+        // 3색 버튼
+        ctx.beginPath();
+        ctx.arc(20, topBarH / 2, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#EF4444';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(38, topBarH / 2, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#F59E0B';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(56, topBarH / 2, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#10B981';
+        ctx.fill();
+
+        // 윈도우 타이틀
+        ctx.fillStyle = '#94A3B8';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Gifty Studio', cropCanvas.width / 2, topBarH / 2 + 4);
+      }
+
+      // 2. 비디오 스트림 그리기
+      ctx.drawImage(video, actualX, actualY, effectiveW, effectiveH, 0, topBarH, cropW, cropH);
+
+      // 3. 마우스 클릭 리플 애니메이션
+      if (isClickRippleRef.current && ripplesRef.current.length > 0) {
+        for (let i = ripplesRef.current.length - 1; i >= 0; i--) {
+          const rip = ripplesRef.current[i];
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(rip.x * cropW, topBarH + rip.y * cropH, rip.r, 0, Math.PI * 2);
+          ctx.strokeStyle = rip.color.replace('ALPHA', String(Math.max(0, rip.alpha)));
+          ctx.lineWidth = 3.5;
+          ctx.stroke();
+          ctx.restore();
+
+          rip.r += 2.2;
+          rip.alpha -= 0.045;
+          if (rip.alpha <= 0) {
+            ripplesRef.current.splice(i, 1);
+          }
+        }
+      }
+
+      // 4. 실시간 단축키 뱃지 시각화
+      if (activeKeyRef.current && Date.now() < activeKeyRef.current.expireAt) {
+        const keyText = activeKeyRef.current.key;
+        ctx.save();
+        ctx.font = 'bold 14px sans-serif';
+        const textMetrics = ctx.measureText(keyText);
+        const badgeW = textMetrics.width + 26;
+        const badgeH = 32;
+        const badgeX = (cropCanvas.width - badgeW) / 2;
+        const badgeY = cropCanvas.height - 48;
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        ctx.beginPath();
+        ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 8);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(249, 115, 22, 0.85)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'center';
+        ctx.fillText(keyText, cropCanvas.width / 2, badgeY + 21);
+        ctx.restore();
+      }
+
       requestAnimationFrame(renderCropFrame);
     };
     requestAnimationFrame(renderCropFrame);
@@ -524,6 +763,39 @@ export default function ScreenCaptureModal({
     document.body.removeChild(a);
   };
 
+  // 프레임 내부 클릭 핸들러 (리플 및 스무스 줌 포커싱)
+  const handleFrameClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    const normX = Math.max(0.05, Math.min(0.95, clickX / rect.width));
+    const normY = Math.max(0.05, Math.min(0.95, clickY / rect.height));
+
+    if (isClickRippleEnabled) {
+      ripplesRef.current.push({
+        x: normX,
+        y: normY,
+        r: 6,
+        alpha: 0.95,
+        color: e.button === 2 ? 'rgba(168, 85, 247, ALPHA)' : 'rgba(249, 115, 22, ALPHA)'
+      });
+    }
+
+    if (isSmoothZoomEnabled) {
+      if (targetZoomRef.current > 1.2) {
+        targetZoomRef.current = 1.0;
+        targetFocusNormXRef.current = 0.5;
+        targetFocusNormYRef.current = 0.5;
+        setCurrentZoomLevel(1.0);
+      } else {
+        targetZoomRef.current = 1.65;
+        targetFocusNormXRef.current = normX;
+        targetFocusNormYRef.current = normY;
+        setCurrentZoomLevel(1.65);
+      }
+    }
+  };
+
   if (!isOpen && !isPipOpen) return null;
 
   return (
@@ -578,44 +850,153 @@ export default function ScreenCaptureModal({
               </span>
             </div>
 
-            {/* 프리셋 선택 버튼 그룹 */}
-            <div className="flex items-center gap-1.5 bg-slate-800/90 p-1 rounded-xl border border-slate-700 text-xs">
-              <button
-                type="button"
-                onClick={() => applyPresetDimensions('blog')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
-                  activePreset === 'blog' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                블로그(4:3) ⭐
-              </button>
-              <button
-                type="button"
-                onClick={() => applyPresetDimensions('wide')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
-                  activePreset === 'wide' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                와이드(16:9)
-              </button>
-              <button
-                type="button"
-                onClick={() => applyPresetDimensions('square')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
-                  activePreset === 'square' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                정사각형(1:1)
-              </button>
-              <button
-                type="button"
-                onClick={() => applyPresetDimensions('full')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
-                  activePreset === 'full' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                전체 화면
-              </button>
+            {/* 프리셋 및 고기능 토글 버튼 그룹 */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* 규격 프리셋 */}
+              <div className="flex items-center gap-1 bg-slate-800/90 p-1 rounded-xl border border-slate-700 text-xs">
+                <button
+                  type="button"
+                  onClick={() => applyPresetDimensions('blog')}
+                  className={`px-2 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                    activePreset === 'blog' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                  }`}
+                  title="네이버 블로그 최적 4:3 (800x600)"
+                >
+                  블로그(4:3) ⭐
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPresetDimensions('wide')}
+                  className={`px-2 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                    activePreset === 'wide' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                  }`}
+                  title="유튜브 및 일반 영상 16:9"
+                >
+                  와이드(16:9)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPresetDimensions('square')}
+                  className={`px-2 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                    activePreset === 'square' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                  }`}
+                  title="인스타/스마트스토어 1:1"
+                >
+                  1:1
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPresetDimensions('shorts')}
+                  className={`px-2 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                    activePreset === 'shorts' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                  }`}
+                  title="유튜브 쇼츠 / 릴스 9:16"
+                >
+                  <Smartphone size={12} className="inline mr-0.5" /> 쇼츠
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPresetDimensions('split-left')}
+                  className={`px-2 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                    activePreset === 'split-left' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                  }`}
+                  title="화면 좌측 1/2 분할"
+                >
+                  <Columns size={12} className="inline mr-0.5" /> 좌1/2
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPresetDimensions('split-right')}
+                  className={`px-2 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                    activePreset === 'split-right' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                  }`}
+                  title="화면 우측 1/2 분할"
+                >
+                  우1/2
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPresetDimensions('full')}
+                  className={`px-2 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                    activePreset === 'full' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                  }`}
+                  title="모니터 전체 화면"
+                >
+                  전체
+                </button>
+              </div>
+
+              {/* 1, 2, 3단계 창의적 고기능 토글 툴바 */}
+              <div className="flex items-center gap-1 bg-slate-800/90 p-1 rounded-xl border border-slate-700 text-xs">
+                {/* 1단계: Mac 창틀 래핑 토글 */}
+                <button
+                  type="button"
+                  onClick={() => setIsMacFrameEnabled(!isMacFrameEnabled)}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                    isMacFrameEnabled
+                      ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-400'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="스크린샷 및 녹화물에 세련된 macOS 3색 버튼 창틀을 자동 씌워줍니다"
+                >
+                  <Laptop size={13} />
+                  <span>Mac 창틀</span>
+                </button>
+
+                {/* 2단계: Screen Studio 스무스 줌 토글 */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !isSmoothZoomEnabled;
+                    setIsSmoothZoomEnabled(next);
+                    if (!next) {
+                      targetZoomRef.current = 1.0;
+                      targetFocusNormXRef.current = 0.5;
+                      targetFocusNormYRef.current = 0.5;
+                      setCurrentZoomLevel(1.0);
+                    }
+                  }}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                    isSmoothZoomEnabled
+                      ? 'bg-amber-600 text-white shadow-sm ring-1 ring-amber-400'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="프레임 내부를 클릭하면 마우스 위치로 카메라가 부드럽게 줌인(1.7x)되고, 다시 클릭하면 복귀합니다"
+                >
+                  <ZoomIn size={13} />
+                  <span>스무스 줌 {isSmoothZoomEnabled && (currentZoomLevel > 1.2 ? '1.7x' : '1.0x')}</span>
+                </button>
+
+                {/* 2단계: 클릭 리플 토글 */}
+                <button
+                  type="button"
+                  onClick={() => setIsClickRippleEnabled(!isClickRippleEnabled)}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                    isClickRippleEnabled
+                      ? 'bg-orange-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="클릭할 때마다 세련된 물결 파동 애니메이션을 기록합니다"
+                >
+                  <MousePointer size={13} />
+                  <span>리플</span>
+                </button>
+
+                {/* 3단계: 마그네틱 자석 스냅 토글 */}
+                <button
+                  type="button"
+                  onClick={() => setIsMagneticSnapActive(!isMagneticSnapActive)}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                    isMagneticSnapActive
+                      ? 'bg-teal-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="모니터 가장자리나 중앙 근처로 이동 시 자석처럼 착 달라붙습니다"
+                >
+                  <Magnet size={13} />
+                  <span>자석스냅</span>
+                </button>
+              </div>
             </div>
 
             <button
@@ -658,6 +1039,22 @@ export default function ScreenCaptureModal({
                   <span className="bg-orange-500 text-white text-[11px] font-black px-2 py-0.5 rounded shadow-sm">
                     {currentPixelWidth} × {currentPixelHeight}
                   </span>
+                  {isMacFrameEnabled && (
+                    <span className="bg-indigo-600 text-white text-[11px] font-black px-2 py-0.5 rounded shadow-sm">
+                      💻 Mac 프레임
+                    </span>
+                  )}
+                  {isSmoothZoomEnabled && (
+                    <span className="bg-amber-600 text-white text-[11px] font-black px-2 py-0.5 rounded shadow-sm flex items-center gap-1">
+                      <ZoomIn size={11} />
+                      {currentZoomLevel > 1.2 ? '1.7x 줌 활성' : '1.0x (클릭시 줌)'}
+                    </span>
+                  )}
+                  {activeKeyDisplay && (
+                    <span className="bg-slate-900 border border-orange-400 text-orange-300 text-[11px] font-black px-2 py-0.5 rounded shadow-sm animate-pulse">
+                      ⌨️ {activeKeyDisplay}
+                    </span>
+                  )}
                   {isRecording && (
                     <span className="bg-red-600 text-white text-[11px] font-black px-2 py-0.5 rounded flex items-center gap-1 animate-pulse">
                       <div className="w-2 h-2 bg-white rounded-full" />
@@ -666,13 +1063,14 @@ export default function ScreenCaptureModal({
                   )}
                 </div>
 
-                {/* 가운데 드래그 이동 영역 (핸들) */}
+                {/* 가운데 드래그 이동 영역 (핸들 & 클릭 리플/줌 인터랙션) */}
                 <div
                   onMouseDown={(e) => handleMouseDown(e, 'move')}
+                  onClick={handleFrameClick}
                   className="w-full h-full cursor-move flex items-center justify-center bg-orange-500/5 hover:bg-orange-500/10 transition-colors"
                 >
-                  <div className="p-2 bg-black/50 text-white/80 rounded-full backdrop-blur-xs opacity-0 hover:opacity-100 transition-opacity pointer-events-none flex items-center gap-1 text-xs">
-                    <Move size={14} /> 드래그하여 이동
+                  <div className="p-2 bg-black/60 text-white/90 rounded-full backdrop-blur-xs opacity-0 hover:opacity-100 transition-opacity pointer-events-none flex items-center gap-1 text-xs font-bold">
+                    <Move size={14} /> 드래그 이동 {isSmoothZoomEnabled && '• 클릭 시 줌'}
                   </div>
                 </div>
 

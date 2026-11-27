@@ -51,6 +51,8 @@ export interface ExtraConvertOptions {
   isBoomerang?: boolean;
   textWatermark?: string;
   mosaicBoxes?: MosaicBox[];
+  smart20mbCompress?: boolean;
+  macMockupFrame?: boolean;
 }
 
 export const convertToGif = async (
@@ -184,8 +186,9 @@ export const convertToGif = async (
       colorFilterStr = ',eq=brightness=0.05:contrast=1.1:saturation=1.2';
     }
 
-    // Build base video pipeline (Speed, FPS, Scale, Color)
-    const basePipeline = `[0:v]${speedFilter}fps=${profile.fps},scale=${profile.scale}:-1:flags=lanczos${colorFilterStr}`;
+    // Build base video pipeline (Speed, FPS, Scale, Color, Smart Decimate)
+    const smartDecimateFilter = (options?.smart20mbCompress || isTargetConstrained) ? ',mpdecimate' : '';
+    const basePipeline = `[0:v]${speedFilter}fps=${profile.fps},scale=${profile.scale}:-1:flags=lanczos${colorFilterStr}${smartDecimateFilter}`;
     let filterGraph = '';
 
     if (isBoomerang) {
@@ -270,8 +273,11 @@ export const convertToGif = async (
       currentNode = '[v_logo]';
     }
 
-    // 4. Palette generation and dithering
-    filterGraph += `${currentNode}split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
+    // 4. Palette generation and dithering (Smart Color Optimization for 20MB)
+    const paletteOptions = (options?.smart20mbCompress || isTargetConstrained)
+      ? 'palettegen=stats_mode=diff:max_colors=240[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3'
+      : 'palettegen[p];[s1][p]paletteuse';
+    filterGraph += `${currentNode}split[s0][s1];[s0]${paletteOptions}`;
 
     const args = [
       '-ss', startTime.toString(),
