@@ -343,10 +343,12 @@ export default function ImageStudioPage() {
   const { settings, isLoaded } = useSiteSettings();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // 상단 메인 모드 탭: 'remove-bg' (AI 배경제거) vs 'enhance' (사진 보정 & 그림자 복원) vs 'design' (미리캔버스 썸네일 디자인)
-  const [currentTab, setCurrentTab] = useState<'remove-bg' | 'enhance' | 'design'>('remove-bg');
+  // 상단 메인 모드 탭: 'remove-bg' (AI 배경제거) vs 'enhance' (사진 보정 & 그림자 복원) vs 'design' (미리캔버스 썸네일 디자인) vs 'capture' (화면 캡처 & 자유 녹화)
+  const [currentTab, setCurrentTab] = useState<'remove-bg' | 'enhance' | 'design' | 'capture'>('remove-bg');
   const [isCaptureModalOpen, setIsCaptureModalOpen] = useState<boolean>(false);
-  const [captureModalTab, setCaptureModalTab] = useState<'movavi' | 'screenshot' | 'record'>('movavi');
+  const [captureModalTab, setCaptureModalTab] = useState<'movavi' | 'screenshot' | 'record' | 'pip'>('movavi');
+  const [lastCapturedImage, setLastCapturedImage] = useState<{ file: File; url: string } | null>(null);
+  const [lastRecordedVideo, setLastRecordedVideo] = useState<{ file: File; url: string } | null>(null);
 
   // ==========================================
   // [미리캔버스 모드: 썸네일 & 타이포 디자인 전용 상태]
@@ -494,14 +496,27 @@ export default function ImageStudioPage() {
 
   // 스크린샷 캡처 완료 핸들러
   const handleScreenshotCaptured = (file: File) => {
+    const url = URL.createObjectURL(file);
+    setLastCapturedImage({ file, url });
     if (currentTab === 'remove-bg') {
       processFile(file);
     } else if (currentTab === 'enhance') {
       processEnhanceFile(file);
-    } else {
+    } else if (currentTab === 'design') {
       processDesignFile(file);
+    } else {
+      setCopyFeedback('📸 화면 스크린샷이 성공적으로 캡처되었습니다! 아래에서 누끼·보정·썸네일로 즉시 연결해보세요.');
+      setTimeout(() => setCopyFeedback(''), 5000);
     }
-    setCopyFeedback('📸 화면 스크린샷이 성공적으로 로드되었습니다! 원하는 대로 편집해보세요.');
+  };
+
+  // 화면 녹화 완료 핸들러
+  const handleRecordingComplete = (file: File) => {
+    const url = URL.createObjectURL(file);
+    setLastRecordedVideo({ file, url });
+    setCurrentTab('capture');
+    setCopyFeedback('🎥 부분 화면 녹화가 완료되었습니다! 아래에서 바로 미리보고 네이버 20MB 칼맞춤 움짤로 변환해보세요.');
+    setTimeout(() => setCopyFeedback(''), 5000);
   };
 
   // ==========================================
@@ -2210,47 +2225,66 @@ export default function ImageStudioPage() {
               ? '클릭 한 번으로 깔끔하게 누끼를 따고, 원하는 배경색과 스티커 효과를 더해보세요.' 
               : currentTab === 'enhance'
               ? '물리 조명 역보정으로 질감을 살리며 그림자를 싹 지우고, 화사하게 톤보정하세요.'
-              : '사진 위에 감성 타이틀과 블로그 뱃지를 얹어 네이버 1등 대표 썸네일을 1초 만에 완성하세요.'}
+              : currentTab === 'design'
+              ? '사진 위에 감성 타이틀과 블로그 뱃지를 얹어 네이버 1등 대표 썸네일을 1초 만에 완성하세요.'
+              : '모니터 위 원하는 영역을 자유 프레임(Mac 창틀·스무스 줌)으로 캡처하고 부분 녹화하세요.'}
           </p>
         </div>
 
         {/* 상단 탭 전환 스위처 */}
-        <div className="w-full max-w-xl bg-slate-200/80 p-1.5 rounded-2xl flex items-center mb-4 shadow-inner">
+        <div className="w-full max-w-2xl bg-slate-200/80 p-1.5 rounded-2xl flex items-center mb-4 shadow-inner">
           <button
             type="button"
             onClick={() => setCurrentTab('remove-bg')}
-            className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 transition-all ${
+            className={`flex-1 py-2.5 px-2 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1 transition-all ${
               currentTab === 'remove-bg'
                 ? 'bg-white text-purple-700 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Scissors size={16} />
+            <Scissors size={15} />
             <span>AI 누끼</span>
           </button>
           <button
             type="button"
             onClick={() => setCurrentTab('enhance')}
-            className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 transition-all ${
+            className={`flex-1 py-2.5 px-2 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1 transition-all ${
               currentTab === 'enhance'
                 ? 'bg-white text-indigo-600 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Sliders size={16} />
+            <Sliders size={15} />
             <span>사진 보정</span>
           </button>
           <button
             type="button"
             onClick={() => setCurrentTab('design')}
-            className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 transition-all ${
+            className={`flex-1 py-2.5 px-2 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1 transition-all ${
               currentTab === 'design'
                 ? 'bg-white text-rose-600 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Palette size={16} />
-            <span>썸네일 디자인 (미리캔버스) 🎨</span>
+            <Palette size={15} />
+            <span>썸네일 디자인</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setCurrentTab('capture')}
+            className={`flex-1 py-2.5 px-2 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1 transition-all ${
+              currentTab === 'capture'
+                ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm ring-1 ring-orange-400'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Video size={15} />
+            <span>화면 캡처 &amp; 녹화</span>
+            <span className={`text-[10px] font-black px-1.5 py-0.2 rounded-full ${
+              currentTab === 'capture' ? 'bg-white text-orange-600' : 'bg-red-500 text-white animate-pulse'
+            }`}>
+              HOT
+            </span>
           </button>
         </div>
 
@@ -4113,6 +4147,246 @@ export default function ImageStudioPage() {
           </div>
         )}
 
+        {/* ========================================================= */}
+        {/* 탭 4: 화면 캡처 & 자유 녹화 스튜디오 대시보드 */}
+        {/* ========================================================= */}
+        {currentTab === 'capture' && (
+          <div className="w-full bg-white rounded-3xl shadow-sm border border-slate-200 p-5 sm:p-8 animate-in fade-in">
+            {/* 스튜디오 메인 헤더 */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-black mb-2 shadow-xs">
+                  <Video size={13} />
+                  <span>실시간 모니터 캡처 &amp; 자유 녹화 스튜디오</span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                  모니터 위 화면을 따서 1초 만에 스튜디오로! 🎯
+                </h3>
+                <p className="text-slate-500 text-xs sm:text-sm mt-1">
+                  원하는 유튜브 영상, 웹페이지, 프로그램 화면을 자유 프레임으로 캡처하고 녹화하여 즉시 AI 누끼나 썸네일로 연결하세요.
+                </p>
+              </div>
+
+              {/* 5대 혁신 기능 배지 */}
+              <div className="flex flex-wrap gap-1.5 self-start sm:self-auto">
+                <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-[11px] font-bold px-2 py-1 rounded-lg">💻 Mac 창틀</span>
+                <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[11px] font-bold px-2 py-1 rounded-lg">🔍 스무스 줌</span>
+                <span className="bg-orange-50 border border-orange-200 text-orange-700 text-[11px] font-bold px-2 py-1 rounded-lg">🔘 클릭 리플</span>
+                <span className="bg-teal-50 border border-teal-200 text-teal-700 text-[11px] font-bold px-2 py-1 rounded-lg">🧲 자석 스냅</span>
+                <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold px-2 py-1 rounded-lg">🛡️ 20MB 칼맞춤</span>
+              </div>
+            </div>
+
+            {/* 3대 핵심 캡처 & 녹화 실행 카드 그리드 */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
+              {/* 카드 1: 자유 영역 지정 캡처 (추천 ⭐) */}
+              <div className="bg-gradient-to-br from-orange-50/80 via-amber-50/50 to-white rounded-2xl p-5 border border-orange-200/80 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-black mb-3 shadow-sm">
+                    <Crop size={22} />
+                  </div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <h4 className="font-black text-slate-900 text-base">자유 영역 스튜디오</h4>
+                    <span className="bg-orange-500 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">추천 ⭐</span>
+                  </div>
+                  <p className="text-slate-500 text-xs leading-relaxed mb-4">
+                    모니터 화면 전체 위에서 오렌지 프레임을 이동/리사이즈하며 블로그(4:3), 와이드(16:9), 쇼츠(9:16) 규격으로 캡처 &amp; 부분 녹화합니다.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCaptureModalTab('movavi');
+                    setIsCaptureModalOpen(true);
+                  }}
+                  className="w-full py-2.5 px-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs sm:text-sm rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <Crop size={16} />
+                  <span>스튜디오 시작하기</span>
+                </button>
+              </div>
+
+              {/* 카드 2: 항상 위에 뜨는 플로팅 창 (PiP) */}
+              <div className="bg-gradient-to-br from-blue-50/80 via-indigo-50/50 to-white rounded-2xl p-5 border border-blue-200/80 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black mb-3 shadow-sm">
+                    <Sparkles size={22} />
+                  </div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <h4 className="font-black text-slate-900 text-base">플로팅 창 (Always on Top)</h4>
+                    <span className="bg-blue-600 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">편리 🚀</span>
+                  </div>
+                  <p className="text-slate-500 text-xs leading-relaxed mb-4">
+                    다른 프로그램(유튜브, 블로그, 카톡) 작업 중에도 화면 구석에 작은 독립 창을 항상 띄워두고 실시간으로 조작합니다.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCaptureModalTab('pip');
+                    setIsCaptureModalOpen(true);
+                  }}
+                  className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs sm:text-sm rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <Sparkles size={16} />
+                  <span>플로팅 창 열기</span>
+                </button>
+              </div>
+
+              {/* 카드 3: 실제 모니터 위 투명 프레임 (Desktop Cam) */}
+              <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-white rounded-2xl p-5 border border-slate-700 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-black mb-3 shadow-sm">
+                    <Laptop size={22} />
+                  </div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <h4 className="font-black text-white text-base">데스크톱 투명 프레임</h4>
+                    <span className="bg-emerald-500 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">PC 전용 🖥️</span>
+                  </div>
+                  <p className="text-slate-300 text-xs leading-relaxed mb-4">
+                    윈도우 바탕화면 위에 진짜 속이 뚫린 투명 프레임을 띄워놓고 어떤 프로그램이든 자유롭게 드래그하며 즉시 1:1 캡처합니다.
+                  </p>
+                </div>
+                <div className="bg-slate-800/90 p-2.5 rounded-xl border border-slate-700 text-[11px] text-slate-300 mb-2">
+                  💡 폴더의 <code className="text-orange-400 font-bold">[실제모니터_자유프레임_실행].bat</code> 더블 클릭 실행!
+                </div>
+              </div>
+            </div>
+
+            {/* 빠른 1초 전체 캡처 & 녹화 버튼 */}
+            <div className="flex flex-wrap items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200/80 mb-6 gap-3">
+              <div className="flex items-center gap-2 text-xs text-slate-600 font-bold">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>빠른 캡처 도구: 전체 화면을 1초 만에 캡처하거나 녹화할 수도 있습니다.</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCaptureModalTab('screenshot');
+                    setIsCaptureModalOpen(true);
+                  }}
+                  className="px-3.5 py-2 bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 text-xs font-bold rounded-xl shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                >
+                  <Camera size={14} />
+                  <span>전체 화면 캡처</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCaptureModalTab('record');
+                    setIsCaptureModalOpen(true);
+                  }}
+                  className="px-3.5 py-2 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                >
+                  <Video size={14} className="text-red-500" />
+                  <span>전체 화면 녹화</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 최근 캡처/녹화 결과물 원스톱 파이프라인 (One-Stop Pipeline) */}
+            {(lastCapturedImage || lastRecordedVideo) && (
+              <div className="mt-8 pt-6 border-t border-slate-200 animate-in fade-in slide-in-from-bottom-2">
+                <h4 className="text-sm font-black text-slate-800 mb-4 flex items-center gap-2">
+                  <span>✨ 방금 작업한 결과물 원스톱 파이프라인</span>
+                  <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold">원클릭 다음 단계</span>
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* 최근 스크린샷 카드 */}
+                  {lastCapturedImage && (
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                            <Camera size={14} className="text-orange-600" /> 캡처된 스크린샷
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium">{lastCapturedImage.file.name}</span>
+                        </div>
+                        <div className="relative w-full h-40 bg-slate-900 rounded-xl overflow-hidden mb-3 flex items-center justify-center">
+                          <img src={lastCapturedImage.url} alt="Captured preview" className="max-w-full max-h-full object-contain" />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-xs font-black">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            processFile(lastCapturedImage.file);
+                            setCurrentTab('remove-bg');
+                          }}
+                          className="p-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl flex items-center justify-center gap-1 shadow-xs transition-colors cursor-pointer"
+                        >
+                          <Scissors size={13} />
+                          <span>AI 누끼따기</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            processEnhanceFile(lastCapturedImage.file);
+                            setCurrentTab('enhance');
+                          }}
+                          className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl flex items-center justify-center gap-1 shadow-xs transition-colors cursor-pointer"
+                        >
+                          <Sliders size={13} />
+                          <span>사진 보정</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            processDesignFile(lastCapturedImage.file);
+                            setCurrentTab('design');
+                          }}
+                          className="p-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl flex items-center justify-center gap-1 shadow-xs transition-colors cursor-pointer col-span-2 sm:col-span-1"
+                        >
+                          <Palette size={13} />
+                          <span>썸네일 제목</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 최근 녹화 영상 카드 */}
+                  {lastRecordedVideo && (
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                            <Video size={14} className="text-red-500" /> 녹화된 부분 영상
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium">{lastRecordedVideo.file.name}</span>
+                        </div>
+                        <div className="relative w-full h-40 bg-black rounded-xl overflow-hidden mb-3 flex items-center justify-center">
+                          <video src={lastRecordedVideo.url} controls className="max-w-full max-h-full object-contain" />
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 text-xs font-black">
+                        <Link
+                          href="/?from=record"
+                          className="flex-1 p-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl flex items-center justify-center gap-1 shadow-xs transition-colors text-center cursor-pointer"
+                        >
+                          <Film size={14} />
+                          <span>네이버 20MB 칼맞춤 움짤(GIF) 만들기 🛡️</span>
+                        </Link>
+                        <a
+                          href={lastRecordedVideo.url}
+                          download={lastRecordedVideo.file.name}
+                          className="p-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl flex items-center justify-center shadow-xs transition-colors"
+                          title="영상 다운로드"
+                        >
+                          <Download size={14} />
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 하단 추천 상품 / 소품 배너 */}
         <div className="w-full max-w-4xl mx-auto mt-8">
           <CoupangSupportCard category="nukki" />
@@ -4145,6 +4419,7 @@ export default function ImageStudioPage() {
           onClose={() => setIsCaptureModalOpen(false)}
           initialTab={captureModalTab}
           onScreenshotCaptured={handleScreenshotCaptured}
+          onRecordingComplete={handleRecordingComplete}
         />
       </main>
       
