@@ -4249,7 +4249,7 @@ export default function ImageStudioPage() {
                   </p>
                 </div>
                 <div className="bg-slate-800/90 p-2.5 rounded-xl border border-slate-700 text-[11px] text-slate-300 mb-2">
-                  💡 폴더의 <code className="text-orange-400 font-bold">[실제모니터_자유프레임_실행].bat</code> 더블 클릭 실행!
+                  💡 폴더의 <code className="text-orange-400 font-bold">[실제모니터_자유프레임_실행].bat</code> 더블 클릭 실행! (창 없이 깔끔 실행은 .vbs 클릭)
                 </div>
               </div>
             </div>
