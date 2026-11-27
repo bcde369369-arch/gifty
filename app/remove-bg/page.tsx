@@ -2265,7 +2265,7 @@ export default function ImageStudioPage() {
             className="px-4 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs sm:text-sm rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer active:scale-95"
           >
             <Sparkles size={16} />
-            <span>🚀 화면 위 자유 이동 플로팅 (캡처 &amp; 녹화)</span>
+            <span>🚀 자유 크기 조절 플로팅 창 (캡처 &amp; 부분 녹화)</span>
             <span className="text-[10px] bg-white text-blue-700 font-black px-1.5 py-0.5 rounded-full">
               NEW
             </span>

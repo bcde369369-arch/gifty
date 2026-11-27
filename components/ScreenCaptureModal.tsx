@@ -942,10 +942,10 @@ export default function ScreenCaptureModal({
                       </div>
                       <div className="text-xs text-slate-700 leading-relaxed">
                         <strong className="text-sm font-black text-blue-950 block mb-1">
-                          설치 없이 컴퓨터 화면 위에 항상 떠 있는 플로팅 뷰파인더!
+                          설치 없이 컴퓨터 화면 위에 항상 떠 있는 자유 크기 조절 플로팅 창!
                         </strong>
-                        브라우저, 엑셀, 노션, 유튜브 등 다른 창을 자유롭게 이동하고 스크롤하면서,
-                        원하는 순간 화면 위 플로팅 컨트롤러에서 <strong>[📸 찰칵 캡처]</strong> 또는 <strong>[🔴 녹화]</strong> 버튼을 누르면 작업 창으로 즉시 전송됩니다.
+                        브라우저, 엑셀, 노션, 유튜브 등 다른 창을 자유롭게 이동하면서,
+                        플로팅 창에 탑재된 <strong>오렌지 조절 프레임(8방향 리사이즈 &amp; 픽셀 입력)</strong>으로 내가 원하는 크기(너비×높이)를 자유자재로 맞춰서 <strong>[📸 이 크기로 캡처]</strong> 또는 <strong>[🔴 이 크기로 녹화]</strong>하세요!
                       </div>
                     </div>
                   </div>
