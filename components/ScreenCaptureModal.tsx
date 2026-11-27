@@ -31,11 +31,12 @@ import {
   saveRecordedVideo
 } from '@/lib/screenCapture';
 import { useRouter } from 'next/navigation';
+import FloatingPipStudio from './FloatingPipStudio';
 
 interface ScreenCaptureModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'movavi' | 'screenshot' | 'record';
+  initialTab?: 'movavi' | 'pip' | 'screenshot' | 'record';
   onScreenshotCaptured?: (file: File) => void;
   onRecordingComplete?: (file: File) => void;
 }
@@ -50,8 +51,12 @@ export default function ScreenCaptureModal({
   onRecordingComplete
 }: ScreenCaptureModalProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'movavi' | 'screenshot' | 'record'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'movavi' | 'pip' | 'screenshot' | 'record'>(initialTab);
   const [isSupported, setIsSupported] = useState(true);
+
+  // 플로팅 PiP 스튜디오 상태
+  const [isPipOpen, setIsPipOpen] = useState(false);
+  const [pipStream, setPipStream] = useState<MediaStream | null>(null);
 
   // 자유 영역 지정 스튜디오 상태
   const [isMovaviOpen, setIsMovaviOpen] = useState(false);
@@ -143,6 +148,27 @@ export default function ScreenCaptureModal({
     if (recordedVideoUrl) URL.revokeObjectURL(recordedVideoUrl);
     setRecordedVideoUrl(null);
     setRecordedFile(null);
+  };
+
+  // =========================================================
+  // [0] 항상 위에 떠서 다른 창 자유 이동 캡처/녹화 (PiP)
+  // =========================================================
+  const launchFloatingPip = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          displaySurface: 'monitor'
+        } as any,
+        audio: includeAudio
+      });
+      setPipStream(stream);
+      setIsPipOpen(true);
+      onClose(); // 고정 모달을 닫아 다른 작업을 자유롭게 할 수 있도록 함
+    } catch (err: any) {
+      if (err.name !== 'NotAllowedError') {
+        alert(err.message || '화면 공유 권한을 가져오지 못했습니다.');
+      }
+    }
   };
 
   // =========================================================
@@ -498,10 +524,43 @@ export default function ScreenCaptureModal({
     document.body.removeChild(a);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !isPipOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200">
+    <>
+      {/* 플로팅 PiP 뷰파인더 (항상 위에 떠서 다른 창 자유 이동 캡처 & 녹화) */}
+      {isPipOpen && (
+        <FloatingPipStudio
+          stream={pipStream}
+          isOpen={isPipOpen}
+          onClose={() => {
+            setIsPipOpen(false);
+            if (pipStream) {
+              pipStream.getTracks().forEach((t) => t.stop());
+              setPipStream(null);
+            }
+          }}
+          onScreenshotCaptured={(file) => {
+            setIsPipOpen(false);
+            if (pipStream) {
+              pipStream.getTracks().forEach((t) => t.stop());
+              setPipStream(null);
+            }
+            onScreenshotCaptured?.(file);
+          }}
+          onRecordingComplete={(file) => {
+            setIsPipOpen(false);
+            if (pipStream) {
+              pipStream.getTracks().forEach((t) => t.stop());
+              setPipStream(null);
+            }
+            onRecordingComplete?.(file);
+          }}
+        />
+      )}
+
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200">
       {/* ========================================================================= */}
       {/* [A] 자유 영역 전체 인터랙티브 스튜디오 오버레이 (화면 선택 시 풀스크린 가동) */}
       {/* ========================================================================= */}
@@ -805,10 +864,24 @@ export default function ScreenCaptureModal({
           </div>
 
           {/* 상단 탭 전환 */}
-          <div className="flex border-b border-slate-200 px-6 pt-3 bg-white">
+          <div className="flex border-b border-slate-200 px-6 pt-3 bg-white overflow-x-auto">
+            <button
+              onClick={() => setActiveTab('pip')}
+              className={`pb-3 px-3.5 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+                activeTab === 'pip'
+                  ? 'border-blue-600 text-blue-600 font-black'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Sparkles size={16} />
+              <span>🚀 자유 이동 플로팅</span>
+              <span className="text-[10px] font-black bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
+                신규
+              </span>
+            </button>
             <button
               onClick={() => setActiveTab('movavi')}
-              className={`pb-3 px-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+              className={`pb-3 px-3.5 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === 'movavi'
                   ? 'border-orange-500 text-orange-600 font-black'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -822,7 +895,7 @@ export default function ScreenCaptureModal({
             </button>
             <button
               onClick={() => setActiveTab('screenshot')}
-              className={`pb-3 px-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+              className={`pb-3 px-3.5 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === 'screenshot'
                   ? 'border-purple-600 text-purple-700 font-black'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -833,7 +906,7 @@ export default function ScreenCaptureModal({
             </button>
             <button
               onClick={() => setActiveTab('record')}
-              className={`pb-3 px-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+              className={`pb-3 px-3.5 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === 'record'
                   ? 'border-indigo-600 text-indigo-700 font-black'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -859,6 +932,61 @@ export default function ScreenCaptureModal({
             </div>
           ) : (
             <div className="p-6">
+              {/* [탭 0: 화면 위 자유 이동 플로팅 뷰파인더] */}
+              {activeTab === 'pip' && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-blue-600 text-white rounded-xl shrink-0 mt-0.5">
+                        <Sparkles size={18} />
+                      </div>
+                      <div className="text-xs text-slate-700 leading-relaxed">
+                        <strong className="text-sm font-black text-blue-950 block mb-1">
+                          설치 없이 컴퓨터 화면 위에 항상 떠 있는 플로팅 뷰파인더!
+                        </strong>
+                        브라우저, 엑셀, 노션, 유튜브 등 다른 창을 자유롭게 이동하고 스크롤하면서,
+                        원하는 순간 화면 위 플로팅 컨트롤러에서 <strong>[📸 찰칵 캡처]</strong> 또는 <strong>[🔴 녹화]</strong> 버튼을 누르면 작업 창으로 즉시 전송됩니다.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-700">🎙️ 마이크 음성 함께 녹음</span>
+                      <button
+                        type="button"
+                        onClick={() => setIncludeAudio(!includeAudio)}
+                        className={`px-3 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 ${
+                          includeAudio
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        {includeAudio ? <Mic size={13} /> : <MicOff size={13} />}
+                        {includeAudio ? '음성 포함 ON' : '음성 제외 OFF'}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      💡 내 목소리나 마이크 음성을 함께 설명하며 녹화할 수 있습니다.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={launchFloatingPip}
+                    className="w-full py-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-700 text-white font-black rounded-2xl text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    <Sparkles size={18} />
+                    <span>🚀 화면 위 플로팅 뷰파인더 띄우기</span>
+                    <ChevronRight size={18} />
+                  </button>
+
+                  <div className="text-center pt-1 text-[11px] text-slate-500">
+                    💡 프로그램 설치 없이 웹 브라우저(크롬, 엣지, 웨일 등) 최신 표준 기능으로 동작합니다.
+                  </div>
+                </div>
+              )}
+
               {/* [탭 1: 자유 영역 지정 캡처 & 부분 녹화 (추천)] */}
               {activeTab === 'movavi' && (
                 <div className="space-y-4">
@@ -1013,6 +1141,8 @@ export default function ScreenCaptureModal({
           )}
         </div>
       )}
-    </div>
+      </div>
+    )}
+  </>
   );
 }

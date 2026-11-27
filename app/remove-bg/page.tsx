@@ -2259,6 +2259,20 @@ export default function ImageStudioPage() {
           <button
             type="button"
             onClick={() => {
+              setCaptureModalTab('pip');
+              setIsCaptureModalOpen(true);
+            }}
+            className="px-4 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs sm:text-sm rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+          >
+            <Sparkles size={16} />
+            <span>🚀 화면 위 자유 이동 플로팅 (캡처 &amp; 녹화)</span>
+            <span className="text-[10px] bg-white text-blue-700 font-black px-1.5 py-0.5 rounded-full">
+              NEW
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               setCaptureModalTab('movavi');
               setIsCaptureModalOpen(true);
             }}
@@ -2331,6 +2345,17 @@ export default function ImageStudioPage() {
                   <span>로 바로 붙여넣기도 가능해요!</span>
                 </div>
                 <div className="flex flex-wrap items-center justify-center gap-2 mt-4 z-10" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCaptureModalTab('pip');
+                      setIsCaptureModalOpen(true);
+                    }}
+                    className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl border border-blue-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Sparkles size={14} />
+                    <span>자유 이동 플로팅 캡처</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -2663,6 +2688,17 @@ export default function ImageStudioPage() {
                   <span>로 바로 붙여넣기도 가능해요!</span>
                 </div>
                 <div className="flex flex-wrap items-center justify-center gap-2 mt-4 z-10" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCaptureModalTab('pip');
+                      setIsCaptureModalOpen(true);
+                    }}
+                    className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl border border-blue-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Sparkles size={14} />
+                    <span>자유 이동 플로팅 캡처</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -3492,6 +3528,17 @@ export default function ImageStudioPage() {
                     <Upload size={16} />
                     <span>사진 선택하기</span>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCaptureModalTab('pip');
+                      setIsCaptureModalOpen(true);
+                    }}
+                    className="px-4 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs sm:text-sm font-bold rounded-xl border border-blue-200 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Sparkles size={15} />
+                    <span>자유 이동 플로팅 캡처</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
