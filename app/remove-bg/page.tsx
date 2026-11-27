@@ -58,7 +58,8 @@ import {
   EyeOff,
   Type,
   LayoutTemplate,
-  BookmarkCheck
+  BookmarkCheck,
+  Laptop
 } from 'lucide-react';
 import { removeBackground } from '@imgly/background-removal';
 import CoupangBanner from '@/components/CoupangBanner';
